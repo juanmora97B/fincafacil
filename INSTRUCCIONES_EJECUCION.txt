@@ -1,0 +1,75 @@
+========================================
+  INSTRUCCIONES PARA EJECUTAR FINCAFACIL
+========================================
+
+PASO 1: INSTALAR DEPENDENCIAS
+-----------------------------
+Abre una terminal (CMD o PowerShell) en esta carpeta y ejecuta:
+
+    python -m pip install customtkinter Pillow
+
+O simplemente haz doble clic en: instalar_dependencias.bat
+
+
+PASO 2: EJECUTAR EL PROGRAMA
+-----------------------------
+En la terminal, ejecuta:
+
+    python main.py
+
+O haz doble clic en: ejecutar.bat
+
+
+SOLUCIÓN DE PROBLEMAS
+---------------------
+Si aparece "python no se reconoce":
+  - Asegúrate de tener Python instalado
+  - Agrega Python al PATH del sistema
+  - O usa la ruta completa: C:\Python3X\python.exe main.py
+
+Si aparece "No module named 'customtkinter'":
+  - Ejecuta: python -m pip install customtkinter Pillow
+  - Asegúrate de estar en la carpeta correcta
+
+Si la ventana no se abre:
+  - Verifica que Python 3.8+ esté instalado
+  - Revisa los mensajes de error en la terminal
+
+
+ESTRUCTURA DEL PROYECTO
+-----------------------
+- main.py                    -> Archivo principal
+- requirements.txt           -> Lista de dependencias
+- instalar_dependencias.bat  -> Script de instalación
+- ejecutar.bat               -> Script de ejecución
+- database/                  -> Base de datos SQLite
+- modules/                   -> Módulos del sistema
+
+
+MÓDULOS DISPONIBLES
+-------------------
+📊 Dashboard      - Estadísticas y resumen general
+🐄 Animales        - Gestión completa de animales
+🌿 Potreros        - Gestión de potreros
+💰 Ventas          - Registro y control de ventas
+🏥 Tratamientos    - Tratamientos y vacunas
+📈 Reportes        - Reportes y estadísticas
+⚙️ Configuración   - Configuración del sistema
+👥 Nómina          - Gestión de personal (próximamente)
+
+
+PRIMERA VEZ
+-----------
+1. El sistema creará automáticamente la base de datos
+2. Ve a Configuración para configurar:
+   - Fincas
+   - Potreros
+   - Razas
+   - Otros catálogos
+3. Luego puedes empezar a registrar animales y usar el sistema
+
+
+¿NECESITAS AYUDA?
+-----------------
+Revisa el archivo README.md para más información detallada.
+

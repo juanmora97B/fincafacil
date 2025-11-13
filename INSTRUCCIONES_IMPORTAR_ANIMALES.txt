@@ -1,0 +1,101 @@
+========================================
+  CÓMO IMPORTAR 70 ANIMALES DESDE EXCEL
+========================================
+
+PASO 1: INSTALAR DEPENDENCIA
+----------------------------
+Ejecute en la terminal:
+    pip install openpyxl
+
+O ejecute:
+    python crear_plantilla_excel.py
+(El script instalará openpyxl automáticamente si no está)
+
+
+PASO 2: CREAR LA PLANTILLA EXCEL
+--------------------------------
+Ejecute:
+    python crear_plantilla_excel.py
+
+Esto creará el archivo: plantilla_importar_animales.xlsx
+
+
+PASO 3: COMPLETAR EL EXCEL
+---------------------------
+Abra el archivo plantilla_importar_animales.xlsx
+
+Complete los datos de sus 70 animales. Los campos OBLIGATORIOS son:
+
+✅ Código* - Código único (ej: 001, VACA-001)
+✅ Tipo Ingreso* - "Nacimiento" o "Compra" (exactamente así)
+✅ Sexo* - "Macho" o "Hembra" (exactamente así)
+✅ Finca* - Nombre EXACTO de la finca del sistema
+
+IMPORTANTE:
+- Use los nombres EXACTOS de Finca, Raza y Potrero que están en el sistema
+- Las fechas deben ser: YYYY-MM-DD (ej: 2023-01-15)
+- No modifique la primera fila (encabezados)
+
+
+PASO 4: CONFIGURAR EL SISTEMA (si aún no lo ha hecho)
+------------------------------------------------------
+Antes de importar, asegúrese de tener configurado:
+
+1. Fincas: Configuración > Fincas
+2. Razas: Configuración > Razas  
+3. Potreros: Configuración > Potreros
+
+Use los nombres EXACTOS de estos en el Excel.
+
+
+PASO 5: IMPORTAR
+----------------
+1. Abra el sistema: python main.py
+2. Vaya a: Animales > Registro Animal
+3. Haga clic en: "📥 Importar desde Excel"
+4. Seleccione su archivo Excel completado
+5. Espere a que termine la importación
+6. Verá un resumen con los animales importados y errores (si los hay)
+
+
+DATOS MÍNIMOS NECESARIOS
+-------------------------
+Para cada animal necesita al menos:
+
+1. Código (único, no repetido)
+2. Tipo Ingreso: "Nacimiento" o "Compra"
+3. Sexo: "Macho" o "Hembra"
+4. Finca: Nombre exacto de una finca existente
+
+Los demás campos son opcionales pero recomendados.
+
+
+EJEMPLO DE DATOS
+----------------
+Código | Tipo Ingreso | Sexo   | Finca          | Raza     | Potrero
+-------|--------------|--------|----------------|----------|----------
+001    | Nacimiento   | Macho  | Finca El Prado | Holstein | Potrero 1
+002    | Compra       | Hembra | Finca El Prado | Angus    | Potrero 2
+
+
+SOLUCIÓN DE PROBLEMAS
+---------------------
+Si dice "Finca no encontrada":
+  → Verifique que la finca existe en Configuración > Fincas
+  → Use el nombre EXACTO (con mayúsculas y espacios iguales)
+
+Si dice "Código duplicado":
+  → Cada animal debe tener un código único
+  → Cambie el código del animal
+
+Si hay errores de formato:
+  → Revise que las fechas sean YYYY-MM-DD
+  → Revise que Tipo Ingreso sea exactamente "Nacimiento" o "Compra"
+  → Revise que Sexo sea exactamente "Macho" o "Hembra"
+
+
+¿NECESITA AYUDA?
+----------------
+Revise el archivo: DATOS_NECESARIOS_EXCEL.md
+para más detalles sobre cada campo.
+
