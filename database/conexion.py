@@ -1,6 +1,9 @@
 import sqlite3
 import os
 from pathlib import Path
+from contextlib import contextmanager
+from config import config
+from modules.utils.logger import log
 
 class DatabaseManager:
     def __init__(self, db_path="database/fincafacil.db"):
@@ -38,8 +41,6 @@ class DatabaseManager:
                 )
             """)
             
-            # En el método ensure_database(), agregar después de la tabla lotes:
-
             # Tabla sectores
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS sector (
@@ -379,5 +380,38 @@ class DatabaseManager:
         """Retorna una conexión a la base de datos"""
         return sqlite3.connect(self.db_path)
 
+# === FUNCIONES COMPATIBLES PARA NUEVOS MÓDULOS ===
+@contextmanager
+def get_db_connection():
+    """Context manager para manejar conexiones a la BD de forma segura"""
+    conn = None
+    try:
+        conn = sqlite3.connect(config.DB_PATH, timeout=config.DB_TIMEOUT)
+        conn.row_factory = sqlite3.Row
+        log.debug("Conexión a BD establecida")
+        yield conn
+    except sqlite3.Error as e:
+        log.error(f"Error de base de datos: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
+            log.debug("Conexión a BD cerrada")
+
+def init_database():
+    """Función de inicialización compatible"""
+    # DatabaseManager ya inicializa automáticamente
+    log.info("Base de datos verificada por DatabaseManager")
+    return db
+
+def check_database_exists():
+    """Verifica si la base de datos existe"""
+    return os.path.exists(config.DB_PATH)
+
 # Instancia global para usar en toda la aplicación
 db = DatabaseManager()
+
+# Prueba al importar
+if __name__ == "__main__":
+    print("✅ Sistema de base de datos listo")
+    print(f"📁 Base de datos en: {config.DB_PATH}")

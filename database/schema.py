@@ -3,8 +3,9 @@ Definiciones unificadas del esquema de la base de datos.
 Este archivo centraliza todas las definiciones de tablas para mantener consistencia.
 """
 
-SCHEMA_DEFINITIONS = {
-    # Tabla fincas
+# Diccionario con todas las tablas en ORDEN CORRECTO (para evitar problemas de dependencias)
+create_tables = {
+    # Tablas maestras básicas (sin dependencias)
     'finca': """
         CREATE TABLE IF NOT EXISTS finca (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,7 +22,54 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla sector
+    'vendedor': """
+        CREATE TABLE IF NOT EXISTS vendedor (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT UNIQUE NOT NULL,
+            nombre TEXT NOT NULL,
+            telefono TEXT,
+            direccion TEXT,
+            email TEXT,
+            estado TEXT DEFAULT 'Activo'
+        )
+    """,
+
+    'raza': """
+        CREATE TABLE IF NOT EXISTS raza (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT UNIQUE NOT NULL,
+            nombre TEXT NOT NULL,
+            especie TEXT,
+            tipo_ganado TEXT,
+            descripcion TEXT,
+            caracteristicas TEXT,
+            estado TEXT DEFAULT 'Activo'
+        )
+    """,
+
+    'lote': """
+        CREATE TABLE IF NOT EXISTS lote (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT UNIQUE NOT NULL,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            criterio TEXT,
+            estado TEXT DEFAULT 'Activo'
+        )
+    """,
+
+    'grupo': """
+        CREATE TABLE IF NOT EXISTS grupo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT UNIQUE NOT NULL,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            criterio TEXT,
+            estado TEXT DEFAULT 'Activo'
+        )
+    """,
+
+    # Tablas con dependencias básicas
     'sector': """
         CREATE TABLE IF NOT EXISTS sector (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +83,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla potrero
     'potrero': """
         CREATE TABLE IF NOT EXISTS potrero (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,45 +99,7 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla lote
-    'lote': """
-        CREATE TABLE IF NOT EXISTS lote (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT UNIQUE NOT NULL,
-            nombre TEXT NOT NULL,
-            descripcion TEXT,
-            criterio TEXT,
-            estado TEXT DEFAULT 'Activo'
-        )
-    """,
-
-    # Tabla grupo
-    'grupo': """
-        CREATE TABLE IF NOT EXISTS grupo (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT UNIQUE NOT NULL,
-            nombre TEXT NOT NULL,
-            descripcion TEXT,
-            criterio TEXT,
-            estado TEXT DEFAULT 'Activo'
-        )
-    """,
-
-    # Tabla raza
-    'raza': """
-        CREATE TABLE IF NOT EXISTS raza (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT UNIQUE NOT NULL,
-            nombre TEXT NOT NULL,
-            especie TEXT,
-            tipo_ganado TEXT,
-            descripcion TEXT,
-            caracteristicas TEXT,
-            estado TEXT DEFAULT 'Activo'
-        )
-    """,
-
-    # Tabla animal
+    # Tabla animal (depende de varias)
     'animal': """
         CREATE TABLE IF NOT EXISTS animal (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,76 +142,7 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla vendedor
-    'vendedor': """
-        CREATE TABLE IF NOT EXISTS vendedor (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT UNIQUE NOT NULL,
-            nombre TEXT NOT NULL,
-            telefono TEXT,
-            direccion TEXT,
-            email TEXT,
-            estado TEXT DEFAULT 'Activo'
-        )
-    """,
-
-    # Tabla peso
-    'peso': """
-        CREATE TABLE IF NOT EXISTS peso (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_animal INTEGER,
-            fecha TEXT,
-            peso REAL,
-            tipo_peso TEXT,
-            comentario TEXT,
-            FOREIGN KEY (id_animal) REFERENCES animal (id)
-        )
-    """,
-
-    # Tabla tratamiento
-    'tratamiento': """
-        CREATE TABLE IF NOT EXISTS tratamiento (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_animal INTEGER,
-            fecha TEXT,
-            tipo_tratamiento TEXT,
-            producto TEXT,
-            dosis TEXT,
-            fecha_proxima TEXT,
-            veterinario TEXT,
-            comentario TEXT,
-            FOREIGN KEY (id_animal) REFERENCES animal (id)
-        )
-    """,
-
-    # Tabla reubicacion
-    'reubicacion': """
-        CREATE TABLE IF NOT EXISTS reubicacion (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_animal INTEGER,
-            id_potrero_anterior INTEGER,
-            id_potrero_nuevo INTEGER,
-            fecha TEXT,
-            motivo TEXT,
-            FOREIGN KEY (id_animal) REFERENCES animal (id),
-            FOREIGN KEY (id_potrero_anterior) REFERENCES potrero (id),
-            FOREIGN KEY (id_potrero_nuevo) REFERENCES potrero (id)
-        )
-    """,
-
-    # Tabla comentario
-    'comentario': """
-        CREATE TABLE IF NOT EXISTS comentario (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_animal INTEGER,
-            fecha TEXT,
-            autor TEXT,
-            nota TEXT,
-            FOREIGN KEY (id_animal) REFERENCES animal (id)
-        )
-    """,
-
-    # Tabla diagnostico_veterinario
+    # Tablas maestras adicionales
     'diagnostico_veterinario': """
         CREATE TABLE IF NOT EXISTS diagnostico_veterinario (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -214,7 +154,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla condicion_corporal
     'condicion_corporal': """
         CREATE TABLE IF NOT EXISTS condicion_corporal (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,7 +168,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla tipo_explotacion
     'tipo_explotacion': """
         CREATE TABLE IF NOT EXISTS tipo_explotacion (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,7 +179,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla procedencia
     'procedencia': """
         CREATE TABLE IF NOT EXISTS procedencia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -254,7 +191,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla destino_venta
     'destino_venta': """
         CREATE TABLE IF NOT EXISTS destino_venta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -266,7 +202,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla motivo_venta
     'motivo_venta': """
         CREATE TABLE IF NOT EXISTS motivo_venta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -277,7 +212,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla causa_muerte
     'causa_muerte': """
         CREATE TABLE IF NOT EXISTS causa_muerte (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -289,7 +223,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla calidad_animal
     'calidad_animal': """
         CREATE TABLE IF NOT EXISTS calidad_animal (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -300,7 +233,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla proveedor
     'proveedor': """
         CREATE TABLE IF NOT EXISTS proveedor (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -315,7 +247,6 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla empleado
     'empleado': """
         CREATE TABLE IF NOT EXISTS empleado (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -344,7 +275,59 @@ SCHEMA_DEFINITIONS = {
         )
     """,
 
-    # Tabla venta
+    # Tablas transaccionales (dependen de animal)
+    'peso': """
+        CREATE TABLE IF NOT EXISTS peso (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_animal INTEGER,
+            fecha TEXT,
+            peso REAL,
+            tipo_peso TEXT,
+            comentario TEXT,
+            FOREIGN KEY (id_animal) REFERENCES animal (id)
+        )
+    """,
+
+    'tratamiento': """
+        CREATE TABLE IF NOT EXISTS tratamiento (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_animal INTEGER,
+            fecha TEXT,
+            tipo_tratamiento TEXT,
+            producto TEXT,
+            dosis TEXT,
+            fecha_proxima TEXT,
+            veterinario TEXT,
+            comentario TEXT,
+            FOREIGN KEY (id_animal) REFERENCES animal (id)
+        )
+    """,
+
+    'reubicacion': """
+        CREATE TABLE IF NOT EXISTS reubicacion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_animal INTEGER,
+            id_potrero_anterior INTEGER,
+            id_potrero_nuevo INTEGER,
+            fecha TEXT,
+            motivo TEXT,
+            FOREIGN KEY (id_animal) REFERENCES animal (id),
+            FOREIGN KEY (id_potrero_anterior) REFERENCES potrero (id),
+            FOREIGN KEY (id_potrero_nuevo) REFERENCES potrero (id)
+        )
+    """,
+
+    'comentario': """
+        CREATE TABLE IF NOT EXISTS comentario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_animal INTEGER,
+            fecha TEXT,
+            autor TEXT,
+            nota TEXT,
+            FOREIGN KEY (id_animal) REFERENCES animal (id)
+        )
+    """,
+
     'venta': """
         CREATE TABLE IF NOT EXISTS venta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -361,11 +344,3 @@ SCHEMA_DEFINITIONS = {
         )
     """
 }
-
-def get_create_table_sql(table_name):
-    """Obtiene el SQL para crear una tabla específica"""
-    return SCHEMA_DEFINITIONS.get(table_name)
-
-def get_all_create_statements():
-    """Retorna todos los statements CREATE TABLE en el orden correcto"""
-    return SCHEMA_DEFINITIONS
