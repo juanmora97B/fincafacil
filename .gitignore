@@ -1,48 +1,79 @@
-# Python
+# ========================================
+#   FincaFácil - Archivo .gitignore
+# ========================================
+
+# ---- ARCHIVOS DEL SISTEMA ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- PYTHON ----
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
 *.egg-info/
-.installed.cfg
 *.egg
+*.log
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Backup files
-*.bak
-*.backup
-
-# Environment
-.env
-.venv
-env/
+# ---- ENTORNO VIRTUAL ----
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
+.venv/
 
-# IDE
+# ---- CONFIGURACIÓN DE EDITORES ----
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Logs
+# ---- BASE DE DATOS ----
+# La base de datos local NO debe subirse al repositorio
+database/fincafacil.db
+*.db
+
+# ---- BACKUPS ----
+backup/
+*.bak
+*.old
+
+# ---- LOGS ----
+logs/
 *.log
+
+# ---- ARCHIVOS TEMPORALES ----
+temp/
+tmp/
+*.tmp
+*.cache
+.cache/
+__temp__/
+build/
+dist/
+
+# ---- ARCHIVOS DE INTERFACE TKINTER PERSONALIZADOS ----
+*.tcl
+*.tk
+
+# ---- ARCHIVOS DE CONFIGURACIÓN SENSIBLES ----
+.env
+*.env
+
+# ---- ARCHIVOS DE COMPILACIÓN PYINSTALLER ----
+*.spec
+
+# ---- ARCHIVOS DE WINDOWS Y PYTHON TEMPORALES ----
+*.pyproj
+*.suo
+*.dll
+*.manifest
+*.obj
+
+# ---- IMÁGENES GRANDES NO NECESARIAS ----
+assets/raw/
+assets/capturas-originales/
+
+# ---- EXPORTACIONES ----
+export/
+reports/
+output/

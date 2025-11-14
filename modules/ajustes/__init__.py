@@ -1,5 +1,4 @@
 import customtkinter as ctk
-from modules.ajustes.ajustes_main import AjustesModule
+from modules.ajustes.ajustes_main import AjustesFrame
 
-__all__ = ['AjustesModule']
-
+__all__ = ["AjustesFrame"]

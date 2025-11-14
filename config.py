@@ -7,18 +7,19 @@ class Config:
     DB_PATH = BASE_DIR / "database" / "fincafacil.db"
     BACKUP_DIR = BASE_DIR / "backup"
     LOG_DIR = BASE_DIR / "logs"
-    
+    ASSETS_DIR = BASE_DIR / "assets"   # <--- NUEVO
+
     # Configuración de la aplicación
     APP_NAME = "FincaFacil"
     VERSION = "1.0.0"
-    
+
     # Configuración de base de datos
     DB_TIMEOUT = 30
-    
+
     # Configuración de backup
     BACKUP_DAYS = 7
-    
-    # Configuración de logging - ¡ESTOS FALTABAN!
+
+    # Configuración de logging
     LOG_LEVEL = "INFO"
     LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -32,3 +33,7 @@ class ProductionConfig(Config):
 
 # Configuración actual
 config = DevelopmentConfig()
+
+# Variables globales compatibles con el resto del proyecto
+RUTA_BASE_DATOS = config.DB_PATH
+RUTA_ASSETS = config.ASSETS_DIR

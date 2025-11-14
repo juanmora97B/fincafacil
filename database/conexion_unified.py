@@ -1,176 +1,185 @@
-import sqlite3
+"""
+conexion_unified.py
+Módulo profesional para manejo centralizado de la base de datos SQLite en FincaFácil.
+
+Incluye:
+- Conexión segura y reutilizable
+- PRAGMA foreign_keys = ON
+- row_factory para acceso tipo diccionario
+- DatabaseManager para manejo unificado
+- Funciones utilitarias para crear/verificar BD
+"""
+
+from __future__ import annotations
 import os
-from pathlib import Path
-from contextlib import contextmanager
+import sqlite3
 import logging
+from typing import Optional, List
 
-# Configuración
-class Config:
-    BASE_DIR = Path(__file__).parent.parent
-    DB_PATH = BASE_DIR / "database" / "fincafacil.db"
-    DB_TIMEOUT = 30
+# ---------------------------------------------------------------------
+# CONFIGURACIÓN DE LOGS
+# ---------------------------------------------------------------------
+log = logging.getLogger("FincaFacil.database")
+if not log.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
 
-config = Config()
 
-# Logger
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-log = logging.getLogger("FincaFacil.DB")
+# ---------------------------------------------------------------------
+# CONFIGURACIÓN DE RUTA DE BASE DE DATOS
+# ---------------------------------------------------------------------
+def _resolve_database_path() -> str:
+    """
+    Determina de forma segura dónde debe guardarse la base de datos.
+    Compatible con PyInstaller y evita rutas relativas inseguras.
+    """
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    db_path = os.path.join(base_dir, "fincafacil.db")
+    return db_path
 
-@contextmanager
-def get_db_connection():
-    """Context manager para conexiones seguras a la BD"""
-    conn = None
+
+DB_PATH = _resolve_database_path()
+
+
+# ---------------------------------------------------------------------
+# FUNCIÓN PRINCIPAL DE CONEXIÓN
+# ---------------------------------------------------------------------
+def get_db_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
+    """Retorna una conexión configurada con buenas prácticas."""
+    path = db_path or DB_PATH
+
     try:
-        conn = sqlite3.connect(config.DB_PATH, timeout=config.DB_TIMEOUT)
+        conn = sqlite3.connect(path, timeout=10)
         conn.row_factory = sqlite3.Row
-        log.debug("Conexión a BD establecida")
-        yield conn
-    except sqlite3.Error as e:
-        log.error(f"Error de base de datos: {e}")
-        raise
-    finally:
-        if conn:
-            conn.close()
-            log.debug("Conexión a BD cerrada")
 
-def recreate_database():
-    """Elimina y recrea la base de datos completa"""
-    if os.path.exists(config.DB_PATH):
-        os.remove(config.DB_PATH)
-        log.info("🗑️ Base de datos anterior eliminada")
-    
-    init_database()
-    log.info("🔄 Base de datos recreada exitosamente")            
+        # Activar integridad referencial
+        conn.execute("PRAGMA foreign_keys = ON")
 
-def init_database():
-    """Inicializa la base de datos con el SCHEMA COMPLETO"""
-    from database.schema import create_tables
-    
-    try:
-        # Crear directorio si no existe
-        os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
-        
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Crear todas las tablas en ORDEN CORRECTO
-            tables_created = 0
-            for table_name, create_stmt in create_tables.items():
-                try:
-                    cursor.execute(create_stmt)
-                    tables_created += 1
-                    log.info(f"✅ Tabla creada: {table_name}")
-                except sqlite3.Error as e:
-                    log.warning(f"⚠️ Tabla {table_name} ya existe o error: {e}")
-            
-            conn.commit()
-            log.info(f"🎉 Base de datos inicializada. Tablas: {tables_created}")
-            
-            # Insertar datos básicos DESPUÉS de crear tablas
-            insert_basic_data()
-            
+        return conn
     except Exception as e:
-        log.error(f"❌ Error inicializando BD: {e}")
+        log.error("Error obteniendo conexión a BD: %s", e)
         raise
 
-def insert_basic_data():
-    """Inserta datos básicos esenciales para el sistema"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Verificar estructura de tabla raza antes de insertar
-            cursor.execute("PRAGMA table_info(raza)")
-            columns = [col[1] for col in cursor.fetchall()]
-            
-            if 'codigo' in columns:
-                # Razas básicas - solo si existe columna codigo
-                razas = [
-                    ('HOL', 'Holstein', 'Lechero', 'Ganado lechero especializado'),
-                    ('ANG', 'Angus', 'Carne', 'Ganado de carne de alta calidad'),
-                    ('BRA', 'Brahman', 'Doble propósito', 'Resistente al clima tropical'),
-                    ('GYR', 'Gyr', 'Lechero', 'Ganado lechero tropical'),
-                    ('CEB', 'Cebú', 'Carne', 'Ganado resistente')
-                ]
-                
-                for codigo, nombre, tipo, desc in razas:
-                    cursor.execute(
-                        "INSERT OR IGNORE INTO raza (codigo, nombre, tipo_ganado, descripcion) VALUES (?, ?, ?, ?)",
-                        (codigo, nombre, tipo, desc)
-                    )
-            else:
-                # Versión alternativa sin codigo
-                razas = [
-                    ('Holstein', 'Ganado lechero especializado', 'Lechero'),
-                    ('Angus', 'Ganado de carne de alta calidad', 'Carne'),
-                    ('Brahman', 'Resistente al clima tropical', 'Doble propósito')
-                ]
-                
-                for nombre, desc, tipo in razas:
-                    cursor.execute(
-                        "INSERT OR IGNORE INTO raza (nombre, descripcion, tipo_ganado) VALUES (?, ?, ?)",
-                        (nombre, desc, tipo)
-                    )
-            
-            # Finca por defecto
-            cursor.execute(
-                "INSERT OR IGNORE INTO finca (codigo, nombre, propietario, ubicacion) VALUES (?, ?, ?, ?)",
-                ('FINCA01', 'Finca Principal', 'Propietario', 'Ubicación Principal')
-            )
-            
-            conn.commit()
-            log.info("✅ Datos básicos insertados")
-            
-    except Exception as e:
-        log.error(f"⚠️ Error insertando datos básicos: {e}")
 
-def check_database_exists():
-    """Verifica si la base de datos existe y está completa"""
-    if not os.path.exists(config.DB_PATH):
-        return False
-    
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='animal'")
-            return cursor.fetchone() is not None
-    except:
-        return False
-
-def get_table_info():
-    """Obtiene información de todas las tablas existentes"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-            tables = cursor.fetchall()
-            return [table[0] for table in tables]
-    except:
-        return []
-
-# Compatibilidad con módulos existentes
+# ---------------------------------------------------------------------
+# CLASE ADMINISTRADORA DE BD
+# ---------------------------------------------------------------------
 class DatabaseManager:
-    """Wrapper para compatibilidad con código existente"""
-    
-    def __init__(self, db_path=None):
-        self.db_path = db_path or config.DB_PATH
-        if not check_database_exists():
-            init_database()
-    
-    def get_connection(self):
-        return sqlite3.connect(self.db_path)
-    
-    def ensure_database(self):
-        if not check_database_exists():
-            init_database()
+    """Manejador central de base de datos con caching de conexión."""
 
-# Instancia global para compatibilidad
+    _conn: Optional[sqlite3.Connection] = None
+
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path or DB_PATH
+
+    def get_connection(self) -> sqlite3.Connection:
+        if DatabaseManager._conn is None:
+            DatabaseManager._conn = get_db_connection(self.db_path)
+        return DatabaseManager._conn
+
+    def close_connection(self):
+        if DatabaseManager._conn is not None:
+            DatabaseManager._conn.close()
+            DatabaseManager._conn = None
+            log.info("Conexión a BD cerrada correctamente.")
+
+    def execute(self, query: str, params: tuple = ()):
+        """Ejecuta una consulta sin retorno."""
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            conn.commit()
+            return True
+        except Exception as e:
+            log.error("Error en execute(): %s | Query: %s", e, query)
+            return False
+
+    def fetchall(self, query: str, params: tuple = ()) -> List[sqlite3.Row]:
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            return cur.fetchall()
+        except Exception as e:
+            log.error("Error en fetchall(): %s | Query: %s", e, query)
+            return []
+
+    def fetchone(self, query: str, params: tuple = ()) -> Optional[sqlite3.Row]:
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            return cur.fetchone()
+        except Exception as e:
+            log.error("Error en fetchone(): %s | Query: %s", e, query)
+            return None
+
+
+# Instancia global reutilizable
 db = DatabaseManager()
 
+
+# ---------------------------------------------------------------------
+# FUNCIONES AUXILIARES
+# ---------------------------------------------------------------------
+def check_database_exists(path: Optional[str] = None) -> bool:
+    """Retorna True si el archivo de BD ya existe."""
+    return os.path.exists(path or DB_PATH)
+
+
+def init_database(schema_sql: Optional[str] = None):
+    """
+    Inicializa la base de datos si no existe.
+    Puede recibir un schema SQL completo.
+    """
+    if check_database_exists():
+        log.info("BD ya existe, no se creará nuevamente.")
+        return
+
+    log.info("Creando BD en: %s", DB_PATH)
+    conn = get_db_connection()
+
+    if schema_sql:
+        try:
+            conn.executescript(schema_sql)
+            conn.commit()
+            log.info("Base de datos creada con schema proporcionado.")
+        except Exception as e:
+            log.error("Error ejecutando schema inicial: %s", e)
+    else:
+        log.warning("init_database() llamada sin un schema. BD vacía creada.")
+
+    conn.close()
+
+
+# ---------------------------------------------------------------------
+# MÉTODO PARA CONSULTAR TABLAS EXISTENTES
+# ---------------------------------------------------------------------
+def get_table_info() -> List[str]:
+    """Retorna una lista con los nombres de las tablas en la BD."""
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).fetchall()
+        return [row["name"] for row in rows]
+    except Exception as e:
+        log.error("Error obteniendo tabla de BD: %s", e)
+        return []
+
+
+# ---------------------------------------------------------------------
+# EJECUCIÓN DIRECTA DEL MÓDULO (para pruebas)
+# ---------------------------------------------------------------------
 if __name__ == "__main__":
-    print("🔧 Inicializando base de datos unificada...")
-    init_database()
+    log.info("Probando conexión unificada...")
+    log.info("Ruta de BD: %s", DB_PATH)
+
+    exists = check_database_exists()
+    log.info("¿Existe la BD?: %s", exists)
+
     tables = get_table_info()
-    print(f"✅ Base de datos lista. Tablas: {len(tables)}")
-    for table in tables:
-        print(f"   - {table}")
+    log.info("Tablas detectadas (%d): %s", len(tables), tables)
