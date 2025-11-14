@@ -1,12 +1,13 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox, filedialog  # 👈 AGREGAR ttk
+from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 import os
 import sqlite3
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database.conexion import db
+from database import get_db_connection
+from utils.validators import animal_validator  # ✅ NUEVO IMPORT
 
 
 class RegistroAnimalFrame(ctk.CTkFrame):
@@ -350,7 +351,7 @@ class RegistroAnimalFrame(ctk.CTkFrame):
     def cargar_datos_combos(self):
         """Carga los datos en los combobox"""
         try:
-            with db.get_connection() as conn:
+            with get_db_connection() as conn:
                 cursor = conn.cursor()
                 
                 # Cargar fincas
@@ -431,37 +432,57 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             self.guardar_compra()
 
     def guardar_nacimiento(self):
-        """Guarda un animal registrado por nacimiento"""
-        # Validaciones
-        if not self.entry_codigo_nac.get().strip():
-            messagebox.showwarning("Atención", "El código del animal es obligatorio.")
-            return
-            
-        if not self.entry_fecha_nac.get().strip():
-            messagebox.showwarning("Atención", "La fecha de nacimiento es obligatoria.")
-            return
-
-        # Obtener datos
+        """Guarda un animal registrado por nacimiento con validación"""
         try:
+            # Recoger datos del formulario
+            datos_animal = {
+                'codigo': self.entry_codigo_nac.get().strip().upper(),
+                'nombre': self.entry_nombre_nac.get().strip(),
+                'sexo': self.combo_sexo_nac.get(),
+                'fecha_nacimiento': self.entry_fecha_nac.get().strip(),
+                'peso_nacimiento': self.entry_peso_nacimiento.get() if hasattr(self, 'entry_peso_nacimiento') else None,
+                'color': self.entry_color_nac.get().strip(),
+                'comentarios': self.text_comentarios_nac.get("1.0", "end-1c").strip(),
+                'precio_compra': None  # No aplica para nacimiento
+            }
+            
+            # ✅ VALIDAR DATOS ANTES DE GUARDAR
+            es_valido, errores = animal_validator.validar_animal_completo(datos_animal)
+            
+            if not es_valido:
+                mensaje_errores = "❌ Errores de validación:\n• " + "\n• ".join(errores)
+                messagebox.showerror("Errores de Validación", mensaje_errores)
+                return False
+            
+            # Validaciones adicionales específicas
+            if not datos_animal['codigo']:
+                messagebox.showwarning("Atención", "El código del animal es obligatorio.")
+                return False
+                
+            if not datos_animal['fecha_nacimiento']:
+                messagebox.showwarning("Atención", "La fecha de nacimiento es obligatoria.")
+                return False
+
+            # Obtener IDs de combos
             id_finca = int(self.combo_finca_nac.get().split("-")[0]) if self.combo_finca_nac.get() else None
-            # La base de datos almacena la raza como texto en la columna 'raza'
             raza_nombre = self.combo_raza_nac.get().split("-", 1)[1] if self.combo_raza_nac.get() and "-" in self.combo_raza_nac.get() else (self.combo_raza_nac.get() or None)
             id_madre = int(self.combo_madre_nac.get().split("-")[0]) if self.combo_madre_nac.get() else None
             id_padre = int(self.combo_padre_nac.get().split("-")[0]) if self.combo_padre_nac.get() else None
 
-            datos = (
+            # Preparar datos para inserción
+            datos_insercion = (
                 id_finca,
-                self.entry_codigo_nac.get().strip(),
-                self.entry_nombre_nac.get().strip(),
+                datos_animal['codigo'],
+                datos_animal['nombre'],
                 'Nacimiento',
-                self.combo_sexo_nac.get(),
+                datos_animal['sexo'],
                 raza_nombre,
-                None,  # id_potrero (se cargará después)
+                None,  # id_potrero
                 None,  # id_lote
                 None,  # id_grupo
-                self.entry_fecha_nac.get().strip(),
+                datos_animal['fecha_nacimiento'],
                 None,  # fecha_compra
-                None,  # peso_nacimiento
+                float(datos_animal['peso_nacimiento']) if datos_animal['peso_nacimiento'] else None,
                 None,  # peso_compra
                 None,  # id_vendedor
                 None,  # precio_compra
@@ -471,16 +492,17 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 self.combo_salud_nac.get(),
                 self.combo_estado_nac.get(),
                 0,  # inventariado
-                self.entry_color_nac.get().strip(),
+                datos_animal['color'],
                 self.entry_hierro_nac.get().strip(),
-                self.entry_num_hierros_nac.get().strip() or 0,
+                int(self.entry_num_hierros_nac.get().strip()) if self.entry_num_hierros_nac.get().strip() else 0,
                 self.entry_composicion_nac.get().strip(),
-                self.text_comentarios_nac.get("1.0", "end-1c").strip(),
+                datos_animal['comentarios'],
                 self.foto_path,
                 datetime.now().strftime("%Y-%m-%d")
             )
             
-            with db.get_connection() as conn:
+            # ✅ DATOS VÁLIDOS - Proceder con guardado
+            with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO animal (
@@ -490,64 +512,89 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                         tipo_concepcion, salud, estado, inventariado, color, hierro, 
                         numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, datos)
+                """, datos_insercion)
                 conn.commit()
                 
-            messagebox.showinfo("Éxito", "Animal registrado por nacimiento correctamente.")
+            messagebox.showinfo("Éxito", "✅ Animal registrado por nacimiento correctamente.")
             self.limpiar_formulario()
+            return True
             
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo guardar el animal:\n{e}")
+            messagebox.showerror("Error", f"❌ No se pudo guardar el animal:\n{e}")
+            return False
 
     def guardar_compra(self):
-        """Guarda un animal registrado por compra"""
-        # Validaciones
-        if not self.entry_codigo_comp.get().strip():
-            messagebox.showwarning("Atención", "El código del animal es obligatorio.")
-            return
-            
-        if not self.entry_fecha_compra.get().strip():
-            messagebox.showwarning("Atención", "La fecha de compra es obligatoria.")
-            return
-
-        # Obtener datos
+        """Guarda un animal registrado por compra con validación"""
         try:
+            # Recoger datos del formulario
+            datos_animal = {
+                'codigo': self.entry_codigo_comp.get().strip().upper(),
+                'nombre': self.entry_nombre_comp.get().strip(),
+                'sexo': self.combo_sexo_comp.get(),
+                'fecha_nacimiento': self.entry_fecha_nac_comp.get().strip() or None,
+                'fecha_compra': self.entry_fecha_compra.get().strip(),
+                'peso_compra': self.entry_peso_compra.get() or None,
+                'precio_compra': self.entry_precio.get() or None,
+                'color': self.entry_color_comp.get().strip(),
+                'comentarios': self.text_comentarios_comp.get("1.0", "end-1c").strip()
+            }
+            
+            # ✅ VALIDAR DATOS ANTES DE GUARDAR
+            es_valido, errores = animal_validator.validar_animal_completo(datos_animal)
+            
+            if not es_valido:
+                mensaje_errores = "❌ Errores de validación:\n• " + "\n• ".join(errores)
+                messagebox.showerror("Errores de Validación", mensaje_errores)
+                return False
+            
+            # Validaciones adicionales específicas
+            if not datos_animal['codigo']:
+                messagebox.showwarning("Atención", "El código del animal es obligatorio.")
+                return False
+                
+            if not datos_animal['fecha_compra']:
+                messagebox.showwarning("Atención", "La fecha de compra es obligatoria.")
+                return False
+
+            # Obtener IDs de combos
             id_finca = int(self.combo_finca_comp.get().split("-")[0]) if self.combo_finca_comp.get() else None
             raza_nombre = self.combo_raza_comp.get().split("-", 1)[1] if self.combo_raza_comp.get() and "-" in self.combo_raza_comp.get() else (self.combo_raza_comp.get() or None)
             id_vendedor = int(self.combo_vendedor.get().split("-")[0]) if self.combo_vendedor.get() else None
             
-            datos = (
+            # Preparar datos para inserción
+            datos_insercion = (
                 id_finca,
-                self.entry_codigo_comp.get().strip(),
-                self.entry_nombre_comp.get().strip(),
+                datos_animal['codigo'],
+                datos_animal['nombre'],
                 'Compra',
-                self.combo_sexo_comp.get(),
+                datos_animal['sexo'],
                 raza_nombre,
                 None,  # id_potrero
                 None,  # id_lote
                 None,  # id_grupo
-                self.entry_fecha_nac_comp.get().strip() or None,
-                self.entry_fecha_compra.get().strip(),
+                datos_animal['fecha_nacimiento'],
+                datos_animal['fecha_compra'],
                 None,  # peso_nacimiento
-                float(self.entry_peso_compra.get() or 0),
+                float(datos_animal['peso_compra']) if datos_animal['peso_compra'] else None,
                 id_vendedor,
-                float(self.entry_precio.get() or 0),
+                float(datos_animal['precio_compra']) if datos_animal['precio_compra'] else None,
                 None,  # id_padre
                 None,  # id_madre
                 None,  # tipo_concepcion
                 self.combo_salud_comp.get(),
                 self.combo_estado_comp.get(),
                 0,  # inventariado
-                self.entry_color_comp.get().strip(),
+                datos_animal['color'],
                 self.entry_hierro_comp.get().strip(),
-                self.entry_num_hierros_comp.get().strip() or 0,
+                int(self.entry_num_hierros_comp.get().strip()) if self.entry_num_hierros_comp.get().strip() else 0,
                 self.entry_composicion_comp.get().strip(),
-                self.text_comentarios_comp.get("1.0", "end-1c").strip(),
+                datos_animal['comentarios'],
                 self.foto_path,
                 datetime.now().strftime("%Y-%m-%d")
             )
             
-            with db.get_connection() as conn:
+            # ✅ DATOS VÁLIDOS - Proceder con guardado
+            with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO animal (
@@ -557,14 +604,16 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                         tipo_concepcion, salud, estado, inventariado, color, hierro, 
                         numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, datos)
+                """, datos_insercion)
                 conn.commit()
                 
-            messagebox.showinfo("Éxito", "Animal registrado por compra correctamente.")
+            messagebox.showinfo("Éxito", "✅ Animal registrado por compra correctamente.")
             self.limpiar_formulario()
+            return True
             
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo guardar el animal:\n{e}")
+            messagebox.showerror("Error", f"❌ No se pudo guardar el animal:\n{e}")
+            return False
 
     def limpiar_formulario(self):
         """Limpia todos los campos del formulario"""

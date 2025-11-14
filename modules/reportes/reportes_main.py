@@ -5,7 +5,7 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database.conexion import db
+from database import db
 
 
 class ReportesModule(ctk.CTkFrame):

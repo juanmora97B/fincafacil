@@ -2,271 +2,302 @@ import customtkinter as ctk
 from tkinter import ttk
 import sqlite3
 from datetime import datetime, timedelta
-import sys
-import os
+from database import get_db_connection
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import seaborn as sns
-from tkinter import PhotoImage
-import io
+import matplotlib
+matplotlib.use('Agg')  # Para evitar problemas de hilos
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database.conexion import db
-
-
-class DashboardModule(ctk.CTkFrame):
+class DashboardModule(ctk.CTkFrame):  # ⚠️ MANTENER EL MISMO NOMBRE para compatibilidad
     def __init__(self, master):
         super().__init__(master)
-        self.pack(fill="both", expand=True)
+        self.pack(fill="both", expand=True, padx=20, pady=20)
         self.crear_widgets()
         self.actualizar_estadisticas()
 
     def crear_widgets(self):
-        # Título
+        """Crea la interfaz del dashboard mejorado"""
+        # Título y botón actualizar
         titulo_frame = ctk.CTkFrame(self, fg_color="transparent")
-        titulo_frame.pack(fill="x", padx=20, pady=(15, 10))
+        titulo_frame.pack(fill="x", pady=(0, 20))
         
-        titulo = ctk.CTkLabel(
+        ctk.CTkLabel(
             titulo_frame,
-            text="📊 Dashboard - Resumen General",
+            text="📊 Dashboard - Resumen Ganadero",
             font=("Segoe UI", 24, "bold")
-        )
-        titulo.pack(side="left")
+        ).pack(side="left")
         
-        btn_actualizar = ctk.CTkButton(
+        ctk.CTkButton(
             titulo_frame,
             text="🔄 Actualizar",
-            width=120,
-            height=30,
             command=self.actualizar_estadisticas,
-            font=("Segoe UI", 11)
-        )
-        btn_actualizar.pack(side="right")
+            width=100
+        ).pack(side="right")
 
-        # Cards de estadísticas
-        self.cards_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.cards_frame.pack(fill="x", padx=20, pady=10)
+        # ==================== MÉTRICAS PRINCIPALES ====================
+        metrics_frame = ctk.CTkFrame(self, fg_color="transparent")
+        metrics_frame.pack(fill="x", pady=(0, 20))
         
-        # Configurar grid para las cards
+        # Configurar grid 2x2 para métricas
         for i in range(4):
-            self.cards_frame.grid_columnconfigure(i, weight=1)
+            metrics_frame.grid_columnconfigure(i, weight=1)
 
-        # Cards de métricas
-        self.card_animales = self.crear_card("🐄 Total Animales", "0", "#2E7D32", 0)
-        self.card_potreros = self.crear_card("🌿 Potreros Activos", "0", "#1976D2", 1)
-        self.card_ventas_mes = self.crear_card("💰 Ventas del Mes", "$0", "#F57C00", 2)
-        self.card_tratamientos = self.crear_card("🏥 Tratamientos Pendientes", "0", "#C62828", 3)
+        # Métricas clave
+        self.metricas = {
+            'total_animales': self.crear_metric_card(metrics_frame, "🐄 Total Animales", "0", "#2E7D32", 0),
+            'animales_activos': self.crear_metric_card(metrics_frame, "✅ Activos", "0", "#1976D2", 1),
+            'valor_inventario': self.crear_metric_card(metrics_frame, "💰 Valor Inventario", "$0", "#F57C00", 2),
+            'en_tratamiento': self.crear_metric_card(metrics_frame, "🏥 En Tratamiento", "0", "#C62828", 3)
+        }
 
-        # Separador
-        separador = ctk.CTkFrame(self, height=2, fg_color="gray")
-        separador.pack(fill="x", padx=20, pady=15)
-
-        # Sección de información detallada
-        info_frame = ctk.CTkFrame(self)
-        info_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-        
-        # Configurar grid
-        info_frame.grid_columnconfigure(0, weight=1)
-        info_frame.grid_columnconfigure(1, weight=1)
-        info_frame.grid_rowconfigure(0, weight=1)
+        # ==================== GRÁFICOS Y DATOS ====================
+        data_frame = ctk.CTkFrame(self, fg_color="transparent")
+        data_frame.pack(fill="both", expand=True)
+        data_frame.grid_columnconfigure(0, weight=2)
+        data_frame.grid_columnconfigure(1, weight=1)
+        data_frame.grid_rowconfigure(0, weight=1)
 
         # Panel izquierdo - Gráficos
-        panel_izq = ctk.CTkFrame(info_frame)
-        panel_izq.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=10)
-        panel_izq.grid_columnconfigure(0, weight=1)
+        charts_frame = ctk.CTkFrame(data_frame)
+        charts_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=10)
+        charts_frame.grid_columnconfigure(0, weight=1)
+        charts_frame.grid_rowconfigure(0, weight=1)
+        charts_frame.grid_rowconfigure(1, weight=1)
 
-        # Tabs para gráficos
-        notebook = ttk.Notebook(panel_izq)
-        notebook.pack(fill="both", expand=True, padx=5, pady=5)
+        # Gráfico 1: Distribución por Razas
+        self.chart1_frame = ctk.CTkFrame(charts_frame)
+        self.chart1_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+        ctk.CTkLabel(self.chart1_frame, text="📈 Distribución por Razas", 
+                    font=("Segoe UI", 14, "bold")).pack(pady=5)
+        self.fig1, self.ax1 = plt.subplots(figsize=(8, 4))
+        self.canvas1 = FigureCanvasTkAgg(self.fig1, self.chart1_frame)
+        self.canvas1.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Tab 1: Distribución de Animales
-        tab_distribucion = ctk.CTkFrame(notebook)
-        notebook.add(tab_distribucion, text="📊 Distribución")
+        # Gráfico 2: Animales por Estado
+        self.chart2_frame = ctk.CTkFrame(charts_frame)
+        self.chart2_frame.grid(row=1, column=0, sticky="nsew")
+        ctk.CTkLabel(self.chart2_frame, text="📊 Estado de Animales", 
+                    font=("Segoe UI", 14, "bold")).pack(pady=5)
+        self.fig2, self.ax2 = plt.subplots(figsize=(8, 4))
+        self.canvas2 = FigureCanvasTkAgg(self.fig2, self.chart2_frame)
+        self.canvas2.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Panel derecho - Información detallada
+        info_frame = ctk.CTkFrame(data_frame)
+        info_frame.grid(row=0, column=1, sticky="nsew")
+        info_frame.grid_columnconfigure(0, weight=1)
+        info_frame.grid_rowconfigure(0, weight=1)
+        info_frame.grid_rowconfigure(1, weight=1)
+
+        # Eventos Recientes
+        eventos_frame = ctk.CTkFrame(info_frame)
+        eventos_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+        eventos_frame.grid_columnconfigure(0, weight=1)
         
-        self.figura_distribucion = plt.Figure(figsize=(6, 4), dpi=100)
-        self.canvas_distribucion = FigureCanvasTkAgg(self.figura_distribucion, tab_distribucion)
-        self.canvas_distribucion.get_tk_widget().pack(fill="both", expand=True)
-
-        # Tab 2: Tendencias
-        tab_tendencias = ctk.CTkFrame(notebook)
-        notebook.add(tab_tendencias, text="📈 Tendencias")
+        ctk.CTkLabel(eventos_frame, text="📅 Eventos Recientes", 
+                    font=("Segoe UI", 14, "bold")).pack(pady=5)
         
-        self.figura_tendencias = plt.Figure(figsize=(6, 4), dpi=100)
-        self.canvas_tendencias = FigureCanvasTkAgg(self.figura_tendencias, tab_tendencias)
-        self.canvas_tendencias.get_tk_widget().pack(fill="both", expand=True)
+        self.eventos_tree = ttk.Treeview(eventos_frame, columns=("fecha", "evento"), 
+                                       show="headings", height=8)
+        self.eventos_tree.heading("fecha", text="Fecha")
+        self.eventos_tree.heading("evento", text="Evento")
+        self.eventos_tree.column("fecha", width=80)
+        self.eventos_tree.column("evento", width=200)
+        self.eventos_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Acciones Rápidas
-        acciones_frame = ctk.CTkFrame(panel_izq)
-        acciones_frame.pack(fill="x", padx=5, pady=5)
+        # Alertas y Recordatorios
+        alertas_frame = ctk.CTkFrame(info_frame)
+        alertas_frame.grid(row=1, column=0, sticky="nsew")
+        alertas_frame.grid_columnconfigure(0, weight=1)
         
-        ctk.CTkButton(acciones_frame, text="🐄 Nuevo Animal", 
-                     command=self.nuevo_animal).pack(side="left", padx=2, expand=True)
-        ctk.CTkButton(acciones_frame, text="💉 Nuevo Tratamiento",
-                     command=self.nuevo_tratamiento).pack(side="left", padx=2, expand=True)
-        ctk.CTkButton(acciones_frame, text="📋 Nuevo Registro",
-                     command=self.nuevo_registro).pack(side="left", padx=2, expand=True)
+        ctk.CTkLabel(alertas_frame, text="⚠️ Alertas", 
+                    font=("Segoe UI", 14, "bold")).pack(pady=5)
+        
+        self.alertas_text = ctk.CTkTextbox(alertas_frame, height=100)
+        self.alertas_text.pack(fill="both", expand=True, padx=10, pady=5)
+        self.alertas_text.configure(state="disabled")
 
-        # Panel derecho - Actividad reciente
-        panel_der = ctk.CTkFrame(info_frame)
-        panel_der.grid(row=0, column=1, sticky="nsew", padx=(10, 0), pady=10)
-        panel_der.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(
-            panel_der,
-            text="📅 Actividad Reciente",
-            font=("Segoe UI", 16, "bold")
-        ).pack(pady=10)
-
-        self.tabla_actividad = ttk.Treeview(
-            panel_der,
-            columns=("fecha", "accion", "detalle"),
-            show="headings",
-            height=8
-        )
-        self.tabla_actividad.heading("fecha", text="Fecha")
-        self.tabla_actividad.heading("accion", text="Acción")
-        self.tabla_actividad.heading("detalle", text="Detalle")
-        self.tabla_actividad.column("fecha", width=100, anchor="center")
-        self.tabla_actividad.column("accion", width=120, anchor="center")
-        self.tabla_actividad.column("detalle", width=200, anchor="w")
-        self.tabla_actividad.pack(fill="both", expand=True, padx=10, pady=10)
-
-    def crear_card(self, titulo, valor, color, columna):
-        """Crea una card de estadística"""
-        card = ctk.CTkFrame(self.cards_frame, fg_color=color, corner_radius=12)
+    def crear_metric_card(self, parent, titulo, valor, color, columna):
+        """Crea una card de métrica"""
+        card = ctk.CTkFrame(parent, fg_color=color, corner_radius=12)
         card.grid(row=0, column=columna, sticky="ew", padx=5)
         
-        label_titulo = ctk.CTkLabel(
-            card,
-            text=titulo,
-            font=("Segoe UI", 12),
-            text_color="white"
-        )
-        label_titulo.pack(pady=(15, 5), padx=15)
-
-        label_valor = ctk.CTkLabel(
-            card,
-            text=valor,
-            font=("Segoe UI", 28, "bold"),
-            text_color="white"
-        )
-        label_valor.pack(pady=(0, 15), padx=15)
+        ctk.CTkLabel(card, text=titulo, font=("Segoe UI", 12), 
+                    text_color="white").pack(pady=(15, 5))
         
-        return card
+        valor_label = ctk.CTkLabel(card, text=valor, font=("Segoe UI", 24, "bold"), 
+                                 text_color="white")
+        valor_label.pack(pady=(0, 15))
+        
+        return valor_label
 
     def actualizar_estadisticas(self):
         """Actualiza todas las estadísticas del dashboard"""
         try:
-            with db.get_connection() as conn:
+            with get_db_connection() as conn:
                 cursor = conn.cursor()
-
+                
+                # ==================== MÉTRICAS PRINCIPALES ====================
                 # Total de animales
-                cursor.execute("SELECT COUNT(*) FROM animal WHERE estado = 'Activo'")
+                cursor.execute("SELECT COUNT(*) FROM animal")
                 total_animales = cursor.fetchone()[0]
-
-                # Potreros activos
-                cursor.execute("SELECT COUNT(*) FROM potrero WHERE estado = 'Activo'")
-                total_potreros = cursor.fetchone()[0]
-
-                # Ventas del mes (si existe la tabla)
-                try:
-                    cursor.execute("""
-                        SELECT COALESCE(SUM(precio_total), 0) 
-                        FROM venta 
-                        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')
-                    """)
-                    ventas_mes = cursor.fetchone()[0]
-                except:
-                    ventas_mes = 0
-
-                # Tratamientos pendientes
-                try:
-                    cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM tratamiento 
-                        WHERE fecha_proxima IS NOT NULL 
-                        AND fecha_proxima <= date('now', '+7 days')
-                    """)
-                    tratamientos_pendientes = cursor.fetchone()[0]
-                except:
-                    tratamientos_pendientes = 0
-
-                # Actualizar cards
-                self.actualizar_card(self.card_animales, str(total_animales))
-                self.actualizar_card(self.card_potreros, str(total_potreros))
-                self.actualizar_card(self.card_ventas_mes, f"${ventas_mes:,.0f}")
-                self.actualizar_card(self.card_tratamientos, str(tratamientos_pendientes))
-
-                # Distribución de animales por estado
-                self.actualizar_distribucion_animales(cursor)
-
-                # Actividad reciente
-                self.actualizar_actividad_reciente(cursor)
-
+                
+                # Animales activos
+                cursor.execute("SELECT COUNT(*) FROM animal WHERE estado = 'Activo'")
+                animales_activos = cursor.fetchone()[0]
+                
+                # Valor estimado del inventario (precio_compra de animales activos)
+                cursor.execute("SELECT COALESCE(SUM(precio_compra), 0) FROM animal WHERE estado = 'Activo'")
+                valor_inventario = cursor.fetchone()[0]
+                
+                # Animales en tratamiento (últimos 7 días)
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT id_animal) 
+                    FROM tratamiento 
+                    WHERE fecha >= date('now', '-7 days')
+                """)
+                en_tratamiento = cursor.fetchone()[0]
+                
+                # Actualizar métricas
+                self.metricas['total_animales'].configure(text=str(total_animales))
+                self.metricas['animales_activos'].configure(text=str(animales_activos))
+                self.metricas['valor_inventario'].configure(text=f"${valor_inventario:,.0f}")
+                self.metricas['en_tratamiento'].configure(text=str(en_tratamiento))
+                
+                # ==================== GRÁFICOS ====================
+                self.actualizar_grafico_razas(cursor)
+                self.actualizar_grafico_estados(cursor)
+                
+                # ==================== INFORMACIÓN DETALLADA ====================
+                self.actualizar_eventos_recientes(cursor)
+                self.actualizar_alertas(cursor)
+                
         except Exception as e:
-            print(f"Error al actualizar estadísticas: {e}")
+            print(f"Error actualizando dashboard: {e}")
 
-    def actualizar_card(self, card, nuevo_valor):
-        """Actualiza el valor de una card"""
-        for widget in card.winfo_children():
-            if isinstance(widget, ctk.CTkLabel) and widget.cget("font")[1] == 28:
-                widget.configure(text=nuevo_valor)
-                break
+    def actualizar_grafico_razas(self, cursor):
+        """Actualiza el gráfico de distribución por razas"""
+        try:
+            cursor.execute("""
+                SELECT r.nombre, COUNT(a.id) as cantidad
+                FROM animal a
+                LEFT JOIN raza r ON a.id_raza = r.id
+                WHERE a.estado = 'Activo'
+                GROUP BY r.nombre
+                ORDER BY cantidad DESC
+                LIMIT 8
+            """)
+            
+            datos = cursor.fetchall()
+            razas = [f"{r[0] or 'Sin Raza'}" for r in datos]
+            cantidades = [r[1] for r in datos]
+            
+            self.ax1.clear()
+            if datos:
+                self.ax1.pie(cantidades, labels=razas, autopct='%1.1f%%', startangle=90)
+                self.ax1.set_title('Distribución por Razas', fontweight='bold')
+            else:
+                self.ax1.text(0.5, 0.5, 'No hay datos', ha='center', va='center', 
+                             transform=self.ax1.transAxes, fontsize=12)
+            
+            self.fig1.tight_layout()
+            self.canvas1.draw()
+            
+        except Exception as e:
+            print(f"Error en gráfico razas: {e}")
 
-    def actualizar_distribucion_animales(self, cursor):
-        """Actualiza la tabla de distribución de animales"""
-        # Limpiar tabla
-        for item in self.tabla_animales.get_children():
-            self.tabla_animales.delete(item)
-
+    def actualizar_grafico_estados(self, cursor):
+        """Actualiza el gráfico de animales por estado"""
         try:
             cursor.execute("""
                 SELECT estado, COUNT(*) as cantidad
                 FROM animal
                 GROUP BY estado
-                ORDER BY cantidad DESC
             """)
             
-            for row in cursor.fetchall():
-                self.tabla_animales.insert("", "end", values=row)
+            datos = cursor.fetchall()
+            estados = [e[0] for e in datos]
+            cantidades = [e[1] for e in datos]
+            
+            self.ax2.clear()
+            if datos:
+                bars = self.ax2.bar(estados, cantidades, color=['#2E7D32', '#F57C00', '#C62828'])
+                self.ax2.set_title('Animales por Estado', fontweight='bold')
+                self.ax2.set_ylabel('Cantidad')
+                
+                # Agregar valores en las barras
+                for bar in bars:
+                    height = bar.get_height()
+                    self.ax2.text(bar.get_x() + bar.get_width()/2., height,
+                                 f'{int(height)}', ha='center', va='bottom')
+            else:
+                self.ax2.text(0.5, 0.5, 'No hay datos', ha='center', va='center', 
+                             transform=self.ax2.transAxes, fontsize=12)
+            
+            self.fig2.tight_layout()
+            self.canvas2.draw()
+            
         except Exception as e:
-            print(f"Error al cargar distribución: {e}")
+            print(f"Error en gráfico estados: {e}")
 
-    def actualizar_actividad_reciente(self, cursor):
-        """Actualiza la tabla de actividad reciente"""
-        # Limpiar tabla
-        for item in self.tabla_actividad.get_children():
-            self.tabla_actividad.delete(item)
-
-        actividades = []
-
+    def actualizar_eventos_recientes(self, cursor):
+        """Actualiza la lista de eventos recientes"""
         try:
+            # Limpiar tabla
+            for item in self.eventos_tree.get_children():
+                self.eventos_tree.delete(item)
+            
             # Animales registrados recientemente
             cursor.execute("""
-                SELECT fecha_registro, 'Registro Animal', codigo || ' - ' || COALESCE(nombre, 'Sin nombre')
-                FROM animal
+                SELECT date(fecha_registro), 'Nuevo Animal: ' || codigo
+                FROM animal 
                 WHERE fecha_registro IS NOT NULL
-                ORDER BY fecha_registro DESC
+                ORDER BY fecha_registro DESC 
                 LIMIT 5
             """)
-            for row in cursor.fetchall():
-                actividades.append(row)
-
-            # Reubicaciones recientes
-            cursor.execute("""
-                SELECT fecha, 'Reubicación', potrero_anterior || ' → ' || potrero_nuevo
-                FROM reubicacion
-                ORDER BY fecha DESC
-                LIMIT 5
-            """)
-            for row in cursor.fetchall():
-                actividades.append(row)
-
-            # Ordenar por fecha y mostrar las 5 más recientes
-            actividades.sort(key=lambda x: x[0] if x[0] else "", reverse=True)
-            for act in actividades[:5]:
-                self.tabla_actividad.insert("", "end", values=act)
-
+            
+            for fecha, evento in cursor.fetchall():
+                self.eventos_tree.insert("", "end", values=(fecha, evento))
+                
         except Exception as e:
-            print(f"Error al cargar actividad: {e}")
+            print(f"Error actualizando eventos: {e}")
 
+    def actualizar_alertas(self, cursor):
+        """Actualiza las alertas del sistema"""
+        try:
+            self.alertas_text.configure(state="normal")
+            self.alertas_text.delete("1.0", "end")
+            
+            alertas = []
+            
+            # Verificar animales sin raza
+            cursor.execute("SELECT COUNT(*) FROM animal WHERE id_raza IS NULL AND estado = 'Activo'")
+            sin_raza = cursor.fetchone()[0]
+            if sin_raza > 0:
+                alertas.append(f"⚠️ {sin_raza} animales sin raza asignada")
+            
+            # Verificar animales sin potrero
+            cursor.execute("SELECT COUNT(*) FROM animal WHERE id_potrero IS NULL AND estado = 'Activo'")
+            sin_potrero = cursor.fetchone()[0]
+            if sin_potrero > 0:
+                alertas.append(f"📍 {sin_potrero} animales sin potrero asignado")
+            
+            # Verificar tratamientos próximos
+            cursor.execute("""
+                SELECT COUNT(*) FROM tratamiento 
+                WHERE fecha_proxima BETWEEN date('now') AND date('now', '+3 days')
+            """)
+            tratamientos_proximos = cursor.fetchone()[0]
+            if tratamientos_proximos > 0:
+                alertas.append(f"💉 {tratamientos_proximos} tratamientos próximos")
+            
+            if alertas:
+                for alerta in alertas:
+                    self.alertas_text.insert("end", f"• {alerta}\n")
+            else:
+                self.alertas_text.insert("end", "✅ Todo en orden\n")
+            
+            self.alertas_text.configure(state="disabled")
+            
+        except Exception as e:
+            print(f"Error actualizando alertas: {e}")

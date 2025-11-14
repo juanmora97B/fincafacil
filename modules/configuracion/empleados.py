@@ -6,7 +6,7 @@ import os
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database.conexion import db
+from database import db
 from modules.utils.importador_excel import parse_excel_to_dicts
 
 

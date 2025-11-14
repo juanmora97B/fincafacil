@@ -59,7 +59,7 @@ def validar_modulos():
     # Validar base de datos
     print("Validando base de datos...")
     try:
-        from database.conexion import db
+        from database import db
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")

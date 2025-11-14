@@ -9,7 +9,7 @@ import sqlite3
 from datetime import datetime
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database.conexion import db
+from database import db
 
 try:
     import openpyxl

@@ -4,7 +4,7 @@ from PIL import Image
 import os
 import sqlite3
 from datetime import datetime
-from database.conexion import DatabaseManager
+from database import DatabaseManager
 
 # ==============================
 # CONFIGURACIÓN DE LA VENTANA
