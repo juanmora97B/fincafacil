@@ -7,7 +7,6 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from database import get_db_connection
-from utils.validators import animal_validator  # ✅ NUEVO IMPORT
 
 
 class RegistroAnimalFrame(ctk.CTkFrame):
@@ -83,6 +82,14 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         self.combo_sexo_nac = ctk.CTkComboBox(row2, values=["Macho", "Hembra"], width=200)
         self.combo_sexo_nac.set("Macho")
         self.combo_sexo_nac.pack(side="left", padx=5)
+
+        # Peso al nacer
+        row2b = ctk.CTkFrame(frame_basica, fg_color="transparent")
+        row2b.pack(fill="x", pady=5)
+        
+        ctk.CTkLabel(row2b, text="Peso al Nacer (kg):", width=120).pack(side="left", padx=5)
+        self.entry_peso_nacimiento = ctk.CTkEntry(row2b, placeholder_text="Peso al nacer", width=150)
+        self.entry_peso_nacimiento.pack(side="left", padx=5)
 
         # INFORMACIÓN DE PADRES
         frame_padres = ctk.CTkFrame(main_frame)
@@ -362,13 +369,26 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 cursor.execute("SELECT id, nombre FROM raza WHERE estado = 'Activa' OR estado = 'Activo'")
                 razas = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
                 
-                # Cargar animales para padres
-                cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado = 'Activo'")
-                animales = [f"{row[0]}-{row[1]} ({row[2] or 'Sin nombre'})" for row in cursor.fetchall()]
+                # Cargar animales para padres (solo hembras para madres, machos para padres)
+                cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado = 'Activo' AND sexo = 'Hembra'")
+                madres = [f"{row[0]}-{row[1]} ({row[2] or 'Sin nombre'})" for row in cursor.fetchall()]
+                
+                cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado = 'Activo' AND sexo = 'Macho'")
+                padres = [f"{row[0]}-{row[1]} ({row[2] or 'Sin nombre'})" for row in cursor.fetchall()]
                 
                 # Cargar vendedores
                 cursor.execute("SELECT id, nombre FROM vendedor WHERE estado = 'Activo'")
                 vendedores = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                
+                # Cargar potreros, lotes y grupos
+                cursor.execute("SELECT id, nombre FROM potrero WHERE estado = 'Activo'")
+                potreros = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                
+                cursor.execute("SELECT id, nombre FROM lote WHERE estado = 'Activo'")
+                lotes = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                
+                cursor.execute("SELECT id, nombre FROM grupo WHERE estado = 'Activo'")
+                grupos = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
                 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los datos:\n{e}")
@@ -384,10 +404,19 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             if razas: self.combo_raza_nac.set(razas[0])
             
         if hasattr(self, 'combo_madre_nac'):
-            self.combo_madre_nac.configure(values=animales)
+            self.combo_madre_nac.configure(values=madres)
             
         if hasattr(self, 'combo_padre_nac'):
-            self.combo_padre_nac.configure(values=animales)
+            self.combo_padre_nac.configure(values=padres)
+            
+        if hasattr(self, 'combo_potrero_nac'):
+            self.combo_potrero_nac.configure(values=potreros)
+            
+        if hasattr(self, 'combo_lote_nac'):
+            self.combo_lote_nac.configure(values=lotes)
+            
+        if hasattr(self, 'combo_grupo_nac'):
+            self.combo_grupo_nac.configure(values=grupos)
         
         # Asignar a combos de compra
         if hasattr(self, 'combo_finca_comp'):
@@ -401,6 +430,15 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         if hasattr(self, 'combo_vendedor'):
             self.combo_vendedor.configure(values=vendedores)
             if vendedores: self.combo_vendedor.set(vendedores[0])
+            
+        if hasattr(self, 'combo_potrero_comp'):
+            self.combo_potrero_comp.configure(values=potreros)
+            
+        if hasattr(self, 'combo_lote_comp'):
+            self.combo_lote_comp.configure(values=lotes)
+            
+        if hasattr(self, 'combo_grupo_comp'):
+            self.combo_grupo_comp.configure(values=grupos)
 
     def cargar_foto_nac(self):
         self.cargar_foto("nac")
@@ -422,6 +460,29 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             else:
                 self.label_foto_comp.configure(text=f"Foto: {os.path.basename(file_path)}")
 
+    def validar_datos(self, tipo):
+        """Valida los datos antes de guardar - VERSIÓN SIMPLIFICADA"""
+        if tipo == "nac":
+            codigo = self.entry_codigo_nac.get().strip()
+            fecha_nac = self.entry_fecha_nac.get().strip()
+        else:
+            codigo = self.entry_codigo_comp.get().strip()
+            fecha_compra = self.entry_fecha_compra.get().strip()
+
+        if not codigo:
+            messagebox.showwarning("Atención", "El código del animal es obligatorio.")
+            return False
+            
+        if tipo == "nac" and not fecha_nac:
+            messagebox.showwarning("Atención", "La fecha de nacimiento es obligatoria.")
+            return False
+            
+        if tipo == "comp" and not fecha_compra:
+            messagebox.showwarning("Atención", "La fecha de compra es obligatoria.")
+            return False
+
+        return True
+
     def guardar_animal(self):
         """Guarda el animal según la pestaña activa"""
         tab_actual = self.notebook.index(self.notebook.select())
@@ -432,76 +493,46 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             self.guardar_compra()
 
     def guardar_nacimiento(self):
-        """Guarda un animal registrado por nacimiento con validación"""
-        try:
-            # Recoger datos del formulario
-            datos_animal = {
-                'codigo': self.entry_codigo_nac.get().strip().upper(),
-                'nombre': self.entry_nombre_nac.get().strip(),
-                'sexo': self.combo_sexo_nac.get(),
-                'fecha_nacimiento': self.entry_fecha_nac.get().strip(),
-                'peso_nacimiento': self.entry_peso_nacimiento.get() if hasattr(self, 'entry_peso_nacimiento') else None,
-                'color': self.entry_color_nac.get().strip(),
-                'comentarios': self.text_comentarios_nac.get("1.0", "end-1c").strip(),
-                'precio_compra': None  # No aplica para nacimiento
-            }
-            
-            # ✅ VALIDAR DATOS ANTES DE GUARDAR
-            es_valido, errores = animal_validator.validar_animal_completo(datos_animal)
-            
-            if not es_valido:
-                mensaje_errores = "❌ Errores de validación:\n• " + "\n• ".join(errores)
-                messagebox.showerror("Errores de Validación", mensaje_errores)
-                return False
-            
-            # Validaciones adicionales específicas
-            if not datos_animal['codigo']:
-                messagebox.showwarning("Atención", "El código del animal es obligatorio.")
-                return False
-                
-            if not datos_animal['fecha_nacimiento']:
-                messagebox.showwarning("Atención", "La fecha de nacimiento es obligatoria.")
-                return False
+        """Guarda un animal registrado por nacimiento"""
+        if not self.validar_datos("nac"):
+            return
 
-            # Obtener IDs de combos
+        try:
+            # Recoger datos
+            codigo = self.entry_codigo_nac.get().strip().upper()
+            nombre = self.entry_nombre_nac.get().strip() or None
+            fecha_nacimiento = self.entry_fecha_nac.get().strip()
+            sexo = self.combo_sexo_nac.get()
+            
+            # Obtener IDs
             id_finca = int(self.combo_finca_nac.get().split("-")[0]) if self.combo_finca_nac.get() else None
             raza_nombre = self.combo_raza_nac.get().split("-", 1)[1] if self.combo_raza_nac.get() and "-" in self.combo_raza_nac.get() else (self.combo_raza_nac.get() or None)
             id_madre = int(self.combo_madre_nac.get().split("-")[0]) if self.combo_madre_nac.get() else None
             id_padre = int(self.combo_padre_nac.get().split("-")[0]) if self.combo_padre_nac.get() else None
-
+            id_potrero = int(self.combo_potrero_nac.get().split("-")[0]) if self.combo_potrero_nac.get() else None
+            id_lote = int(self.combo_lote_nac.get().split("-")[0]) if self.combo_lote_nac.get() else None
+            id_grupo = int(self.combo_grupo_nac.get().split("-")[0]) if self.combo_grupo_nac.get() else None
+            
             # Preparar datos para inserción
             datos_insercion = (
-                id_finca,
-                datos_animal['codigo'],
-                datos_animal['nombre'],
-                'Nacimiento',
-                datos_animal['sexo'],
-                raza_nombre,
-                None,  # id_potrero
-                None,  # id_lote
-                None,  # id_grupo
-                datos_animal['fecha_nacimiento'],
-                None,  # fecha_compra
-                float(datos_animal['peso_nacimiento']) if datos_animal['peso_nacimiento'] else None,
+                id_finca, codigo, nombre, 'Nacimiento', sexo, raza_nombre,
+                id_potrero, id_lote, id_grupo, fecha_nacimiento, None,  # fecha_compra
+                float(self.entry_peso_nacimiento.get()) if self.entry_peso_nacimiento.get().strip() else None,  # peso_nacimiento
                 None,  # peso_compra
                 None,  # id_vendedor
                 None,  # precio_compra
-                id_padre,
-                id_madre,
-                self.combo_concepcion_nac.get(),
-                self.combo_salud_nac.get(),
-                self.combo_estado_nac.get(),
-                0,  # inventariado
-                datos_animal['color'],
-                self.entry_hierro_nac.get().strip(),
+                id_padre, id_madre, self.combo_concepcion_nac.get(),
+                self.combo_salud_nac.get(), self.combo_estado_nac.get(), 0,  # inventariado
+                self.entry_color_nac.get().strip() or None,
+                self.entry_hierro_nac.get().strip() or None,
                 int(self.entry_num_hierros_nac.get().strip()) if self.entry_num_hierros_nac.get().strip() else 0,
-                self.entry_composicion_nac.get().strip(),
-                datos_animal['comentarios'],
+                self.entry_composicion_nac.get().strip() or None,
+                self.text_comentarios_nac.get("1.0", "end-1c").strip() or None,
                 self.foto_path,
-                datetime.now().strftime("%Y-%m-%d")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
             
-            # ✅ DATOS VÁLIDOS - Proceder con guardado
+            # Insertar en BD
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -517,83 +548,51 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 
             messagebox.showinfo("Éxito", "✅ Animal registrado por nacimiento correctamente.")
             self.limpiar_formulario()
-            return True
             
         except Exception as e:
             messagebox.showerror("Error", f"❌ No se pudo guardar el animal:\n{e}")
-            return False
 
     def guardar_compra(self):
-        """Guarda un animal registrado por compra con validación"""
-        try:
-            # Recoger datos del formulario
-            datos_animal = {
-                'codigo': self.entry_codigo_comp.get().strip().upper(),
-                'nombre': self.entry_nombre_comp.get().strip(),
-                'sexo': self.combo_sexo_comp.get(),
-                'fecha_nacimiento': self.entry_fecha_nac_comp.get().strip() or None,
-                'fecha_compra': self.entry_fecha_compra.get().strip(),
-                'peso_compra': self.entry_peso_compra.get() or None,
-                'precio_compra': self.entry_precio.get() or None,
-                'color': self.entry_color_comp.get().strip(),
-                'comentarios': self.text_comentarios_comp.get("1.0", "end-1c").strip()
-            }
-            
-            # ✅ VALIDAR DATOS ANTES DE GUARDAR
-            es_valido, errores = animal_validator.validar_animal_completo(datos_animal)
-            
-            if not es_valido:
-                mensaje_errores = "❌ Errores de validación:\n• " + "\n• ".join(errores)
-                messagebox.showerror("Errores de Validación", mensaje_errores)
-                return False
-            
-            # Validaciones adicionales específicas
-            if not datos_animal['codigo']:
-                messagebox.showwarning("Atención", "El código del animal es obligatorio.")
-                return False
-                
-            if not datos_animal['fecha_compra']:
-                messagebox.showwarning("Atención", "La fecha de compra es obligatoria.")
-                return False
+        """Guarda un animal registrado por compra"""
+        if not self.validar_datos("comp"):
+            return
 
-            # Obtener IDs de combos
+        try:
+            # Recoger datos
+            codigo = self.entry_codigo_comp.get().strip().upper()
+            nombre = self.entry_nombre_comp.get().strip() or None
+            fecha_nacimiento = self.entry_fecha_nac_comp.get().strip() or None
+            fecha_compra = self.entry_fecha_compra.get().strip()
+            sexo = self.combo_sexo_comp.get()
+            
+            # Obtener IDs
             id_finca = int(self.combo_finca_comp.get().split("-")[0]) if self.combo_finca_comp.get() else None
             raza_nombre = self.combo_raza_comp.get().split("-", 1)[1] if self.combo_raza_comp.get() and "-" in self.combo_raza_comp.get() else (self.combo_raza_comp.get() or None)
             id_vendedor = int(self.combo_vendedor.get().split("-")[0]) if self.combo_vendedor.get() else None
+            id_potrero = int(self.combo_potrero_comp.get().split("-")[0]) if self.combo_potrero_comp.get() else None
+            id_lote = int(self.combo_lote_comp.get().split("-")[0]) if self.combo_lote_comp.get() else None
+            id_grupo = int(self.combo_grupo_comp.get().split("-")[0]) if self.combo_grupo_comp.get() else None
             
             # Preparar datos para inserción
             datos_insercion = (
-                id_finca,
-                datos_animal['codigo'],
-                datos_animal['nombre'],
-                'Compra',
-                datos_animal['sexo'],
-                raza_nombre,
-                None,  # id_potrero
-                None,  # id_lote
-                None,  # id_grupo
-                datos_animal['fecha_nacimiento'],
-                datos_animal['fecha_compra'],
+                id_finca, codigo, nombre, 'Compra', sexo, raza_nombre,
+                id_potrero, id_lote, id_grupo, fecha_nacimiento, fecha_compra,
                 None,  # peso_nacimiento
-                float(datos_animal['peso_compra']) if datos_animal['peso_compra'] else None,
+                float(self.entry_peso_compra.get()) if self.entry_peso_compra.get().strip() else None,  # peso_compra
                 id_vendedor,
-                float(datos_animal['precio_compra']) if datos_animal['precio_compra'] else None,
-                None,  # id_padre
-                None,  # id_madre
-                None,  # tipo_concepcion
-                self.combo_salud_comp.get(),
-                self.combo_estado_comp.get(),
-                0,  # inventariado
-                datos_animal['color'],
-                self.entry_hierro_comp.get().strip(),
+                float(self.entry_precio.get()) if self.entry_precio.get().strip() else None,  # precio_compra
+                None, None, None,  # id_padre, id_madre, tipo_concepcion
+                self.combo_salud_comp.get(), self.combo_estado_comp.get(), 0,  # inventariado
+                self.entry_color_comp.get().strip() or None,
+                self.entry_hierro_comp.get().strip() or None,
                 int(self.entry_num_hierros_comp.get().strip()) if self.entry_num_hierros_comp.get().strip() else 0,
-                self.entry_composicion_comp.get().strip(),
-                datos_animal['comentarios'],
+                self.entry_composicion_comp.get().strip() or None,
+                self.text_comentarios_comp.get("1.0", "end-1c").strip() or None,
                 self.foto_path,
-                datetime.now().strftime("%Y-%m-%d")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
             
-            # ✅ DATOS VÁLIDOS - Proceder con guardado
+            # Insertar en BD
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -609,11 +608,9 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 
             messagebox.showinfo("Éxito", "✅ Animal registrado por compra correctamente.")
             self.limpiar_formulario()
-            return True
             
         except Exception as e:
             messagebox.showerror("Error", f"❌ No se pudo guardar el animal:\n{e}")
-            return False
 
     def limpiar_formulario(self):
         """Limpia todos los campos del formulario"""
@@ -623,6 +620,7 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             self.entry_nombre_nac.delete(0, "end")
             self.entry_fecha_nac.delete(0, "end")
             self.entry_fecha_nac.insert(0, datetime.now().strftime("%Y-%m-%d"))
+            self.entry_peso_nacimiento.delete(0, "end")
             self.combo_sexo_nac.set("Macho")
             self.combo_madre_nac.set("")
             self.combo_padre_nac.set("")

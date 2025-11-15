@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, Menu
 import sqlite3
 import sys
 import os
@@ -31,16 +31,16 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         row1 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row1.pack(fill="x", pady=5)
         ctk.CTkLabel(row1, text="Código *:", width=100).pack(side="left", padx=5)
-        self.entry_codigo = ctk.CTkEntry(row1, width=150,)
+        self.entry_codigo = ctk.CTkEntry(row1, width=150)
         self.entry_codigo.pack(side="left", padx=5)
         ctk.CTkLabel(row1, text="Descripción *:", width=100).pack(side="left", padx=5)
-        self.entry_descripcion = ctk.CTkEntry(row1, width=200,)
+        self.entry_descripcion = ctk.CTkEntry(row1, width=200)
         self.entry_descripcion.pack(side="left", padx=5)
 
         row2 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row2.pack(fill="x", pady=5)
         ctk.CTkLabel(row2, text="Puntuación *:", width=100).pack(side="left", padx=5)
-        self.entry_puntuacion = ctk.CTkEntry(row2, width=100,)
+        self.entry_puntuacion = ctk.CTkEntry(row2, width=100)
         self.entry_puntuacion.pack(side="left", padx=5)
         ctk.CTkLabel(row2, text="Escala:", width=80).pack(side="left", padx=5)
         self.combo_escala = ctk.CTkComboBox(row2, 
@@ -61,13 +61,13 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         row4 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row4.pack(fill="x", pady=5)
         ctk.CTkLabel(row4, text="Características:", width=100).pack(side="left", padx=5, anchor="n")
-        self.text_caracteristicas = ctk.CTkTextbox(row4, width=300, height=80,)
+        self.text_caracteristicas = ctk.CTkTextbox(row4, width=300, height=80)
         self.text_caracteristicas.pack(side="left", padx=5, fill="x", expand=True)
 
         row5 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row5.pack(fill="x", pady=5)
         ctk.CTkLabel(row5, text="Recomendaciones:", width=100).pack(side="left", padx=5, anchor="n")
-        self.text_recomendaciones = ctk.CTkTextbox(row5, width=300, height=80,)
+        self.text_recomendaciones = ctk.CTkTextbox(row5, width=300, height=80)
         self.text_recomendaciones.pack(side="left", padx=5, fill="x", expand=True)
 
         # Botones
@@ -111,6 +111,7 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         action_frame = ctk.CTkFrame(self, fg_color="transparent")
         action_frame.pack(pady=10)
         
+        ctk.CTkButton(action_frame, text="👁️ Ver Detalles", command=self.ver_detalles).pack(side="left", padx=5)
         ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_condicion).pack(side="left", padx=5)
         ctk.CTkButton(action_frame, text="🗑️ Eliminar Seleccionado", command=self.eliminar_condicion, 
                      fg_color="red", hover_color="#8B0000").pack(side="left", padx=5)
@@ -118,7 +119,6 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         ctk.CTkButton(action_frame, text="🔄 Actualizar Lista", command=self.cargar_condiciones).pack(side="left", padx=5)
 
         # Menú contextual (clic derecho)
-        from tkinter import Menu
         self.menu_contextual = Menu(self, tearoff=0)
         self.menu_contextual.add_command(label="✏️ Editar", command=self.editar_condicion)
         self.menu_contextual.add_command(label="🗑️ Eliminar", command=self.eliminar_condicion)
@@ -127,33 +127,15 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         self.tabla.bind("<Button-3>", self.mostrar_menu_contextual)
         self.tabla.bind("<Double-1>", lambda e: self.editar_condicion())
 
-        def mostrar_menu_contextual(self, event):
-            try:
-                row_id = self.tabla.identify_row(event.y)
-                if row_id:
-                    self.tabla.selection_set(row_id)
-                self.menu_contextual.tk_popup(event.x_root, event.y_root)
-            finally:
-                self.menu_contextual.grab_release()
+    def mostrar_menu_contextual(self, event):
+        try:
+            row_id = self.tabla.identify_row(event.y)
+            if row_id:
+                self.tabla.selection_set(row_id)
+            self.menu_contextual.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu_contextual.grab_release()
 
-        self.tabla.pack(side="left", fill="both", expand=True)
-
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-
-        # Botones de acción
-        action_frame = ctk.CTkFrame(self, fg_color="transparent")
-        action_frame.pack(pady=10)
-
-        ctk.CTkButton(action_frame, text="👁️ Ver Detalles", command=self.ver_detalles).pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_condicion).pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="🗑️ Eliminar Seleccionado", command=self.eliminar_condicion, 
-                     fg_color="red", hover_color="#8B0000").pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="📥 Importar Excel", command=self.importar_excel).pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="🔄 Actualizar Lista", command=self.cargar_condiciones).pack(side="left", padx=5)
-        
     def guardar_condicion(self):
         """Guarda una nueva condición corporal"""
         codigo = self.entry_codigo.get().strip()

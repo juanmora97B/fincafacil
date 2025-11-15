@@ -1,27 +1,13 @@
 import customtkinter as ctk
-from tkinter import ttk
 import sys
 import os
+import logging
 
 # Ensure the parent directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from modules.configuracion.proveedores import ProveedoresFrame
-from modules.configuracion.calidad_animal import CalidadAnimalFrame
-from modules.configuracion.motivos_venta import MotivosVentaFrame
-from modules.configuracion.causa_muerte import CausaMuerteFrame
-from modules.configuracion.destino_venta import DestinoVentaFrame
-from modules.configuracion.procedencia import ProcedenciaFrame
-from modules.configuracion.tipo_explotacion import TipoExplotacionFrame
-from modules.configuracion.condiciones_corporales import CondicionesCorporalesFrame
-from modules.configuracion.diagnosticos import DiagnosticosFrame
-from modules.configuracion.empleados import EmpleadosFrame
-from modules.configuracion.fincas import FincasFrame
-from modules.configuracion.lotes import LotesFrame
-from modules.configuracion.potreros import PotrerosFrame
-from modules.configuracion.razas import RazasFrame
-from modules.configuracion.sectores import SectoresFrame
-
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 class ConfiguracionModule(ctk.CTkFrame):
     def __init__(self, master):
@@ -64,32 +50,32 @@ class ConfiguracionModule(ctk.CTkFrame):
         separador = ctk.CTkFrame(menu_frame, height=2, fg_color="gray")
         separador.pack(fill="x", padx=10, pady=5)
         
-        # Categorías y módulos
+        # Categorías y módulos - VERSIÓN MEJORADA CON MANEJO DINÁMICO
         categorias = {
             "🏠 FINCA Y UBICACIÓN": [
-                ("🏠 Fincas", self.mostrar_fincas),
-                ("📍 Sectores", self.mostrar_sectores),
-                ("🌿 Potreros", self.mostrar_potreros),
-                ("📦 Lotes", self.mostrar_lotes)
+                ("🏠 Fincas", "fincas", self.mostrar_fincas),
+                ("📍 Sectores", "sectores", self.mostrar_sectores),
+                ("🌿 Potreros", "potreros", self.mostrar_potreros),
+                ("📦 Lotes", "lotes", self.mostrar_lotes)
             ],
             "🐄 ANIMALES": [
-                ("🐄 Razas", self.mostrar_razas),
-                ("⭐ Calidad Animal", self.mostrar_calidad),
-                ("⚖️ Cond. Corporales", self.mostrar_condiciones),
-                ("🏭 Tipos Explotación", self.mostrar_tipos_explotacion)
+                ("🐄 Razas", "razas", self.mostrar_razas),
+                ("⭐ Calidad Animal", "calidad", self.mostrar_calidad),
+                ("⚖️ Cond. Corporales", "condiciones", self.mostrar_condiciones),
+                ("🏭 Tipos Explotación", "tipos_explotacion", self.mostrar_tipos_explotacion)
             ],
             "💰 COMERCIAL": [
-                ("📋 Motivos Venta", self.mostrar_motivos_venta),
-                ("🏷️ Destinos Venta", self.mostrar_destinos_venta),
-                ("📍 Procedencias", self.mostrar_procedencias)
+                ("📋 Motivos Venta", "motivos_venta", self.mostrar_motivos_venta),
+                ("🏷️ Destinos Venta", "destinos_venta", self.mostrar_destinos_venta),
+                ("📍 Procedencias", "procedencias", self.mostrar_procedencias)
             ],
             "🏥 SALUD": [
-                ("💀 Causas Muerte", self.mostrar_causas_muerte),
-                ("🏥 Diagnósticos", self.mostrar_diagnosticos)
+                ("💀 Causas Muerte", "causas_muerte", self.mostrar_causas_muerte),
+                ("🏥 Diagnósticos", "diagnosticos", self.mostrar_diagnosticos)
             ],
             "👥 PERSONAL Y PROVEEDORES": [
-                ("🛒 Proveedores", self.mostrar_proveedores),
-                ("👥 Empleados", self.mostrar_empleados)
+                ("🛒 Proveedores", "proveedores", self.mostrar_proveedores),
+                ("👥 Empleados", "empleados", self.mostrar_empleados)
             ]
         }
         
@@ -102,7 +88,7 @@ class ConfiguracionModule(ctk.CTkFrame):
             cat_label.pack(anchor="w", padx=15, pady=(15, 5))
             
             # Botones de la categoría
-            for texto, comando in modulos:
+            for texto, modulo_id, comando in modulos:
                 btn = ctk.CTkButton(menu_frame, 
                                    text=texto,
                                    width=200,
@@ -110,187 +96,157 @@ class ConfiguracionModule(ctk.CTkFrame):
                                    corner_radius=8,
                                    command=comando)
                 btn.pack(pady=2, padx=10)
+                # Guardar referencia para posible uso futuro
+                btn.modulo_id = modulo_id
             
             # Separador entre categorías
             separador_cat = ctk.CTkFrame(menu_frame, height=1, fg_color="lightgray")
             separador_cat.pack(fill="x", padx=10, pady=8)
     
     def limpiar_area_trabajo(self):
-        """Limpia el área de trabajo"""
-        for widget in self.work_area.winfo_children():
-            widget.destroy()
+        """Limpia el área de trabajo de manera segura"""
+        try:
+            for widget in self.work_area.winfo_children():
+                widget.destroy()
+        except Exception as e:
+            logger.error(f"Error al limpiar área de trabajo: {e}")
     
     def mostrar_inicio(self):
         """Muestra la pantalla de inicio en el área de trabajo"""
         self.limpiar_area_trabajo()
         
-        # Frame de contenido
-        content_frame = ctk.CTkFrame(self.work_area)
-        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # Icono grande
-        icono = ctk.CTkLabel(content_frame, text="⚙️", 
-                            font=("Segoe UI", 80))
-        icono.pack(pady=(50, 20))
-        
-        # Título
-        titulo = ctk.CTkLabel(content_frame, 
-                             text="Configuración del Sistema",
-                             font=("Segoe UI", 28, "bold"))
-        titulo.pack(pady=10)
-        
-        # Descripción
-        descripcion = ctk.CTkLabel(content_frame,
-                                  text="Seleccione una opción del menú lateral para gestionar\nlos diferentes parámetros y catálogos del sistema.",
-                                  font=("Segoe UI", 16),
-                                  justify="center")
-        descripcion.pack(pady=10)
-        
-        # Información adicional
-        info = ctk.CTkLabel(content_frame,
-                           text="Aquí podrá configurar toda la información base\nnecesaria para el funcionamiento de FincaFácil.",
-                           font=("Segoe UI", 14),
-                           text_color="gray",
-                           justify="center")
-        info.pack(pady=20)
+        try:
+            # Frame de contenido
+            content_frame = ctk.CTkFrame(self.work_area)
+            content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            # Icono grande
+            icono = ctk.CTkLabel(content_frame, text="⚙️", 
+                                font=("Segoe UI", 80))
+            icono.pack(pady=(50, 20))
+            
+            # Título
+            titulo = ctk.CTkLabel(content_frame, 
+                                 text="Configuración del Sistema",
+                                 font=("Segoe UI", 28, "bold"))
+            titulo.pack(pady=10)
+            
+            # Descripción
+            descripcion = ctk.CTkLabel(content_frame,
+                                      text="Seleccione una opción del menú lateral para gestionar\nlos diferentes parámetros y catálogos del sistema.",
+                                      font=("Segoe UI", 16),
+                                      justify="center")
+            descripcion.pack(pady=10)
+            
+            # Información adicional
+            info = ctk.CTkLabel(content_frame,
+                               text="Aquí podrá configurar toda la información base\nnecesaria para el funcionamiento de FincaFácil.",
+                               font=("Segoe UI", 14),
+                               text_color="gray",
+                               justify="center")
+            info.pack(pady=20)
+            
+        except Exception as e:
+            logger.error(f"Error al mostrar pantalla de inicio: {e}")
+            self.mostrar_error(f"Error al cargar la pantalla de inicio: {e}")
+
+    # ==========================
+    # FUNCIONES PARA MOSTRAR MÓDULOS - VERSIÓN MEJORADA
+    # ==========================
     
-    # ==========================
-    # FUNCIONES PARA MOSTRAR MÓDULOS
-    # ==========================
+    def cargar_modulo(self, nombre_modulo, clase_frame):
+        """Carga un módulo de forma genérica con manejo de errores"""
+        self.limpiar_area_trabajo()
+        try:
+            # Importación dinámica para evitar problemas de importación circular
+            modulo = __import__(f'modules.configuracion.{nombre_modulo}', 
+                              fromlist=[clase_frame])
+            frame_class = getattr(modulo, clase_frame)
+            frame_instance = frame_class(self.work_area)
+            frame_instance.pack(fill="both", expand=True)
+            logger.info(f"Módulo {nombre_modulo} cargado correctamente")
+            
+        except ImportError as e:
+            logger.error(f"Error de importación en {nombre_modulo}: {e}")
+            self.mostrar_error(f"El módulo {nombre_modulo} no está disponible.\nError: {e}")
+        except Exception as e:
+            logger.error(f"Error al cargar {nombre_modulo}: {e}")
+            self.mostrar_error(f"Error al cargar {nombre_modulo}:\n{e}")
     
     def mostrar_fincas(self):
-        self.limpiar_area_trabajo()
-        try:
-            fincas_frame = FincasFrame(self.work_area)
-            fincas_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Fincas: {e}")
+        self.cargar_modulo('fincas', 'FincasFrame')
     
     def mostrar_sectores(self):
-        self.limpiar_area_trabajo()
-        try:
-            sectores_frame = SectoresFrame(self.work_area)
-            sectores_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Sectores: {e}")
+        self.cargar_modulo('sectores', 'SectoresFrame')
     
     def mostrar_potreros(self):
-        self.limpiar_area_trabajo()
-        try:
-            potreros_frame = PotrerosFrame(self.work_area)
-            potreros_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Potreros: {e}")
+        self.cargar_modulo('potreros', 'PotrerosFrame')
     
     def mostrar_lotes(self):
-        self.limpiar_area_trabajo()
-        try:
-            lotes_frame = LotesFrame(self.work_area)
-            lotes_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Lotes: {e}")
+        self.cargar_modulo('lotes', 'LotesFrame')
     
     def mostrar_razas(self):
-        self.limpiar_area_trabajo()
-        try:
-            razas_frame = RazasFrame(self.work_area)
-            razas_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Razas: {e}")
+        self.cargar_modulo('razas', 'RazasFrame')
     
     def mostrar_calidad(self):
-        self.limpiar_area_trabajo()
-        try:
-            calidad_frame = CalidadAnimalFrame(self.work_area)
-            calidad_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Calidad Animal: {e}")
+        self.cargar_modulo('calidad_animal', 'CalidadAnimalFrame')
     
     def mostrar_condiciones(self):
-        self.limpiar_area_trabajo()
-        try:
-            condiciones_frame = CondicionesCorporalesFrame(self.work_area)
-            condiciones_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Condiciones Corporales: {e}")
+        self.cargar_modulo('condiciones_corporales', 'CondicionesCorporalesFrame')
     
     def mostrar_tipos_explotacion(self):
-        self.limpiar_area_trabajo()
-        try:
-            tipos_frame = TipoExplotacionFrame(self.work_area)
-            tipos_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Tipos de Explotación: {e}")
+        self.cargar_modulo('tipo_explotacion', 'TipoExplotacionFrame')
     
     def mostrar_motivos_venta(self):
-        self.limpiar_area_trabajo()
-        try:
-            motivos_frame = MotivosVentaFrame(self.work_area)
-            motivos_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Motivos de Venta: {e}")
+        self.cargar_modulo('motivos_venta', 'MotivosVentaFrame')
     
     def mostrar_destinos_venta(self):
-        self.limpiar_area_trabajo()
-        try:
-            destinos_frame = DestinoVentaFrame(self.work_area)
-            destinos_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Destinos de Venta: {e}")
+        self.cargar_modulo('destino_venta', 'DestinoVentaFrame')
     
     def mostrar_procedencias(self):
-        self.limpiar_area_trabajo()
-        try:
-            procedencias_frame = ProcedenciaFrame(self.work_area)
-            procedencias_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Procedencias: {e}")
+        self.cargar_modulo('procedencia', 'ProcedenciaFrame')
     
     def mostrar_causas_muerte(self):
-        self.limpiar_area_trabajo()
-        try:
-            causas_frame = CausaMuerteFrame(self.work_area)
-            causas_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Causas de Muerte: {e}")
+        self.cargar_modulo('causa_muerte', 'CausaMuerteFrame')
     
     def mostrar_diagnosticos(self):
-        self.limpiar_area_trabajo()
-        try:
-            diagnosticos_frame = DiagnosticosFrame(self.work_area)
-            diagnosticos_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Diagnósticos: {e}")
+        self.cargar_modulo('diagnosticos', 'DiagnosticosFrame')
     
     def mostrar_proveedores(self):
-        self.limpiar_area_trabajo()
-        try:
-            proveedores_frame = ProveedoresFrame(self.work_area)
-            proveedores_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Proveedores: {e}")
+        self.cargar_modulo('proveedores', 'ProveedoresFrame')
     
     def mostrar_empleados(self):
-        self.limpiar_area_trabajo()
-        try:
-            empleados_frame = EmpleadosFrame(self.work_area)
-            empleados_frame.pack(fill="both", expand=True)
-        except Exception as e:
-            self.mostrar_error(f"Error al cargar Empleados: {e}")
+        self.cargar_modulo('empleados', 'EmpleadosFrame')
     
     def mostrar_error(self, mensaje):
         """Muestra un mensaje de error en el área de trabajo"""
-        error_frame = ctk.CTkFrame(self.work_area)
-        error_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        ctk.CTkLabel(error_frame, text="❌ Error", 
-                    font=("Segoe UI", 20, "bold"), 
-                    text_color="red").pack(pady=10)
-        
-        ctk.CTkLabel(error_frame, text=mensaje,
-                    font=("Segoe UI", 14),
-                    wraplength=600).pack(pady=5)
-        
-        ctk.CTkLabel(error_frame, text="El módulo podría no estar implementado aún",
-                    font=("Segoe UI", 12),
-                    text_color="gray").pack(pady=10)
+        try:
+            error_frame = ctk.CTkFrame(self.work_area)
+            error_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            ctk.CTkLabel(error_frame, text="❌ Error", 
+                        font=("Segoe UI", 20, "bold"), 
+                        text_color="red").pack(pady=10)
+            
+            ctk.CTkLabel(error_frame, text=mensaje,
+                        font=("Segoe UI", 14),
+                        wraplength=600).pack(pady=5)
+            
+            ctk.CTkLabel(error_frame, text="Verifique que el módulo esté correctamente implementado",
+                        font=("Segoe UI", 12),
+                        text_color="gray").pack(pady=10)
+            
+            # Botón para regresar al inicio
+            ctk.CTkButton(error_frame, text="🏠 Volver al Inicio", 
+                         command=self.mostrar_inicio).pack(pady=10)
+                        
+        except Exception as e:
+            logger.error(f"Error al mostrar mensaje de error: {e}")
+
+    def mostrar(self):
+        """Muestra el módulo (para compatibilidad)"""
+        self.pack(fill="both", expand=True)
+
+    def ocultar(self):
+        """Oculta el módulo (para compatibilidad)"""
+        self.pack_forget()

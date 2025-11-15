@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, Menu
 import sqlite3
 import sys
 import os
@@ -31,10 +31,10 @@ class TipoExplotacionFrame(ctk.CTkFrame):
         row1 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row1.pack(fill="x", pady=5)
         ctk.CTkLabel(row1, text="Código *:", width=100).pack(side="left", padx=5)
-        self.entry_codigo = ctk.CTkEntry(row1, width=150,)
+        self.entry_codigo = ctk.CTkEntry(row1, width=150)
         self.entry_codigo.pack(side="left", padx=5)
         ctk.CTkLabel(row1, text="Descripción *:", width=100).pack(side="left", padx=5)
-        self.entry_descripcion = ctk.CTkEntry(row1, width=200,)
+        self.entry_descripcion = ctk.CTkEntry(row1, width=200)
         self.entry_descripcion.pack(side="left", padx=5)
 
         row2 = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -81,18 +81,6 @@ class TipoExplotacionFrame(ctk.CTkFrame):
             self.tabla.heading(col, text=heading)
             self.tabla.column(col, width=width, anchor="center")
 
-        # Menú contextual (clic derecho)
-        from tkinter import Menu
-        self.menu_contextual = Menu(self, tearoff=0)
-        self.menu_contextual.add_command(label="✏️ Editar", command=self.editar_tipo_explotacion)
-        self.menu_contextual.add_command(label="🗑️ Eliminar", command=self.eliminar_tipo_explotacion)
-        self.menu_contextual.add_separator()
-        self.menu_contextual.add_command(label="🔄 Actualizar", command=self.cargar_tipos_explotacion)
-        
-        # Vincular eventos de la tabla
-        self.tabla.bind("<Button-3>", self.mostrar_menu_contextual)
-        self.tabla.bind("<Double-1>", lambda e: self.editar_tipo_explotacion())
-        
         self.tabla.pack(side="left", fill="both", expand=True)
 
         # Scrollbar
@@ -110,14 +98,25 @@ class TipoExplotacionFrame(ctk.CTkFrame):
         ctk.CTkButton(action_frame, text="📥 Importar Excel", command=self.importar_excel).pack(side="left", padx=5)
         ctk.CTkButton(action_frame, text="🔄 Actualizar Lista", command=self.cargar_tipos_explotacion).pack(side="left", padx=5)
 
+        # Menú contextual (clic derecho)
+        self.menu_contextual = Menu(self, tearoff=0)
+        self.menu_contextual.add_command(label="✏️ Editar", command=self.editar_tipo_explotacion)
+        self.menu_contextual.add_command(label="🗑️ Eliminar", command=self.eliminar_tipo_explotacion)
+        self.menu_contextual.add_separator()
+        self.menu_contextual.add_command(label="🔄 Actualizar", command=self.cargar_tipos_explotacion)
+        
+        # Vincular eventos de la tabla
+        self.tabla.bind("<Button-3>", self.mostrar_menu_contextual)
+        self.tabla.bind("<Double-1>", lambda e: self.editar_tipo_explotacion())
+
     def mostrar_menu_contextual(self, event):
-            try:
-                row_id = self.tabla.identify_row(event.y)
-                if row_id:
-                    self.tabla.selection_set(row_id)
-                self.menu_contextual.tk_popup(event.x_root, event.y_root)
-            finally:
-                self.menu_contextual.grab_release()
+        try:
+            row_id = self.tabla.identify_row(event.y)
+            if row_id:
+                self.tabla.selection_set(row_id)
+            self.menu_contextual.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu_contextual.grab_release()
         
     def guardar_tipo_explotacion(self):
         """Guarda un nuevo tipo de explotación"""
@@ -196,6 +195,8 @@ class TipoExplotacionFrame(ctk.CTkFrame):
     def limpiar_formulario(self):
         self.entry_codigo.delete(0, "end")
         self.entry_descripcion.delete(0, "end")
+        self.text_comentario.delete("1.0", "end")
+        self.combo_categoria.set("Carne")
         
     def importar_excel(self):
         """Importar tipos de explotación desde un archivo Excel.
@@ -270,5 +271,3 @@ class TipoExplotacionFrame(ctk.CTkFrame):
 
         except Exception as e:
             messagebox.showerror("Error", f"Error al importar:\n{e}")
-        self.text_comentario.delete("1.0", "end")
-        self.combo_categoria.set("Carne")

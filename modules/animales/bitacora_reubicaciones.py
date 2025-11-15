@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox  # 👈 AGREGAR ttk
+from tkinter import ttk, messagebox
 import sys
 import os
 
@@ -52,6 +52,7 @@ class BitacoraReubicacionesFrame(ctk.CTkFrame):
         btn_actualizar.pack(pady=5)
 
     def mostrar(self):
+        """Muestra el historial de reubicaciones - VERSIÓN CORREGIDA"""
         # Limpiar tabla
         for fila in self.tabla.get_children():
             self.tabla.delete(fila)
@@ -59,15 +60,35 @@ class BitacoraReubicacionesFrame(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # Consulta alternativa usando comentarios para reubicaciones
                 cursor.execute("""
-                    SELECT a.codigo, r.potrero_anterior, r.potrero_nuevo, r.fecha, r.motivo
-                    FROM reubicacion r
-                    JOIN animal a ON a.id = r.id_animal
-                    ORDER BY r.fecha DESC
+                    SELECT a.codigo, 
+                           'Ver historial' as potrero_anterior,
+                           'Ver historial' as potrero_nuevo,
+                           c.fecha, 
+                           c.nota
+                    FROM comentario c
+                    JOIN animal a ON c.id_animal = a.id
+                    WHERE (c.nota LIKE '%reubicación%' OR c.nota LIKE '%potrero%' 
+                           OR c.nota LIKE '%Reubicación%' OR c.nota LIKE '%traslado%')
+                    ORDER BY c.fecha DESC
                 """)
                 
                 for fila in cursor.fetchall():
-                    self.tabla.insert("", "end", values=fila)
+                    # Limitar longitud del motivo para mejor visualización
+                    motivo = fila[4]
+                    if len(motivo) > 100:
+                        motivo = motivo[:100] + "..."
+                    
+                    valores = (
+                        fila[0],  # código
+                        fila[1],  # potrero anterior
+                        fila[2],  # potrero nuevo  
+                        fila[3],  # fecha
+                        motivo    # motivo
+                    )
+                    self.tabla.insert("", "end", values=valores)
                     
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las reubicaciones:\n{e}")

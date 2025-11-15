@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox  # 👈 AGREGAR ttk
+from tkinter import ttk, messagebox
 from datetime import datetime
 import sys
 import os
@@ -158,7 +158,7 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT id, nombre FROM finca WHERE estado = 'Activa'")
+                cursor.execute("SELECT id, nombre FROM finca WHERE estado = 'Activa' OR estado = 'Activo'")
                 fincas = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
                 
                 self.combo_fincas.configure(values=fincas)
@@ -178,7 +178,7 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
                 self.finca_seleccionada = None
 
     def cargar_animales_finca(self):
-        """Carga los animales sin inventariar de la finca seleccionada"""
+        """Carga los animales sin inventariar de la finca seleccionada - VERSIÓN CORREGIDA"""
         if not self.finca_seleccionada:
             messagebox.showwarning("Atención", "Seleccione una finca primero.")
             return
@@ -191,10 +191,9 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT a.codigo, a.nombre, a.sexo, r.nombre, p.nombre,
+                    SELECT a.codigo, a.nombre, a.sexo, a.raza, p.nombre,
                            (SELECT peso FROM peso WHERE id_animal = a.id ORDER BY fecha DESC LIMIT 1) as ultimo_peso
                     FROM animal a
-                    LEFT JOIN raza r ON a.raza = r.nombre
                     LEFT JOIN potrero p ON a.id_potrero = p.id
                     WHERE a.id_finca = ? AND a.estado = 'Activo' AND a.inventariado = 0
                     ORDER BY a.codigo
@@ -209,7 +208,7 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
             messagebox.showerror("Error", f"No se pudieron cargar los animales:\n{e}")
 
     def buscar_animal(self):
-        """Busca un animal por código"""
+        """Busca un animal por código - VERSIÓN CORREGIDA"""
         codigo = self.entry_codigo_busqueda.get().strip()
         if not codigo:
             messagebox.showwarning("Atención", "Ingrese un código para buscar.")
@@ -219,11 +218,14 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT a.*, f.nombre as finca, r.nombre as raza, p.nombre as potrero
+                    SELECT a.*, f.nombre as finca, r.nombre as raza, p.nombre as potrero,
+                           l.nombre as lote, g.nombre as grupo
                     FROM animal a
                     LEFT JOIN finca f ON a.id_finca = f.id
                     LEFT JOIN raza r ON a.raza = r.nombre
                     LEFT JOIN potrero p ON a.id_potrero = p.id
+                    LEFT JOIN lote l ON a.id_lote = l.id
+                    LEFT JOIN grupo g ON a.id_grupo = g.id
                     WHERE a.codigo = ? AND a.estado = 'Activo'
                 """, (codigo,))
                 
@@ -242,7 +244,8 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
             messagebox.showerror("Error", f"No se pudo buscar el animal:\n{e}")
 
     def mostrar_info_animal(self, animal):
-        """Muestra la información del animal encontrado"""
+        """Muestra la información del animal encontrado - VERSIÓN CORREGIDA"""
+        # Índices corregidos según estructura real
         info_text = f"""
 🐄 **ANIMAL ENCONTRADO**
 

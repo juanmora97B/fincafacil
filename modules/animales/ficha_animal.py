@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox  # 👈 AGREGAR ttk
+from tkinter import ttk, messagebox
 import sys
 import os
 
@@ -164,7 +164,7 @@ class FichaAnimalFrame(ctk.CTkFrame):
             messagebox.showerror("Error", f"No se pudo buscar el animal:\n{e}")
 
     def mostrar_informacion_general(self, animal):
-        """Muestra la información general del animal"""
+        """Muestra la información general del animal - ÍNDICES CORREGIDOS"""
         info_text = f"""
 🐄 **INFORMACIÓN COMPLETA DEL ANIMAL**
 
@@ -183,7 +183,7 @@ class FichaAnimalFrame(ctk.CTkFrame):
 📅  **FECHAS:**
    • Nacimiento: {animal[10] or 'No registrada'}
    • Compra: {animal[11] or 'No aplica'}
-   • Registro: {animal[27]}
+   • Registro: {animal[27] or 'No registrada'}
 
 👨‍👩‍👧  **INFORMACIÓN PADRES:**
    • Madre: {animal[37] or 'No registrada'} ({animal[38] or ''})
