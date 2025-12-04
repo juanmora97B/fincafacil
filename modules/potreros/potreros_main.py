@@ -193,7 +193,7 @@ class PotrerosModule(ctk.CTkFrame):
                     SELECT 
                         f.nombre as finca,
                         p.nombre,
-                        p.sector,
+                        COALESCE(p.sector, 'N/A') as sector,
                         p.area_hectareas,
                         p.capacidad_maxima,
                         p.tipo_pasto,
@@ -273,7 +273,7 @@ class PotrerosModule(ctk.CTkFrame):
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT 
-                        p.nombre, p.sector, p.area_hectareas, p.capacidad_maxima,
+                        p.nombre, COALESCE(p.sector, 'N/A') as sector, p.area_hectareas, p.capacidad_maxima,
                         p.tipo_pasto, p.descripcion, p.estado, f.nombre as finca_nombre
                     FROM potrero p
                     LEFT JOIN finca f ON p.id_finca = f.id

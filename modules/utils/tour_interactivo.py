@@ -20,6 +20,7 @@ class TourInteractivo:
         """
         self.ventana_principal = ventana_principal
         self.pasos_completados = []
+        self.debe_mostrar_tour = False  # Flag para controlar si se debe mostrar el tour
         logger.info("Tour interactivo inicializado")
     
     def iniciar_tour(self):

@@ -10,7 +10,16 @@ from database import db
 from modules.utils.units_helper import units_helper
 from modules.utils.animal_format import build_animal_info_text
 from modules.utils.db_logging import safe_execute
-from utils.metadata import build_meta_note
+
+try:
+    from modules.utils.metadata import GestorMetadatos
+    def build_meta_note(note, metadata=None):
+        """Construye una nota con metadatos."""
+        return note
+except ImportError:
+    def build_meta_note(note, metadata=None):
+        """Fallback si no se puede importar metadata."""
+        return note
 
 class ActualizacionInventarioFrame(ctk.CTkFrame):
     def __init__(self, master):

@@ -22,6 +22,11 @@ class NominaModule(ctk.CTkFrame):
         self._sel = colors["sel"]
         self._hover = colors["hover"]
         self.logger = get_logger("Nomina")
+        
+        # Inicializar atributos
+        self.combo_filtro_empleado = None
+        self.tabla_empleados = None
+        self.tabla_historial = None
 
         self.crear_widgets()
         self.cargar_empleados()

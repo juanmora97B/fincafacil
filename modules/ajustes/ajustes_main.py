@@ -514,7 +514,7 @@ class AjustesFrame(ctk.CTkFrame):
         """Inicia el tour interactivo"""
         try:
             sys.path.append(str(Path(__file__).parent.parent.parent))
-            from utils.tour_interactivo import TourInteractivo
+            from modules.utils.tour_interactivo import TourInteractivo
             
             # Obtener la app principal
             app = self.winfo_toplevel()

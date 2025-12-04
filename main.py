@@ -181,7 +181,7 @@ class FincaFacilApp(ctk.CTk):
     def verificar_primer_uso(self):
         """Verifica si es la primera vez que se usa el sistema y muestra el tour"""
         try:
-            from utils.tour_interactivo import TourInteractivo
+            from modules.utils.tour_interactivo import TourInteractivo
             
             tour = TourInteractivo(self)
             if tour.debe_mostrar_tour():
