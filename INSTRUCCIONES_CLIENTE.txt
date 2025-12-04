@@ -1,0 +1,248 @@
+═══════════════════════════════════════════════════════════
+    INSTRUCCIONES PARA INSTALAR FINCAFACIL
+═══════════════════════════════════════════════════════════
+
+PARA EL CLIENTE / USUARIO FINAL
+
+═══════════════════════════════════════════════════════════
+
+PASO 1: OBTENER EL INSTALADOR
+───────────────────────────────────────────────────────────
+
+El instalador puede recibirse mediante:
+
+  ✓ USB o pendrive (archivo copiado)
+  ✓ Descarga desde internet (enlace proporcionado)
+  ✓ Email o mensaje (si el tamaño lo permite)
+
+Nombre del archivo: FincaFacil_Setup_v1.0.exe
+Tamaño aproximado: 150-250 MB
+
+
+═══════════════════════════════════════════════════════════
+
+PASO 2: EJECUTAR EL INSTALADOR
+───────────────────────────────────────────────────────────
+
+1. Busque el archivo FincaFacil_Setup_v1.0.exe
+
+2. Haga CLIC DERECHO sobre el archivo
+
+3. Seleccione "Ejecutar como administrador"
+
+4. Si aparece un mensaje de Windows pidiendo permiso:
+   → Haga clic en "Sí"
+
+5. Si aparece "Windows protegió tu PC":
+   → Haga clic en "Más información"
+   → Haga clic en "Ejecutar de todas formas"
+
+
+═══════════════════════════════════════════════════════════
+
+PASO 3: SEGUIR EL ASISTENTE
+───────────────────────────────────────────────────────────
+
+El instalador le mostrará varias pantallas:
+
+PANTALLA 1: Bienvenida
+  → Lea la información
+  → Haga clic en "Siguiente"
+
+PANTALLA 2: Licencia
+  → Lea la licencia
+  → Marque "Acepto el acuerdo"
+  → Haga clic en "Siguiente"
+
+PANTALLA 3: Ubicación de instalación
+  → Deje la ubicación predeterminada:
+    C:\Program Files\FincaFacil
+  → O elija otra ubicación si lo prefiere
+  → Haga clic en "Siguiente"
+
+PANTALLA 4: Accesos directos
+  → Marque si desea icono en el escritorio
+  → Haga clic en "Siguiente"
+
+PANTALLA 5: Confirmar instalación
+  → Revise la información
+  → Haga clic en "Instalar"
+
+PANTALLA 6: Instalando...
+  → Espere unos minutos (2-5 minutos aproximadamente)
+  → NO cierre esta ventana
+
+PANTALLA 7: Finalizar
+  → Marque "Ejecutar FincaFacil" si desea abrirlo ahora
+  → Haga clic en "Finalizar"
+
+
+═══════════════════════════════════════════════════════════
+
+PASO 4: PRIMER USO
+───────────────────────────────────────────────────────────
+
+La primera vez que ejecute FincaFacil:
+
+1. TOUR INTERACTIVO
+   Se abrirá automáticamente un tour que le explicará
+   cómo usar el sistema.
+   
+   Este tour es OPCIONAL:
+   - Puede seguirlo completo (recomendado)
+   - Puede cancelarlo y verlo después
+
+2. CONFIGURACIÓN INICIAL
+   El sistema creará automáticamente:
+   - Base de datos
+   - Carpetas necesarias
+   - Configuración básica
+   
+   Esto ocurre automáticamente, no requiere acción.
+
+
+═══════════════════════════════════════════════════════════
+
+UBICACIÓN DEL PROGRAMA
+───────────────────────────────────────────────────────────
+
+Después de instalar, puede abrir FincaFacil desde:
+
+  → Menú Inicio de Windows
+    Busque: "FincaFacil"
+    
+  → Escritorio
+    Si creó acceso directo durante instalación
+    
+  → Barra de búsqueda de Windows
+    Escriba: "FincaFacil"
+
+
+═══════════════════════════════════════════════════════════
+
+REQUISITOS DE SU COMPUTADORA
+───────────────────────────────────────────────────────────
+
+Mínimos:
+  ✓ Windows 10 o superior (64 bits)
+  ✓ 4 GB de memoria RAM
+  ✓ 500 MB de espacio en disco
+  ✓ Resolución de pantalla: 1366x768
+
+Recomendados:
+  ✓ Windows 11
+  ✓ 8 GB de memoria RAM
+  ✓ 1 GB de espacio disponible
+  ✓ Resolución: 1920x1080
+
+NO NECESITA:
+  ✗ Conexión a internet (funciona completamente offline)
+  ✗ Instalar Python u otros programas
+  ✗ Configuración técnica
+  ✗ Conocimientos de programación
+
+
+═══════════════════════════════════════════════════════════
+
+SI TIENE PROBLEMAS
+───────────────────────────────────────────────────────────
+
+PROBLEMA: El instalador no se ejecuta
+SOLUCIÓN:
+  - Ejecute como administrador (clic derecho)
+  - Desactive temporalmente el antivirus
+  - Vuelva a descargar el archivo
+
+─────────────────────────────────────────────────────────
+
+PROBLEMA: "Windows protegió tu PC"
+SOLUCIÓN:
+  - Esto es normal para programas nuevos
+  - Haga clic en "Más información"
+  - Haga clic en "Ejecutar de todas formas"
+  - Es seguro, el programa no contiene virus
+
+─────────────────────────────────────────────────────────
+
+PROBLEMA: El programa no inicia
+SOLUCIÓN:
+  - Ejecute FincaFacil como administrador
+  - Cierre cualquier otra instancia abierta
+  - Reinicie su computadora
+
+─────────────────────────────────────────────────────────
+
+PROBLEMA: No puedo guardar datos
+SOLUCIÓN:
+  - Ejecute como administrador
+  - Verifique que tiene permisos en la carpeta
+  - Contacte al soporte técnico
+
+
+═══════════════════════════════════════════════════════════
+
+DESINSTALAR FINCAFACIL
+───────────────────────────────────────────────────────────
+
+Si necesita desinstalar el programa:
+
+1. Panel de Control
+2. Programas y características
+3. Busque "FincaFacil"
+4. Haga clic en "Desinstalar"
+5. El sistema preguntará si desea conservar su base de datos:
+   - SÍ: Para reinstalar después sin perder datos
+   - NO: Eliminar todo completamente
+
+
+═══════════════════════════════════════════════════════════
+
+AYUDA ADICIONAL
+───────────────────────────────────────────────────────────
+
+Dentro del programa encontrará:
+
+  → Manual de Usuario completo
+    Ubicación: Ajustes > Ayuda y Documentación
+    
+  → Tour Interactivo
+    Ubicación: Ajustes > Iniciar Tour
+    
+  → Ayuda contextual
+    En cada pantalla del sistema
+
+
+═══════════════════════════════════════════════════════════
+
+SOPORTE TÉCNICO
+───────────────────────────────────────────────────────────
+
+Si necesita ayuda adicional, contacte a:
+
+  📧 Email: [Su email de soporte]
+  📞 Teléfono: [Su teléfono]
+  💬 WhatsApp: [Su WhatsApp]
+
+O visite el repositorio del proyecto:
+  🌐 https://github.com/juanmora97B/FincaFacil
+
+
+═══════════════════════════════════════════════════════════
+
+PRIVACIDAD Y SEGURIDAD
+───────────────────────────────────────────────────────────
+
+  ✓ Todos sus datos permanecen en su computadora
+  ✓ No se envía información a internet
+  ✓ No hay seguimiento ni telemetría
+  ✓ Privacidad total garantizada
+  ✓ Software de código abierto
+
+
+═══════════════════════════════════════════════════════════
+
+¡LISTO!
+
+Ya puede comenzar a usar FincaFacil para gestionar su finca.
+
+═══════════════════════════════════════════════════════════

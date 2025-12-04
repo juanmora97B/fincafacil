@@ -1,9 +1,17 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog
-from datetime import datetime, timedelta
+from datetime import datetime
 import sys
 import os
+from modules.utils.ui import add_tooltip
+from modules.utils.logger import get_logger
+from modules.utils.date_picker import attach_date_picker
 import csv
+from io import StringIO
+try:
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None  # Gráficos deshabilitados si no está disponible
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from database import db
@@ -13,31 +21,54 @@ class ReportesModule(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        # Colores y modo adaptativos
+        self._modo = ctk.get_appearance_mode()
+        self._fg_card = "#2B2B2B" if self._modo == "Dark" else "#F5F5F5"
+        self._sel = "#1976D2" if self._modo == "Light" else "#1F538D"
+        self._hover = "#90caf9" if self._modo == "Light" else "#14375E"
+        self.logger = get_logger("Reportes")
+        # Rangos de fecha opcionales para filtros
+        self._f_inicio = None
+        self._f_fin = None
+        # Filtros Inventario
+        self._inv_sexo = None
+        self._inv_estado = None
+        self._inv_finca = None
+        self._inv_raza = None
+        # Filtros Potreros
+        self._pot_finca = None
+        self._pot_estado = None
+        self._pot_ocup_min = None
         self.crear_widgets()
 
     def crear_widgets(self):
-        # Título
+        # Título compacto
         titulo = ctk.CTkLabel(
             self,
             text="📈 Reportes y Estadísticas",
-            font=("Segoe UI", 22, "bold")
+            font=("Segoe UI", 22, "bold"),
+            text_color=self._sel
         )
-        titulo.pack(pady=15)
+        titulo.pack(pady=(5, 3))
+        add_tooltip(titulo, "Visualización y exportación de reportes del sistema")
 
-        # Frame principal
+        # Frame principal expandido
         main_frame = ctk.CTkFrame(self)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=5, pady=(3, 5))
 
         # Panel izquierdo - Selección de reportes
         left_panel = ctk.CTkFrame(main_frame, width=280)
         left_panel.pack(side="left", fill="y", padx=(0, 10))
         left_panel.pack_propagate(False)
 
-        ctk.CTkLabel(
+        lbl_tipos = ctk.CTkLabel(
             left_panel,
             text="📋 Tipos de Reportes",
-            font=("Segoe UI", 16, "bold")
-        ).pack(pady=15)
+            font=("Segoe UI", 16, "bold"),
+            text_color=self._sel
+        )
+        lbl_tipos.pack(pady=5)
+        add_tooltip(lbl_tipos, "Seleccione el tipo de reporte a visualizar")
 
         # Lista de reportes
         reportes = [
@@ -70,6 +101,7 @@ class ReportesModule(ctk.CTkFrame):
                 border_color=("gray70", "gray30")
             )
             btn.pack(pady=3)
+            add_tooltip(btn, f"Abrir {reporte}")
 
         # Panel derecho - Área de reporte
         self.report_area = ctk.CTkFrame(main_frame)
@@ -86,13 +118,14 @@ class ReportesModule(ctk.CTkFrame):
 
         # Frame para el título y botones
         header_frame = ctk.CTkFrame(self.report_area, fg_color="transparent")
-        header_frame.pack(fill="x", padx=20, pady=10)
+        header_frame.pack(fill="x", padx=4, pady=10)
 
         # Título del reporte
         titulo_reporte = ctk.CTkLabel(
             header_frame,
             text=tipo_reporte,
-            font=("Segoe UI", 18, "bold")
+            font=("Segoe UI", 18, "bold"),
+            text_color=self._sel
         )
         titulo_reporte.pack(side="left")
 
@@ -100,19 +133,157 @@ class ReportesModule(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         btn_frame.pack(side="right")
 
-        ctk.CTkButton(
+        btn_export = ctk.CTkButton(
             btn_frame,
             text="📄 Exportar CSV",
             command=lambda: self.exportar_reporte(tipo_reporte),
-            width=120
-        ).pack(side="left", padx=5)
+            width=120,
+            fg_color=self._sel,
+            hover_color=self._hover
+        )
+        btn_export.pack(side="left", padx=5)
+        add_tooltip(btn_export, "Exportar el reporte actual a CSV")
 
-        ctk.CTkButton(
+        btn_refresh = ctk.CTkButton(
             btn_frame,
             text="🔄 Actualizar",
             command=lambda: self.actualizar_reporte(tipo_reporte),
-            width=100
-        ).pack(side="left", padx=5)
+            width=100,
+            fg_color=self._sel,
+            hover_color=self._hover
+        )
+        btn_refresh.pack(side="left", padx=5)
+        add_tooltip(btn_refresh, "Actualizar datos del reporte")
+
+        # Botón gráfico si matplotlib disponible y tipo admite
+        if plt is not None and any(k in tipo_reporte for k in ["Inventario", "Ventas", "Tratamientos", "Potreros"]):
+            btn_chart = ctk.CTkButton(
+                btn_frame,
+                text="📊 Ver Gráfico",
+                command=lambda: self.ver_grafico(tipo_reporte),
+                width=110,
+                fg_color=self._sel,
+                hover_color=self._hover
+            )
+            btn_chart.pack(side="left", padx=5)
+            add_tooltip(btn_chart, "Mostrar gráfico resumido")
+
+        # Filtros de fecha (aplican a reportes con dimensión temporal)
+        soporta_fecha = any(k in tipo_reporte for k in ["Ventas", "Tratamientos", "Actividad"])
+        filtro_frame = None
+        if soporta_fecha:
+            filtro_frame = ctk.CTkFrame(self.report_area)
+            filtro_frame.pack(fill="x", padx=4, pady=(0, 10))
+            ctk.CTkLabel(filtro_frame, text="Filtro por Fecha", font=("Segoe UI", 14, "bold")).pack(anchor="w")
+            fila_fechas = ctk.CTkFrame(filtro_frame, fg_color="transparent")
+            fila_fechas.pack(fill="x", pady=5)
+            hoy = datetime.now().date()
+            primer_dia_mes = hoy.replace(day=1)
+            lbl_ini = ctk.CTkLabel(fila_fechas, text="Inicio:")
+            lbl_ini.pack(side="left", padx=5)
+            entry_inicio = ctk.CTkEntry(fila_fechas, width=140, placeholder_text="YYYY-MM-DD")
+            entry_inicio.pack(side="left", padx=5)
+            entry_inicio.insert(0, self._f_inicio or primer_dia_mes.strftime("%Y-%m-%d"))
+            attach_date_picker(fila_fechas, entry_inicio)
+            add_tooltip(entry_inicio, "Fecha inicial del rango")
+            lbl_fin = ctk.CTkLabel(fila_fechas, text="Fin:")
+            lbl_fin.pack(side="left", padx=5)
+            entry_fin = ctk.CTkEntry(fila_fechas, width=140, placeholder_text="YYYY-MM-DD")
+            entry_fin.pack(side="left", padx=5)
+            entry_fin.insert(0, self._f_fin or hoy.strftime("%Y-%m-%d"))
+            attach_date_picker(fila_fechas, entry_fin)
+            add_tooltip(entry_fin, "Fecha final del rango")
+            def aplicar_filtro():
+                fi = entry_inicio.get().strip(); ff = entry_fin.get().strip(); fmt = "%Y-%m-%d"
+                try:
+                    fi_dt = datetime.strptime(fi, fmt).date(); ff_dt = datetime.strptime(ff, fmt).date()
+                    if fi_dt > ff_dt:
+                        messagebox.showwarning("Atención", "La fecha inicio no puede ser posterior a la fecha fin."); return
+                    self._f_inicio = fi; self._f_fin = ff
+                except Exception:
+                    messagebox.showwarning("Atención", "Fechas inválidas. Use formato YYYY-MM-DD."); return
+                self.actualizar_reporte(tipo_reporte)
+            btn_aplicar = ctk.CTkButton(filtro_frame, text="Filtrar", command=aplicar_filtro, width=100, fg_color=self._sel, hover_color=self._hover)
+            btn_aplicar.pack(anchor="e", pady=5)
+            add_tooltip(btn_aplicar, "Aplicar filtro de fechas al reporte")
+        # Filtros Inventario
+        if "Inventario" in tipo_reporte:
+            filtro_inv = ctk.CTkFrame(self.report_area)
+            filtro_inv.pack(fill="x", padx=4, pady=(0, 10))
+            ctk.CTkLabel(filtro_inv, text="Filtros Inventario", font=("Segoe UI", 14, "bold")).pack(anchor="w")
+            fila = ctk.CTkFrame(filtro_inv, fg_color="transparent")
+            fila.pack(fill="x", pady=5)
+
+            # Sexo
+            cb_sexo = ctk.CTkComboBox(fila, width=110, values=["", "Macho", "Hembra"])
+            cb_sexo.set(self._inv_sexo or "")
+            cb_sexo.pack(side="left", padx=5)
+            add_tooltip(cb_sexo, "Filtrar por sexo")
+            # Estado
+            cb_estado = ctk.CTkComboBox(fila, width=130, values=["", "Activo", "Vendido", "Muerto"])
+            cb_estado.set(self._inv_estado or "")
+            cb_estado.pack(side="left", padx=5)
+            add_tooltip(cb_estado, "Filtrar por estado")
+            # Finca
+            cb_finca = ctk.CTkComboBox(fila, width=160)
+            fincas = self._cargar_fincas_lista()
+            cb_finca.configure(values=[""] + fincas)
+            cb_finca.set(self._inv_finca or "")
+            cb_finca.pack(side="left", padx=5)
+            add_tooltip(cb_finca, "Filtrar por finca (según potrero)")
+            # Raza
+            cb_raza = ctk.CTkComboBox(fila, width=160)
+            razas = self._cargar_razas_lista()
+            cb_raza.configure(values=[""] + razas)
+            cb_raza.set(self._inv_raza or "")
+            cb_raza.pack(side="left", padx=5)
+            add_tooltip(cb_raza, "Filtrar por raza")
+
+            def aplicar_inv():
+                self._inv_sexo = cb_sexo.get() or None
+                self._inv_estado = cb_estado.get() or None
+                self._inv_finca = cb_finca.get() or None
+                self._inv_raza = cb_raza.get() or None
+                self.actualizar_reporte(tipo_reporte)
+
+            ctk.CTkButton(filtro_inv, text="Filtrar", width=100, command=aplicar_inv, fg_color=self._sel, hover_color=self._hover).pack(anchor="e", pady=5)
+
+        # Filtros Potreros
+        if "Potreros" in tipo_reporte:
+            filtro_pot = ctk.CTkFrame(self.report_area)
+            # Reducir padding horizontal (20→10) en barra de filtros
+            filtro_pot.pack(fill="x", padx=10, pady=(0, 10))
+            ctk.CTkLabel(filtro_pot, text="Filtros Potreros", font=("Segoe UI", 14, "bold")).pack(anchor="w")
+            fila2 = ctk.CTkFrame(filtro_pot, fg_color="transparent")
+            fila2.pack(fill="x", pady=5)
+            cb_pfinca = ctk.CTkComboBox(fila2, width=160)
+            fincas = self._cargar_fincas_lista()
+            cb_pfinca.configure(values=[""] + fincas)
+            cb_pfinca.set(self._pot_finca or "")
+            cb_pfinca.pack(side="left", padx=5)
+            add_tooltip(cb_pfinca, "Filtrar por finca")
+            cb_pestado = ctk.CTkComboBox(fila2, width=130, values=["", "Activo", "Inactivo"])
+            cb_pestado.set(self._pot_estado or "")
+            cb_pestado.pack(side="left", padx=5)
+            add_tooltip(cb_pestado, "Filtrar por estado")
+            entry_ocup = ctk.CTkEntry(fila2, width=120, placeholder_text="Ocupación >= %")
+            if self._pot_ocup_min:
+                entry_ocup.insert(0, str(self._pot_ocup_min))
+            entry_ocup.pack(side="left", padx=5)
+            add_tooltip(entry_ocup, "Filtrar por porcentaje mínimo de ocupación")
+
+            def aplicar_pot():
+                self._pot_finca = cb_pfinca.get() or None
+                self._pot_estado = cb_pestado.get() or None
+                val = entry_ocup.get().strip()
+                try:
+                    self._pot_ocup_min = float(val) if val else None
+                except ValueError:
+                    messagebox.showwarning("Atención", "Ocupación mínima debe ser numérica.")
+                    return
+                self.actualizar_reporte(tipo_reporte)
+
+            ctk.CTkButton(filtro_pot, text="Filtrar", width=100, command=aplicar_pot, fg_color=self._sel, hover_color=self._hover).pack(anchor="e", pady=5)
 
         # Generar reporte según el tipo
         if "Resumen General" in tipo_reporte:
@@ -140,7 +311,8 @@ class ReportesModule(ctk.CTkFrame):
 
                 # Frame para las estadísticas
                 stats_frame = ctk.CTkFrame(self.report_area)
-                stats_frame.pack(fill="both", expand=True, padx=20, pady=10)
+                # Compactar margen horizontal principal (20→4)
+                stats_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
                 # Estadísticas principales
                 cursor.execute("SELECT COUNT(*) FROM animal WHERE estado = 'Activo'")
@@ -203,98 +375,78 @@ class ReportesModule(ctk.CTkFrame):
                     justify="left",
                     anchor="nw"
                 )
-                label_info.pack(pady=20, padx=20, fill="both", expand=True)
+                # Mantener algo de aire visual (padx 20→10)
+                label_info.pack(pady=5, padx=10, fill="both", expand=True)
 
         except Exception as e:
             messagebox.showerror("Error", f"Error al generar reporte:\n{e}")
 
     def generar_inventario(self):
         """Genera el reporte de inventario de animales"""
-        # Frame principal con scroll
+        self._style_treeview()
         main_frame = ctk.CTkScrollableFrame(self.report_area)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
-
-        # Tabla
+        # Compactar margen horizontal (20→4)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True)
-
         tabla = ttk.Treeview(
             table_frame,
             columns=("codigo", "nombre", "sexo", "raza", "fecha_nac", "potrero", "estado", "valor"),
             show="headings",
             height=15
         )
-
         columnas = [
-            ("codigo", "Código", 100),
-            ("nombre", "Nombre", 150),
-            ("sexo", "Sexo", 80),
-            ("raza", "Raza", 120),
-            ("fecha_nac", "F. Nacimiento", 100),
-            ("potrero", "Potrero", 120),
-            ("estado", "Estado", 100),
-            ("valor", "Valor", 100)
+            ("codigo", "Código", 100), ("nombre", "Nombre", 150), ("sexo", "Sexo", 80),
+            ("raza", "Raza", 120), ("fecha_nac", "F. Nacimiento", 100), ("potrero", "Potrero", 120),
+            ("estado", "Estado", 100), ("valor", "Valor", 100)
         ]
-
         for col, heading, width in columnas:
-            tabla.heading(col, text=heading)
-            tabla.column(col, width=width, anchor="center")
-
+            tabla.heading(col, text=heading); tabla.column(col, width=width, anchor="center")
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT 
-                        a.codigo,
-                        COALESCE(a.nombre, 'Sin nombre') as nombre,
-                        a.sexo,
-                        r.nombre as raza,
-                        a.fecha_nacimiento,
-                        p.nombre as potrero,
-                        a.estado,
-                        a.precio_compra
+                where_parts = []; params = []
+                if self._inv_sexo: where_parts.append("a.sexo = ?"); params.append(self._inv_sexo)
+                if self._inv_estado: where_parts.append("a.estado = ?"); params.append(self._inv_estado)
+                if self._inv_raza: where_parts.append("r.nombre = ?"); params.append(self._inv_raza)
+                if self._inv_finca: where_parts.append("f.nombre = ?"); params.append(self._inv_finca)
+                where_clause = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+                query = f"""
+                    SELECT a.codigo, COALESCE(a.nombre,'Sin nombre'), a.sexo, r.nombre, a.fecha_nacimiento,
+                           p.nombre as potrero, a.estado, a.precio_compra, f.nombre as finca
                     FROM animal a
-                    LEFT JOIN raza r ON a.id_raza = r.id
+                    LEFT JOIN raza r ON a.raza_id = r.id
                     LEFT JOIN potrero p ON a.id_potrero = p.id
+                    LEFT JOIN finca f ON p.id_finca = f.id
+                    {where_clause}
                     ORDER BY a.estado, a.codigo
-                """)
-
-                total_valor = 0
+                """
+                cursor.execute(query, params)
+                total_valor = 0; count = 0
                 for row in cursor.fetchall():
-                    valor = row[7] or 0
-                    total_valor += valor
+                    valor = row[7] or 0; total_valor += valor; count += 1
                     fecha_nac = row[4].strftime("%d/%m/%Y") if row[4] else "-"
-                    tabla.insert("", "end", values=(
-                        row[0], row[1], row[2], row[3] or "-", 
-                        fecha_nac, row[5] or "-", row[6], f"${valor:,.0f}"
-                    ))
-
-                # Resumen
-                resumen_frame = ctk.CTkFrame(main_frame)
-                resumen_frame.pack(fill="x", pady=10)
-
+                    tabla.insert("", "end", values=(row[0], row[1], row[2], row[3] or "-", fecha_nac, row[5] or "-", row[6], f"${valor:,.0f}"))
+                resumen_frame = ctk.CTkFrame(main_frame); resumen_frame.pack(fill="x", pady=10)
+                rango_text = ""
+                if any([self._inv_sexo, self._inv_estado, self._inv_finca, self._inv_raza]):
+                    filtros_activos = [f for f in [self._inv_sexo, self._inv_estado, self._inv_finca, self._inv_raza] if f]
+                    rango_text = " | Filtros: " + ", ".join(filtros_activos)
                 cursor.execute("SELECT COUNT(*) FROM animal")
                 total_animales = cursor.fetchone()[0]
-
-                ctk.CTkLabel(
-                    resumen_frame,
-                    text=f"📊 Resumen: {total_animales} animales | Valor total: ${total_valor:,.0f}",
-                    font=("Segoe UI", 12, "bold")
-                ).pack(pady=5)
-
+                ctk.CTkLabel(resumen_frame, text=f"📊 Resumen: {count}/{total_animales} animales | Valor mostrado: ${total_valor:,.0f}{rango_text}", font=("Segoe UI", 12, "bold")).pack(pady=5)
         except Exception as e:
-            print(f"Error en inventario: {e}")
-
+            self.logger.error(f"Error en inventario: {e}")
         tabla.pack(side="left", fill="both", expand=True)
-
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
         tabla.configure(yscroll=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
     def generar_ventas(self):
         """Genera el reporte de ventas"""
+        self._style_treeview()
         main_frame = ctk.CTkScrollableFrame(self.report_area)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True)
@@ -321,11 +473,15 @@ class ReportesModule(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Verificar si existe la tabla venta
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='venta'")
                 if cursor.fetchone():
-                    cursor.execute("""
+                    # Construir filtro dinámico
+                    params = []
+                    where_clause = ""
+                    if self._f_inicio and self._f_fin:
+                        where_clause = "WHERE date(v.fecha) BETWEEN date(?) AND date(?)"
+                        params.extend([self._f_inicio, self._f_fin])
+                    query = f"""
                         SELECT 
                             v.fecha,
                             a.codigo || ' - ' || COALESCE(a.nombre, 'Sin nombre') as animal,
@@ -334,9 +490,10 @@ class ReportesModule(ctk.CTkFrame):
                             v.motivo_venta
                         FROM venta v
                         JOIN animal a ON v.id_animal = a.id
+                        {where_clause}
                         ORDER BY v.fecha DESC
-                    """)
-
+                    """
+                    cursor.execute(query, params)
                     total = 0
                     count = 0
                     for row in cursor.fetchall():
@@ -347,25 +504,29 @@ class ReportesModule(ctk.CTkFrame):
                         tabla.insert("", "end", values=(
                             fecha, row[1], f"${precio:,.0f}", row[3] or "-", row[4] or "-"
                         ))
-
-                    # Resumen
                     if count > 0:
                         resumen_frame = ctk.CTkFrame(main_frame)
                         resumen_frame.pack(fill="x", pady=10)
+                        rango_text = "" if not (self._f_inicio and self._f_fin) else f" | Rango: {self._f_inicio} a {self._f_fin}"
                         ctk.CTkLabel(
                             resumen_frame,
-                            text=f"💰 Total de Ventas: {count} transacciones | Monto total: ${total:,.0f}",
+                            text=f"💰 Total de Ventas: {count} transacciones | Monto total: ${total:,.0f}{rango_text}",
                             font=("Segoe UI", 12, "bold")
+                        ).pack(pady=5)
+                    else:
+                        ctk.CTkLabel(
+                            main_frame,
+                            text="ℹ️ No hay ventas en el rango seleccionado" if (self._f_inicio and self._f_fin) else "ℹ️ No se encontraron registros de ventas",
+                            font=("Segoe UI", 12)
                         ).pack(pady=5)
                 else:
                     ctk.CTkLabel(
                         main_frame,
-                        text="ℹ️ No se encontraron registros de ventas",
+                        text="ℹ️ La tabla de ventas no existe aún",
                         font=("Segoe UI", 12)
-                    ).pack(pady=20)
-
+                    ).pack(pady=5)
         except Exception as e:
-            print(f"Error en ventas: {e}")
+            self.logger.error(f"Error en ventas: {e}")
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
@@ -374,8 +535,9 @@ class ReportesModule(ctk.CTkFrame):
 
     def generar_tratamientos(self):
         """Genera el reporte de tratamientos"""
+        self._style_treeview()
         main_frame = ctk.CTkScrollableFrame(self.report_area)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True)
@@ -403,10 +565,14 @@ class ReportesModule(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tratamiento'")
                 if cursor.fetchone():
-                    cursor.execute("""
+                    params = []
+                    where_clause = ""
+                    if self._f_inicio and self._f_fin:
+                        where_clause = "WHERE date(t.fecha_inicio) BETWEEN date(?) AND date(?)"
+                        params.extend([self._f_inicio, self._f_fin])
+                    query = f"""
                         SELECT 
                             t.fecha_inicio,
                             a.codigo || ' - ' || COALESCE(a.nombre, 'Sin nombre') as animal,
@@ -417,36 +583,40 @@ class ReportesModule(ctk.CTkFrame):
                         FROM tratamiento t
                         JOIN animal a ON t.id_animal = a.id
                         LEFT JOIN diagnostico_veterinario d ON t.id_diagnostico = d.id
+                        {where_clause}
                         ORDER BY t.fecha_inicio DESC
-                    """)
-
+                    """
+                    cursor.execute(query, params)
+                    count = 0
                     for row in cursor.fetchall():
                         fecha = row[0].strftime("%d/%m/%Y") if row[0] else "-"
                         tabla.insert("", "end", values=(
                             fecha, row[1], row[2] or "-", row[3] or "-", 
                             row[4] or "-", row[5] or "-"
                         ))
-
-                    # Contador
-                    cursor.execute("SELECT COUNT(*) FROM tratamiento")
-                    total = cursor.fetchone()[0]
-                    
+                        count += 1
                     resumen_frame = ctk.CTkFrame(main_frame)
                     resumen_frame.pack(fill="x", pady=10)
+                    rango_text = "" if not (self._f_inicio and self._f_fin) else f" | Rango: {self._f_inicio} a {self._f_fin}"
                     ctk.CTkLabel(
                         resumen_frame,
-                        text=f"🏥 Total de tratamientos registrados: {total}",
+                        text=f"🏥 Total de tratamientos: {count}{rango_text}",
                         font=("Segoe UI", 12, "bold")
                     ).pack(pady=5)
+                    if count == 0:
+                        ctk.CTkLabel(
+                            main_frame,
+                            text="ℹ️ No hay tratamientos en el rango seleccionado" if (self._f_inicio and self._f_fin) else "ℹ️ No se encontraron registros de tratamientos",
+                            font=("Segoe UI", 12)
+                        ).pack(pady=10)
                 else:
                     ctk.CTkLabel(
                         main_frame,
-                        text="ℹ️ No se encontraron registros de tratamientos",
+                        text="ℹ️ La tabla de tratamientos no existe aún",
                         font=("Segoe UI", 12)
-                    ).pack(pady=20)
-
+                    ).pack(pady=5)
         except Exception as e:
-            print(f"Error en tratamientos: {e}")
+            self.logger.error(f"Error en tratamientos: {e}")
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
@@ -455,8 +625,9 @@ class ReportesModule(ctk.CTkFrame):
 
     def generar_potreros(self):
         """Genera el reporte de potreros"""
+        self._style_treeview()
         main_frame = ctk.CTkScrollableFrame(self.report_area)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True)
@@ -468,26 +639,19 @@ class ReportesModule(ctk.CTkFrame):
             height=15
         )
 
-        columnas = [
-            ("nombre", "Potrero", 120),
-            ("finca", "Finca", 120),
-            ("sector", "Sector", 100),
-            ("area", "Área (Ha)", 90),
-            ("capacidad", "Capacidad", 90),
-            ("animales", "Animales", 80),
-            ("ocupacion", "Ocupación", 80),
-            ("pasto", "Tipo Pasto", 120),
-            ("estado", "Estado", 100)
-        ]
-
-        for col, heading, width in columnas:
-            tabla.heading(col, text=heading)
-            tabla.column(col, width=width, anchor="center")
-
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                where_parts = []
+                params = []
+                if self._pot_finca:
+                    where_parts.append("f.nombre = ?")
+                    params.append(self._pot_finca)
+                if self._pot_estado:
+                    where_parts.append("p.estado = ?")
+                    params.append(self._pot_estado)
+                where_clause = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+                query = f"""
                     SELECT 
                         p.nombre,
                         f.nombre as finca,
@@ -499,30 +663,35 @@ class ReportesModule(ctk.CTkFrame):
                         p.id
                     FROM potrero p
                     LEFT JOIN finca f ON p.id_finca = f.id
+                    {where_clause}
                     ORDER BY f.nombre, p.nombre
-                """)
-
+                """
+                cursor.execute(query, params)
+                mostrados = 0
                 for row in cursor.fetchall():
-                    # Contar animales en este potrero
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM animal 
-                        WHERE id_potrero = ? AND estado = 'Activo'
-                    """, (row[7],))
+                    cursor.execute("SELECT COUNT(*) FROM animal WHERE id_potrero = ? AND estado = 'Activo'", (row[7],))
                     cantidad_animales = cursor.fetchone()[0]
-                    
-                    # Calcular ocupación
                     capacidad = row[4] or 1
                     ocupacion = (cantidad_animales / capacidad) * 100 if capacidad > 0 else 0
-                    
+                    if self._pot_ocup_min is not None and ocupacion < self._pot_ocup_min:
+                        continue
                     area = f"{row[3]:.2f}" if row[3] else "-"
                     tabla.insert("", "end", values=(
-                        row[0], row[1] or "-", row[2] or "-", area, 
-                        row[4] or "-", cantidad_animales, f"{ocupacion:.1f}%",
-                        row[5] or "-", row[6] or "Activo"
+                        row[0], row[1] or "-", row[2] or "-", area,
+                        row[4] or "-", cantidad_animales, f"{ocupacion:.1f}%", row[5] or "-", row[6] or "Activo"
                     ))
+                    mostrados += 1
+                resumen_frame = ctk.CTkFrame(main_frame)
+                resumen_frame.pack(fill="x", pady=10)
+                filtros = []
+                if self._pot_finca: filtros.append(self._pot_finca)
+                if self._pot_estado: filtros.append(self._pot_estado)
+                if self._pot_ocup_min is not None: filtros.append(f"Ocup ≥ {self._pot_ocup_min}%")
+                filtros_text = " | Filtros: " + ", ".join(filtros) if filtros else ""
+                ctk.CTkLabel(resumen_frame, text=f"🌿 Potreros mostrados: {mostrados}{filtros_text}", font=("Segoe UI", 12, "bold")).pack(pady=5)
 
         except Exception as e:
-            print(f"Error en potreros: {e}")
+            self.logger.error(f"Error en potreros: {e}")
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
@@ -532,7 +701,7 @@ class ReportesModule(ctk.CTkFrame):
     def generar_actividad(self):
         """Genera el reporte de actividad reciente"""
         main_frame = ctk.CTkScrollableFrame(self.report_area)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         try:
             with db.get_connection() as conn:
@@ -541,36 +710,37 @@ class ReportesModule(ctk.CTkFrame):
                 info_text = "📅 ACTIVIDAD RECIENTE DEL SISTEMA\n\n"
                 info_text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-                # Animales registrados recientemente
-                cursor.execute("""
-                    SELECT COUNT(*) 
-                    FROM animal 
-                    WHERE fecha_registro >= date('now', '-30 days')
-                """)
-                nuevos_animales = cursor.fetchone()[0]
-                info_text += f"🐄 Animales registrados (últimos 30 días): {nuevos_animales}\n\n"
+                # Determinar rango base
+                rango_texto = "Últimos 30 días"
+                cond_animales = "fecha_registro >= date('now', '-30 days')"
+                cond_tratamientos = "fecha_inicio >= date('now', '-30 days')"
+                cond_ventas = "fecha >= date('now', '-30 days')"
+                params_anim = params_trat = params_ven = []
+                if self._f_inicio and self._f_fin:
+                    rango_texto = f"Rango {self._f_inicio} a {self._f_fin}"
+                    cond_animales = "date(fecha_registro) BETWEEN date(?) AND date(?)"
+                    cond_tratamientos = "date(fecha_inicio) BETWEEN date(?) AND date(?)"
+                    cond_ventas = "date(fecha) BETWEEN date(?) AND date(?)"
+                    params_anim = params_trat = params_ven = [self._f_inicio, self._f_fin]
 
-                # Tratamientos recientes
+                # Animales registrados en rango
+                cursor.execute(f"SELECT COUNT(*) FROM animal WHERE {cond_animales}", params_anim)
+                nuevos_animales = cursor.fetchone()[0]
+                info_text += f"🐄 Animales registrados ({rango_texto}): {nuevos_animales}\n\n"
+
+                # Tratamientos en rango
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tratamiento'")
                 if cursor.fetchone():
-                    cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM tratamiento 
-                        WHERE fecha_inicio >= date('now', '-30 days')
-                    """)
+                    cursor.execute(f"SELECT COUNT(*) FROM tratamiento WHERE {cond_tratamientos}", params_trat)
                     tratamientos_recientes = cursor.fetchone()[0]
-                    info_text += f"🏥 Tratamientos aplicados (30 días): {tratamientos_recientes}\n\n"
+                    info_text += f"🏥 Tratamientos aplicados ({rango_texto}): {tratamientos_recientes}\n\n"
 
-                # Ventas recientes
+                # Ventas en rango
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='venta'")
                 if cursor.fetchone():
-                    cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM venta 
-                        WHERE fecha >= date('now', '-30 days')
-                    """)
+                    cursor.execute(f"SELECT COUNT(*) FROM venta WHERE {cond_ventas}", params_ven)
                     ventas_recientes = cursor.fetchone()[0]
-                    info_text += f"💰 Ventas realizadas (30 días): {ventas_recientes}\n\n"
+                    info_text += f"💰 Ventas realizadas ({rango_texto}): {ventas_recientes}\n\n"
 
                 # Empleados activos
                 cursor.execute("SELECT COUNT(*) FROM empleado WHERE estado = 'Activo'")
@@ -587,15 +757,18 @@ class ReportesModule(ctk.CTkFrame):
                     justify="left",
                     anchor="nw"
                 )
-                label_info.pack(pady=20, padx=20, fill="both", expand=True)
+                # Mantener algo de aire visual (padx 20→10)
+                label_info.pack(pady=5, padx=10, fill="both", expand=True)
 
         except Exception as e:
-            print(f"Error en actividad: {e}")
+            self.logger.error(f"Error en actividad: {e}")
 
     def generar_empleados(self):
         """Genera el reporte de empleados"""
+        self._style_treeview()
         main_frame = ctk.CTkScrollableFrame(self.report_area)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        # Compactar margen horizontal (20→4)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True)
@@ -658,7 +831,7 @@ class ReportesModule(ctk.CTkFrame):
                 ).pack(pady=5)
 
         except Exception as e:
-            print(f"Error en empleados: {e}")
+            self.logger.error(f"Error en empleados: {e}")
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
@@ -668,7 +841,7 @@ class ReportesModule(ctk.CTkFrame):
     def generar_lotes(self):
         """Genera el reporte de lotes"""
         info_frame = ctk.CTkFrame(self.report_area)
-        info_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        info_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         info_text = """
 📦 REPORTE DE LOTES
@@ -696,7 +869,7 @@ Características próximas:
             justify="left",
             anchor="nw"
         )
-        label_info.pack(pady=20, padx=20, fill="both", expand=True)
+        label_info.pack(pady=5, padx=10, fill="both", expand=True)
 
     def exportar_reporte(self, tipo_reporte):
         """Exporta el reporte actual a CSV"""
@@ -706,14 +879,263 @@ Características próximas:
                 filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
                 title=f"Exportar {tipo_reporte}"
             )
-            
-            if filename:
-                messagebox.showinfo("Éxito", f"Reporte exportado como: {filename}")
-                # Aquí se implementaría la lógica de exportación real
+            if not filename:
+                return
+            # Preparar datos según reporte
+            headers, rows = self._generar_dataset(tipo_reporte)
+            if not rows:
+                messagebox.showinfo("Exportación", "No hay datos para exportar con los filtros actuales.")
+                return
+            # Escritura con BOM para Excel
+            with open(filename, "w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                writer.writerows(rows)
+            messagebox.showinfo("Éxito", f"Reporte exportado correctamente ({len(rows)} filas).")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo exportar el reporte:\n{e}")
+
+    def _generar_dataset(self, tipo_reporte):
+        """Devuelve (headers, rows) según tipo y filtros activos"""
+        try:
+            if "Inventario" in tipo_reporte:
+                headers = ["Código", "Nombre", "Sexo", "Raza", "Fecha Nac", "Potrero", "Estado", "Valor"]
+                rows = []
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    where_parts = []
+                    params = []
+                    if self._inv_sexo: where_parts.append("a.sexo = ?") or params.append(self._inv_sexo)
+                    if self._inv_estado: where_parts.append("a.estado = ?") or params.append(self._inv_estado)
+                    if self._inv_raza: where_parts.append("r.nombre = ?") or params.append(self._inv_raza)
+                    if self._inv_finca: where_parts.append("f.nombre = ?") or params.append(self._inv_finca)
+                    where_clause = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+                    query = f"""
+                        SELECT a.codigo, COALESCE(a.nombre,''), a.sexo, r.nombre, a.fecha_nacimiento, p.nombre, a.estado, a.precio_compra
+                        FROM animal a
+                        LEFT JOIN raza r ON a.raza_id = r.id
+                        LEFT JOIN potrero p ON a.id_potrero = p.id
+                        LEFT JOIN finca f ON p.id_finca = f.id
+                        {where_clause}
+                        ORDER BY a.estado, a.codigo
+                    """
+                    cursor.execute(query, params)
+                    for r in cursor.fetchall():
+                        fecha = r[4].strftime('%Y-%m-%d') if r[4] else ''
+                        rows.append([r[0], r[1], r[2], r[3] or '', fecha, r[5] or '', r[6], r[7] or 0])
+                return headers, rows
+            if "Ventas" in tipo_reporte:
+                headers = ["Fecha", "Animal", "Precio", "Comprador", "Motivo"]
+                rows = []
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='venta'")
+                    if not cursor.fetchone():
+                        return headers, rows
+                    where_clause = ""
+                    params = []
+                    if self._f_inicio and self._f_fin:
+                        where_clause = "WHERE date(v.fecha) BETWEEN date(?) AND date(?)"
+                        params = [self._f_inicio, self._f_fin]
+                    query = f"""
+                        SELECT v.fecha, a.codigo || ' - ' || COALESCE(a.nombre,''), v.precio_total, v.comprador, v.motivo_venta
+                        FROM venta v JOIN animal a ON v.id_animal = a.id
+                        {where_clause}
+                        ORDER BY v.fecha DESC
+                    """
+                    cursor.execute(query, params)
+                    for r in cursor.fetchall():
+                        fecha = r[0].strftime('%Y-%m-%d') if r[0] else ''
+                        rows.append([fecha, r[1], r[2] or 0, r[3] or '', r[4] or ''])
+                return headers, rows
+            if "Tratamientos" in tipo_reporte:
+                headers = ["Fecha", "Animal", "Diagnóstico", "Producto", "Dosis", "Veterinario"]
+                rows = []
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tratamiento'")
+                    if not cursor.fetchone():
+                        return headers, rows
+                    where_clause = ""
+                    params = []
+                    if self._f_inicio and self._f_fin:
+                        where_clause = "WHERE date(t.fecha_inicio) BETWEEN date(?) AND date(?)"
+                        params = [self._f_inicio, self._f_fin]
+                    query = f"""
+                        SELECT t.fecha_inicio, a.codigo || ' - ' || COALESCE(a.nombre,''), d.descripcion, t.producto, t.dosis, t.veterinario
+                        FROM tratamiento t
+                        JOIN animal a ON t.id_animal = a.id
+                        LEFT JOIN diagnostico_veterinario d ON t.id_diagnostico = d.id
+                        {where_clause}
+                        ORDER BY t.fecha_inicio DESC
+                    """
+                    cursor.execute(query, params)
+                    for r in cursor.fetchall():
+                        fecha = r[0].strftime('%Y-%m-%d') if r[0] else ''
+                        rows.append([fecha, r[1], r[2] or '', r[3] or '', r[4] or '', r[5] or ''])
+                return headers, rows
+            if "Potreros" in tipo_reporte:
+                headers = ["Potrero", "Finca", "Sector", "Área Ha", "Capacidad", "Animales", "Ocupación %", "Tipo Pasto", "Estado"]
+                rows = []
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    where_parts = []
+                    params = []
+                    if self._pot_finca: where_parts.append("f.nombre = ?") or params.append(self._pot_finca)
+                    if self._pot_estado: where_parts.append("p.estado = ?") or params.append(self._pot_estado)
+                    where_clause = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+                    query = f"""
+                        SELECT p.nombre, f.nombre, p.sector, p.area_hectareas, p.capacidad_maxima, p.tipo_pasto, p.estado, p.id
+                        FROM potrero p LEFT JOIN finca f ON p.id_finca = f.id
+                        {where_clause}
+                        ORDER BY f.nombre, p.nombre
+                    """
+                    cursor.execute(query, params)
+                    for r in cursor.fetchall():
+                        cursor.execute("SELECT COUNT(*) FROM animal WHERE id_potrero = ? AND estado='Activo'", (r[7],))
+                        cant = cursor.fetchone()[0]
+                        cap = r[4] or 1
+                        ocup = (cant / cap) * 100 if cap > 0 else 0
+                        if self._pot_ocup_min is not None and ocup < self._pot_ocup_min:
+                            continue
+                        rows.append([r[0], r[1] or '', r[2] or '', f"{(r[3] or 0):.2f}", r[4] or 0, cant, f"{ocup:.1f}", r[5] or '', r[6] or 'Activo'])
+                return headers, rows
+            if "Actividad" in tipo_reporte:
+                headers = ["Métrica", "Valor"]
+                # Reutilizar texto mostrado ya calculado con nueva consulta
+                rows = []
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    # Similar a generar_actividad pero resumido
+                    cond_animales = "fecha_registro >= date('now','-30 days')"
+                    params_anim = []
+                    if self._f_inicio and self._f_fin:
+                        cond_animales = "date(fecha_registro) BETWEEN date(?) AND date(?)"
+                        params_anim = [self._f_inicio, self._f_fin]
+                    cursor.execute(f"SELECT COUNT(*) FROM animal WHERE {cond_animales}", params_anim)
+                    rows.append(["Animales registrados", cursor.fetchone()[0]])
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tratamiento'")
+                    if cursor.fetchone():
+                        cond_trat = "fecha_inicio >= date('now','-30 days')"
+                        params_trat = []
+                        if self._f_inicio and self._f_fin:
+                            cond_trat = "date(fecha_inicio) BETWEEN date(?) AND date(?)"
+                            params_trat = [self._f_inicio, self._f_fin]
+                        cursor.execute(f"SELECT COUNT(*) FROM tratamiento WHERE {cond_trat}", params_trat)
+                        rows.append(["Tratamientos aplicados", cursor.fetchone()[0]])
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='venta'")
+                    if cursor.fetchone():
+                        cond_ven = "fecha >= date('now','-30 days')"
+                        params_ven = []
+                        if self._f_inicio and self._f_fin:
+                            cond_ven = "date(fecha) BETWEEN date(?) AND date(?)"
+                            params_ven = [self._f_inicio, self._f_fin]
+                        cursor.execute(f"SELECT COUNT(*) FROM venta WHERE {cond_ven}", params_ven)
+                        rows.append(["Ventas realizadas", cursor.fetchone()[0]])
+                return headers, rows
+        except Exception as e:
+            self.logger.error(f"Error generando dataset: {e}")
+        return [], []
+
+    def ver_grafico(self, tipo_reporte):
+        if plt is None:
+            messagebox.showwarning("Gráfico", "matplotlib no disponible.")
+            return
+        headers, rows = self._generar_dataset(tipo_reporte)
+        if not rows:
+            messagebox.showinfo("Gráfico", "No hay datos para graficar.")
+            return
+        win = ctk.CTkToplevel(self)
+        win.title(f"Gráfico - {tipo_reporte}")
+        win.geometry("640x480")
+        # Crear figura según tipo
+        fig, ax = plt.subplots(figsize=(6,4))
+        if "Inventario" in tipo_reporte:
+            # Conteo por sexo y estado
+            sexo_counts = {}
+            estado_counts = {}
+            for r in rows:
+                sexo_counts[r[2]] = sexo_counts.get(r[2],0)+1
+                estado_counts[r[6]] = estado_counts.get(r[6],0)+1
+            categorias = list(sexo_counts.keys())
+            valores = [sexo_counts[c] for c in categorias]
+            ax.bar(categorias, valores, color="#1976D2")
+            ax.set_title("Inventario por Sexo")
+        elif "Ventas" in tipo_reporte:
+            # Distribución por motivo
+            motivo_idx = headers.index("Motivo")
+            motivo_counts = {}
+            for r in rows:
+                motivo = r[motivo_idx] or "(Sin)"
+                motivo_counts[motivo] = motivo_counts.get(motivo,0)+1
+            categorias = list(motivo_counts.keys())
+            valores = [motivo_counts[c] for c in categorias]
+            ax.barh(categorias, valores, color="#388E3C")
+            ax.set_title("Ventas por Motivo")
+        elif "Tratamientos" in tipo_reporte:
+            diag_idx = headers.index("Diagnóstico")
+            diag_counts = {}
+            for r in rows:
+                d = r[diag_idx] or "(Sin)"
+                diag_counts[d] = diag_counts.get(d,0)+1
+            categorias = list(diag_counts.keys())[:15]
+            valores = [diag_counts[c] for c in categorias]
+            ax.barh(categorias, valores, color="#D32F2F")
+            ax.set_title("Top Diagnósticos")
+        elif "Potreros" in tipo_reporte:
+            ocup_idx = headers.index("Ocupación %")
+            pot_idx = headers.index("Potrero")
+            categorias = [r[pot_idx] for r in rows][:20]
+            valores = [float(r[ocup_idx]) for r in rows][:20]
+            ax.bar(categorias, valores, color="#FFA000")
+            ax.set_title("Ocupación Potreros (%)")
+            ax.tick_params(axis='x', rotation=45)
+        else:
+            ax.text(0.5,0.5,"Tipo no soportado", ha='center', va='center')
+        ax.grid(alpha=0.3)
+        fig.tight_layout()
+        try:
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            canvas = FigureCanvasTkAgg(fig, master=win)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+        except Exception as e:
+            self.logger.error(f"Error incrustando gráfico: {e}")
+            plt.close(fig)
+            messagebox.showerror("Gráfico", f"No se pudo mostrar el gráfico:\n{e}")
 
     def actualizar_reporte(self, tipo_reporte):
         """Actualiza el reporte actual"""
         self.mostrar_reporte(tipo_reporte)
         messagebox.showinfo("Actualizado", f"Reporte {tipo_reporte} actualizado")
+
+    # _add_tooltip eliminado: ahora se usa add_tooltip centralizado desde modules.utils.ui
+
+    def _style_treeview(self):
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure(
+            "Treeview",
+            background=self._fg_card,
+            fieldbackground=self._fg_card,
+            foreground="black" if self._modo == "Light" else "white",
+            rowheight=28
+        )
+        style.map("Treeview", background=[('selected', self._sel)])
+
+    # Helpers para cargar listas
+    def _cargar_fincas_lista(self):
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor(); cursor.execute("SELECT nombre FROM finca WHERE estado='Activo'");
+                return [r[0] for r in cursor.fetchall() if r[0]]
+        except Exception:
+            return []
+
+    def _cargar_razas_lista(self):
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor(); cursor.execute("SELECT nombre FROM raza ORDER BY nombre");
+                return [r[0] for r in cursor.fetchall() if r[0]]
+        except Exception:
+            return []

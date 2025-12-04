@@ -25,6 +25,12 @@ TEMPLATES = {
     'calidad_animal': ['codigo', 'nombre', 'descripcion'],
     'proveedores': ['codigo', 'nombre', 'telefono', 'email', 'direccion'],
     'empleados': ['codigo', 'nombre', 'identificacion', 'telefono', 'email', 'cargo'],
+    # Nueva plantilla para registro masivo de animales
+    'animales': [
+        'codigo', 'tipo_ingreso', 'sexo', 'fecha_nacimiento', 'fecha_compra',
+        'finca', 'raza', 'potrero', 'peso_nacimiento', 'peso_compra',
+        'precio_compra', 'salud', 'color', 'hierro', 'comentarios'
+    ],
 }
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'assets', 'templates')

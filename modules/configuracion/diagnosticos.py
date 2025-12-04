@@ -23,7 +23,7 @@ class DiagnosticosFrame(ctk.CTkFrame):
 
         # Frame del formulario
         form_frame = ctk.CTkFrame(self, corner_radius=10)
-        form_frame.pack(pady=10, padx=20, fill="x")
+        form_frame.pack(pady=10, padx=4, fill="x")
 
         ctk.CTkLabel(form_frame, text="📝 Nuevo Diagnóstico", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
 
@@ -59,11 +59,11 @@ class DiagnosticosFrame(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text="🔄 Limpiar", command=self.limpiar_formulario).pack(side="left", padx=5)
 
         # Separador
-        ctk.CTkLabel(self, text="📋 Diagnósticos Registrados", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=20)
+        ctk.CTkLabel(self, text="📋 Diagnósticos Registrados", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=4)
 
         # Frame de la tabla
         table_frame = ctk.CTkFrame(self)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        table_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         # Tabla
         self.tabla = ttk.Treeview(table_frame, columns=("codigo", "descripcion", "tipo", "comentario"), show="headings", height=12)

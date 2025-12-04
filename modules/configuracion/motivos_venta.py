@@ -17,13 +17,17 @@ class MotivosVentaFrame(ctk.CTkFrame):
         self.cargar_motivos()
 
     def crear_widgets(self):
+        # Frame scrollable principal para toda la interfaz
+        scroll_container = ctk.CTkScrollableFrame(self)
+        scroll_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
         # Título
-        titulo = ctk.CTkLabel(self, text="📋 Configuración de Motivos de Venta", font=("Segoe UI", 20, "bold"))
+        titulo = ctk.CTkLabel(scroll_container, text="📋 Configuración de Motivos de Venta", font=("Segoe UI", 20, "bold"))
         titulo.pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self, corner_radius=10)
-        form_frame.pack(pady=10, padx=20, fill="x")
+        form_frame = ctk.CTkFrame(scroll_container, corner_radius=10)
+        form_frame.pack(pady=10, padx=4, fill="x")
 
         ctk.CTkLabel(form_frame, text="📝 Nuevo Motivo", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
 
@@ -52,11 +56,11 @@ class MotivosVentaFrame(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text="🔄 Limpiar", command=self.limpiar_formulario).pack(side="left", padx=5)
 
         # Separador
-        ctk.CTkLabel(self, text="📋 Motivos Registrados", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=20)
+        ctk.CTkLabel(scroll_container, text="📋 Motivos Registrados", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=4)
 
         # Frame de la tabla
-        table_frame = ctk.CTkFrame(self)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        table_frame = ctk.CTkFrame(scroll_container)
+        table_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         # Tabla
         self.tabla = ttk.Treeview(table_frame, columns=("codigo", "descripcion", "comentario"), show="headings", height=12)
@@ -79,7 +83,7 @@ class MotivosVentaFrame(ctk.CTkFrame):
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
-        action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_frame = ctk.CTkFrame(scroll_container, fg_color="transparent")
         action_frame.pack(pady=10)
         
         ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_motivo).pack(side="left", padx=5)
@@ -89,7 +93,7 @@ class MotivosVentaFrame(ctk.CTkFrame):
         ctk.CTkButton(action_frame, text="📥 Importar Excel", command=self.importar_excel).pack(side="left", padx=5)
 
     def guardar_motivo(self):
-        """Guarda un nuevo motivo de venta"""
+        """Guarda un nuevo motivo de venta o actualiza si está en edición"""
         codigo = self.entry_codigo.get().strip()
         descripcion = self.entry_descripcion.get().strip()
         
@@ -100,18 +104,29 @@ class MotivosVentaFrame(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO motivo_venta (codigo, descripcion, comentario, estado)
-                    VALUES (?, ?, ?, ?)
-                """, (
-                    codigo,
-                    descripcion,
-                    self.text_comentario.get("1.0", "end-1c").strip(),
-                    "Activo"
-                ))
+                if self.entry_codigo.cget("state") == "disabled":
+                    cursor.execute("""
+                        UPDATE motivo_venta 
+                        SET descripcion = ?, comentario = ?
+                        WHERE codigo = ?
+                    """, (
+                        descripcion,
+                        self.text_comentario.get("1.0", "end-1c").strip(),
+                        codigo
+                    ))
+                else:
+                    cursor.execute("""
+                        INSERT INTO motivo_venta (codigo, descripcion, comentario, estado)
+                        VALUES (?, ?, ?, ?)
+                    """, (
+                        codigo,
+                        descripcion,
+                        self.text_comentario.get("1.0", "end-1c").strip(),
+                        "Activo"
+                    ))
                 conn.commit()
 
-            messagebox.showinfo("Éxito", "Motivo de venta guardado correctamente.")
+            messagebox.showinfo("Éxito", "Motivo de venta guardado correctamente." if self.entry_codigo.cget("state") != "disabled" else "Motivo de venta actualizado correctamente.")
             self.limpiar_formulario()
             self.cargar_motivos()
             
@@ -131,7 +146,8 @@ class MotivosVentaFrame(ctk.CTkFrame):
                 cursor.execute("SELECT codigo, descripcion, comentario FROM motivo_venta WHERE estado = 'Activo'")
                 
                 for fila in cursor.fetchall():
-                    self.tabla.insert("", "end", values=fila)
+                    valores = tuple(str(v) if v is not None else "" for v in fila)
+                    self.tabla.insert("", "end", values=valores)
                     
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los motivos:\n{e}")
@@ -141,7 +157,25 @@ class MotivosVentaFrame(ctk.CTkFrame):
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione un motivo para editar.")
             return
-        messagebox.showinfo("Editar", "Funcionalidad de edición en desarrollo")
+        codigo = self.tabla.item(seleccionado[0])["values"][0]
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT codigo, descripcion, comentario FROM motivo_venta WHERE codigo = ?", (codigo,))
+                row = cursor.fetchone()
+                if not row:
+                    messagebox.showerror("Error", "No se encontró el motivo")
+                    return
+                self.entry_codigo.delete(0, "end")
+                self.entry_codigo.insert(0, str(row[0]))
+                self.entry_codigo.configure(state="disabled")
+                self.entry_descripcion.delete(0, "end")
+                self.entry_descripcion.insert(0, str(row[1]))
+                self.text_comentario.delete("1.0", "end")
+                if row[2]:
+                    self.text_comentario.insert("1.0", str(row[2]))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el motivo:\n{e}")
 
     def eliminar_motivo(self):
         seleccionado = self.tabla.selection()
@@ -150,11 +184,11 @@ class MotivosVentaFrame(ctk.CTkFrame):
             return
         
         codigo = self.tabla.item(seleccionado[0])["values"][0]
-        if messagebox.askyesno("Confirmar", f"¿Eliminar el motivo '{codigo}'?"):
+        if messagebox.askyesno("Confirmar", f"¿Eliminar el motivo '{codigo}'?\n\nEsta acción no se puede deshacer."):
             try:
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE motivo_venta SET estado = 'Inactivo' WHERE codigo = ?", (codigo,))
+                    cursor.execute("DELETE FROM motivo_venta WHERE codigo = ?", (codigo,))
                     conn.commit()
                 messagebox.showinfo("Éxito", "Motivo eliminado.")
                 self.cargar_motivos()
@@ -162,6 +196,7 @@ class MotivosVentaFrame(ctk.CTkFrame):
                 messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
 
     def limpiar_formulario(self):
+        self.entry_codigo.configure(state="normal")
         self.entry_codigo.delete(0, "end")
         self.entry_descripcion.delete(0, "end")
         self.text_comentario.delete("1.0", "end")

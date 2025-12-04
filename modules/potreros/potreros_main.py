@@ -5,54 +5,69 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from database import db
+from modules.utils.ui import get_theme_colors, style_treeview, add_tooltip
 
 
 class PotrerosModule(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        self._colors = get_theme_colors()
+        self._modo = self._colors["mode"]
+        self._fg_card = self._colors["fg"]
+        self._sel_card = self._colors["sel"]
+        self._hover_card = self._colors["hover"]
         self.crear_widgets()
         self.cargar_potreros()
 
     def crear_widgets(self):
-        # Título
+        # Título compacto
         titulo = ctk.CTkLabel(
             self,
             text="🌿 Gestión de Potreros",
-            font=("Segoe UI", 22, "bold")
+            font=("Segoe UI", 22, "bold"),
+            text_color=self._sel_card
         )
-        titulo.pack(pady=15)
+        titulo.pack(pady=(5, 3))
+        add_tooltip(titulo, "Gestión y visualización de potreros en la finca")
 
-        # Frame principal
+        # Frame principal expandido
         main_frame = ctk.CTkFrame(self)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=2, pady=(3, 10))
 
         # Información general
         info_frame = ctk.CTkFrame(main_frame)
-        info_frame.pack(fill="x", pady=10)
+        info_frame.pack(fill="x", pady=5)
 
-        ctk.CTkLabel(
+        info_label = ctk.CTkLabel(
             info_frame,
             text="💡 Para agregar o editar potreros, use el módulo de Configuración > Potreros",
             font=("Segoe UI", 12),
-            wraplength=600
-        ).pack(pady=10)
+            wraplength=600,
+            text_color="gray"
+        )
+        info_label.pack(pady=5)
+        add_tooltip(info_label, "Acceso rápido a configuración de potreros")
 
         # Métricas rápidas
         self.crear_metricas_rapidas(main_frame)
 
         # Tabla de potreros
-        ctk.CTkLabel(
+        tabla_label = ctk.CTkLabel(
             main_frame,
             text="📋 Potreros Registrados",
-            font=("Segoe UI", 18, "bold")
-        ).pack(pady=(20, 10))
+            font=("Segoe UI", 18, "bold"),
+            text_color=self._sel_card
+        )
+        tabla_label.pack(pady=(10, 5))
+        add_tooltip(tabla_label, "Listado de todos los potreros registrados")
 
         # Frame para la tabla
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True)
 
         # Tabla
+        style_treeview()
         self.tabla = ttk.Treeview(
             table_frame,
             columns=("finca", "nombre", "sector", "area", "capacidad", "animales", "pasto", "estado"),
@@ -83,38 +98,52 @@ class PotrerosModule(ctk.CTkFrame):
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
-        action_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        action_frame.pack(pady=15)
+        action_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        action_frame.pack(pady=5)
 
-        ctk.CTkButton(
+        btn_actualizar = ctk.CTkButton(
             action_frame,
             text="🔄 Actualizar",
             command=self.cargar_potreros,
-            width=150
-        ).pack(side="left", padx=5)
+            width=150,
+            fg_color=self._sel_card,
+            hover_color=self._hover_card
+        )
+        btn_actualizar.pack(side="left", padx=5)
+        add_tooltip(btn_actualizar, "Recargar la lista y métricas de potreros")
 
-        ctk.CTkButton(
+        btn_detalles = ctk.CTkButton(
             action_frame,
             text="📊 Ver Detalles",
             command=self.ver_detalles_potrero,
-            width=150
-        ).pack(side="left", padx=5)
+            width=150,
+            fg_color=self._sel_card,
+            hover_color=self._hover_card
+        )
+        btn_detalles.pack(side="left", padx=5)
+        add_tooltip(btn_detalles, "Ver información detallada del potrero seleccionado")
 
-        ctk.CTkButton(
+        btn_animales = ctk.CTkButton(
             action_frame,
             text="🐄 Ver Animales",
             command=self.ver_animales_potrero,
-            width=150
-        ).pack(side="left", padx=5)
+            width=150,
+            fg_color=self._sel_card,
+            hover_color=self._hover_card
+        )
+        btn_animales.pack(side="left", padx=5)
+        add_tooltip(btn_animales, "Ver animales asignados al potrero seleccionado")
 
-        ctk.CTkButton(
+        btn_config = ctk.CTkButton(
             action_frame,
             text="⚙️ Configurar Potreros",
             command=self.abrir_configuracion,
             width=200,
-            fg_color="green",
-            hover_color="#006400"
-        ).pack(side="left", padx=5)
+            fg_color="#388E3C" if self._modo == "Light" else "#006400",
+            hover_color="#43A047" if self._modo == "Light" else "#228B22"
+        )
+        btn_config.pack(side="left", padx=5)
+        add_tooltip(btn_config, "Ir a configuración avanzada de potreros")
 
     def crear_metricas_rapidas(self, parent):
         """Crea métricas rápidas de potreros"""
@@ -137,14 +166,16 @@ class PotrerosModule(ctk.CTkFrame):
         card = ctk.CTkFrame(parent, fg_color=color, corner_radius=12)
         card.grid(row=0, column=columna, sticky="ew", padx=5)
 
-        ctk.CTkLabel(card, text=titulo, font=("Segoe UI", 12),
-                     text_color="white").pack(pady=(10, 5))
+        label = ctk.CTkLabel(card, text=titulo, font=("Segoe UI", 12), text_color="white")
+        label.pack(pady=(10, 5))
+        add_tooltip(label, f"Métrica: {titulo}")
 
-        valor_label = ctk.CTkLabel(card, text=valor, font=("Segoe UI", 16, "bold"),
-                                   text_color="white")
+        valor_label = ctk.CTkLabel(card, text=valor, font=("Segoe UI", 16, "bold"), text_color="white")
         valor_label.pack(pady=(0, 10))
+        add_tooltip(valor_label, f"Valor actual de {titulo}")
 
         return valor_label
+    
 
     def cargar_potreros(self):
         """Carga los potreros en la tabla y actualiza métricas"""
@@ -310,7 +341,7 @@ class PotrerosModule(ctk.CTkFrame):
                     SELECT 
                         a.codigo, a.nombre, r.nombre as raza, a.sexo, a.estado
                     FROM animal a
-                    LEFT JOIN raza r ON a.id_raza = r.id
+                    LEFT JOIN raza r ON a.raza_id = r.id
                     WHERE a.id_potrero = (
                         SELECT p.id FROM potrero p
                         LEFT JOIN finca f ON p.id_finca = f.id
@@ -330,7 +361,8 @@ class PotrerosModule(ctk.CTkFrame):
 
                     # Frame principal
                     main_frame = ctk.CTkFrame(ventana_animales)
-                    main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+                    # Compactar ancho (20→4)
+                    main_frame.pack(fill="both", expand=True, padx=4, pady=5)
 
                     ctk.CTkLabel(
                         main_frame,

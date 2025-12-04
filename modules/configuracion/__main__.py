@@ -2,6 +2,7 @@ import customtkinter as ctk
 import sys
 import os
 import logging
+from modules.utils.ui import add_tooltip
 
 # Ensure the parent directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -13,10 +14,15 @@ class ConfiguracionModule(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        # Colores y modo adaptativos
+        self._modo = ctk.get_appearance_mode()
+        self._fg_card = "#2B2B2B" if self._modo == "Dark" else "#F5F5F5"
+        self._sel = "#1976D2" if self._modo == "Light" else "#1F538D"
+        self._hover = "#90caf9" if self._modo == "Light" else "#14375E"
         
         # Frame principal con dos columnas
         self.main_container = ctk.CTkFrame(self)
-        self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        self.main_container.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Configurar grid
         self.main_container.grid_columnconfigure(0, weight=0)  # Menú lateral
@@ -43,11 +49,13 @@ class ConfiguracionModule(ctk.CTkFrame):
         
         # Título del menú
         titulo_menu = ctk.CTkLabel(menu_frame, text="📋 Configuraciones", 
-                                  font=("Segoe UI", 16, "bold"))
+                                   font=("Segoe UI", 16, "bold"),
+                                   text_color=self._sel)
         titulo_menu.pack(pady=15)
-        
+        add_tooltip(titulo_menu, "Parámetros y catálogos del sistema")
+
         # Separador
-        separador = ctk.CTkFrame(menu_frame, height=2, fg_color="gray")
+        separador = ctk.CTkFrame(menu_frame, height=2, fg_color=("#D0D0D0" if self._modo == "Light" else "#404040"))
         separador.pack(fill="x", padx=10, pady=5)
         
         # Categorías y módulos - VERSIÓN MEJORADA CON MANEJO DINÁMICO
@@ -86,6 +94,7 @@ class ConfiguracionModule(ctk.CTkFrame):
                                    font=("Segoe UI", 12, "bold"),
                                    text_color="gray")
             cat_label.pack(anchor="w", padx=15, pady=(15, 5))
+            add_tooltip(cat_label, f"{categoria}")
             
             # Botones de la categoría
             for texto, modulo_id, comando in modulos:
@@ -94,13 +103,16 @@ class ConfiguracionModule(ctk.CTkFrame):
                                    width=200,
                                    height=35,
                                    corner_radius=8,
-                                   command=comando)
+                                   command=comando,
+                                   fg_color=self._sel,
+                                   hover_color=self._hover)
                 btn.pack(pady=2, padx=10)
                 # Guardar referencia para posible uso futuro
                 btn.modulo_id = modulo_id
+                add_tooltip(btn, f"Abrir {texto}")
             
             # Separador entre categorías
-            separador_cat = ctk.CTkFrame(menu_frame, height=1, fg_color="lightgray")
+            separador_cat = ctk.CTkFrame(menu_frame, height=1, fg_color=("#E0E0E0" if self._modo == "Light" else "#303030"))
             separador_cat.pack(fill="x", padx=10, pady=8)
     
     def limpiar_area_trabajo(self):
@@ -118,7 +130,8 @@ class ConfiguracionModule(ctk.CTkFrame):
         try:
             # Frame de contenido
             content_frame = ctk.CTkFrame(self.work_area)
-            content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            # Compactar ancho (20→4)
+            content_frame.pack(fill="both", expand=True, padx=4, pady=20)
             
             # Icono grande
             icono = ctk.CTkLabel(content_frame, text="⚙️", 
@@ -128,8 +141,10 @@ class ConfiguracionModule(ctk.CTkFrame):
             # Título
             titulo = ctk.CTkLabel(content_frame, 
                                  text="Configuración del Sistema",
-                                 font=("Segoe UI", 28, "bold"))
+                                 font=("Segoe UI", 28, "bold"),
+                                 text_color=self._sel)
             titulo.pack(pady=10)
+            add_tooltip(titulo, "Centro de configuración de FincaFácil")
             
             # Descripción
             descripcion = ctk.CTkLabel(content_frame,
@@ -222,7 +237,8 @@ class ConfiguracionModule(ctk.CTkFrame):
         """Muestra un mensaje de error en el área de trabajo"""
         try:
             error_frame = ctk.CTkFrame(self.work_area)
-            error_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            # Compactar ancho (20→4)
+            error_frame.pack(fill="both", expand=True, padx=4, pady=20)
             
             ctk.CTkLabel(error_frame, text="❌ Error", 
                         font=("Segoe UI", 20, "bold"), 
@@ -237,8 +253,10 @@ class ConfiguracionModule(ctk.CTkFrame):
                         text_color="gray").pack(pady=10)
             
             # Botón para regresar al inicio
-            ctk.CTkButton(error_frame, text="🏠 Volver al Inicio", 
-                         command=self.mostrar_inicio).pack(pady=10)
+            btn_volver = ctk.CTkButton(error_frame, text="🏠 Volver al Inicio", 
+                         command=self.mostrar_inicio, fg_color=self._sel, hover_color=self._hover)
+            btn_volver.pack(pady=10)
+            add_tooltip(btn_volver, "Regresar a la pantalla de inicio")
                         
         except Exception as e:
             logger.error(f"Error al mostrar mensaje de error: {e}")
@@ -250,3 +268,5 @@ class ConfiguracionModule(ctk.CTkFrame):
     def ocultar(self):
         """Oculta el módulo (para compatibilidad)"""
         self.pack_forget()
+
+    # _add_tooltip eliminado: ahora se usa add_tooltip centralizado desde modules.utils.ui

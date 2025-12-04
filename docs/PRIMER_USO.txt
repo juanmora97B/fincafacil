@@ -1,0 +1,256 @@
+═══════════════════════════════════════════════════════════
+    FINCAFACIL - PRIMEROS PASOS
+    Guía de Inicio Rápido
+═══════════════════════════════════════════════════════════
+
+¡FELICITACIONES!
+
+La instalación de FincaFacil se ha completado exitosamente.
+
+
+PRIMER INICIO
+═══════════════════════════════════════════════════════════
+
+La primera vez que ejecute FincaFacil:
+
+1. ✨ Tour Interactivo Automático
+   
+   Se iniciará automáticamente un tour que le guiará por
+   todas las funcionalidades del sistema.
+   
+   Este tour es OPCIONAL:
+   • Puede cancelarlo en cualquier momento
+   • Puede reiniciarlo desde Ajustes > Iniciar Tour
+   
+
+2. 🗄️ Inicialización de Base de Datos
+   
+   El sistema creará automáticamente:
+   • Base de datos SQLite
+   • Tablas y estructura
+   • Configuración inicial
+   
+   Este proceso es automático y toma solo segundos.
+
+
+CONFIGURACIÓN INICIAL RECOMENDADA
+═══════════════════════════════════════════════════════════
+
+Para comenzar a usar FincaFacil, siga estos pasos:
+
+
+PASO 1: Configurar su Finca
+───────────────────────────────────────────────────────────
+   Ir a: Configuración > Fincas
+   
+   • Registre el nombre de su finca
+   • Agregue ubicación y detalles
+   • Configure datos básicos
+
+
+PASO 2: Definir Estructura
+───────────────────────────────────────────────────────────
+   Ir a: Configuración > Lotes/Potreros/Sectores
+   
+   • Cree los lotes de su finca
+   • Defina potreros
+   • Organice sectores
+
+
+PASO 3: Registrar Razas
+───────────────────────────────────────────────────────────
+   Ir a: Configuración > Razas
+   
+   • Agregue las razas de ganado que maneja
+   • Ejemplos: Holstein, Jersey, Brahman, etc.
+
+
+PASO 4: Registrar Animales
+───────────────────────────────────────────────────────────
+   Ir a: Animales > Registro de Animal
+   
+   • Registre cada animal individualmente
+   • O use: Animales > Importar desde Excel
+     para cargar múltiples animales
+
+
+PASO 5: Explorar el Dashboard
+───────────────────────────────────────────────────────────
+   Ir a: Dashboard
+   
+   • Revise las métricas de su finca
+   • Observe las notificaciones
+   • Familiarícese con los gráficos
+
+
+FUNCIONES DESTACADAS
+═══════════════════════════════════════════════════════════
+
+📚 Manual de Usuario
+   Acceso: Ajustes > Ayuda y Documentación > Abrir Manual PDF
+   
+   Contiene información detallada de cada módulo.
+
+
+🔄 Backup Automático
+   • Se activa cada 24 horas al cerrar la aplicación
+   • Los backups se guardan en: instalacion\backup\
+   • No requiere configuración adicional
+
+
+🔔 Sistema de Notificaciones
+   • Alertas de partos próximos (7 días antes)
+   • Avisos de bajo stock de insumos
+   • Recordatorios de tratamientos
+   • Notificaciones de mantenimiento
+   
+   Todas visibles en el Dashboard.
+
+
+📊 Generación de Reportes
+   Ir a: Reportes
+   
+   • Inventario de animales
+   • Producción de leche
+   • Historial de ventas
+   • Reportes personalizados
+   
+   Formatos: PDF y Excel
+
+
+ATAJOS ÚTILES
+═══════════════════════════════════════════════════════════
+
+Navegación rápida desde el menú lateral:
+
+🏠 Dashboard        - Resumen general
+🐄 Animales         - Gestión de inventario
+💕 Reproducción     - Control reproductivo
+🏥 Salud            - Historial médico
+🌿 Potreros         - Ubicaciones
+💊 Tratamientos     - Medicamentos
+💰 Ventas           - Comercialización
+📦 Insumos          - Suministros
+🔧 Herramientas     - Equipos
+📊 Reportes         - Informes
+👥 Nómina           - Empleados
+⚙️  Ajustes         - Configuración
+
+
+IMPORTAR DATOS DESDE EXCEL
+═══════════════════════════════════════════════════════════
+
+Si ya tiene datos de su finca en Excel:
+
+1. Ir a: Animales > Importar desde Excel
+
+2. Descargar la plantilla proporcionada
+
+3. Llenar la plantilla con sus datos
+
+4. Importar el archivo completado
+
+5. El sistema validará y registrará automáticamente
+
+
+CONSEJOS IMPORTANTES
+═══════════════════════════════════════════════════════════
+
+✓ Backup Regular
+  Aunque el sistema hace backup automático, puede crear
+  copias manuales adicionales copiando la carpeta:
+  C:\Program Files\FincaFacil\database\
+
+
+✓ Actualizar Diariamente
+  Registre eventos el mismo día que ocurren:
+  • Nacimientos
+  • Servicios
+  • Tratamientos
+  • Ventas
+
+
+✓ Revisar Dashboard
+  Consulte el dashboard diariamente para:
+  • Ver notificaciones importantes
+  • Monitorear métricas clave
+  • Identificar alertas
+
+
+✓ Exportar Reportes
+  Genere reportes periódicos para:
+  • Análisis de productividad
+  • Toma de decisiones
+  • Cumplimiento regulatorio
+
+
+SOLUCIÓN DE PROBLEMAS COMUNES
+═══════════════════════════════════════════════════════════
+
+❓ La aplicación no inicia
+   • Ejecute como Administrador (clic derecho > Ejecutar como administrador)
+   • Verifique que no haya otra instancia abierta
+
+
+❓ No puedo guardar datos
+   • Verifique permisos de escritura en la carpeta
+   • Ejecute como Administrador
+
+
+❓ Error de base de datos
+   • Restaure desde backup: database\backup\
+   • Copie el archivo .db más reciente a database\
+
+
+❓ Ventana muy pequeña o muy grande
+   • Ajuste desde: Ajustes > Configuración de Pantalla
+   • La ventana se puede redimensionar manualmente
+
+
+RECURSOS ADICIONALES
+═══════════════════════════════════════════════════════════
+
+📖 Manual Completo
+   Ubicación: Menú Inicio > FincaFacil > Manual de Usuario
+   Contiene explicaciones detalladas de cada función.
+
+
+🎯 Tour Interactivo
+   Si canceló el tour inicial, puede reiniciarlo:
+   Ajustes > Tour Interactivo > Iniciar Tour
+
+
+📁 Ejemplos de Excel
+   La aplicación incluye plantillas de Excel pre-configuradas
+   para facilitar la importación de datos.
+
+
+RECOMENDACIONES FINALES
+═══════════════════════════════════════════════════════════
+
+1. Complete la configuración inicial antes de registrar datos
+
+2. Use el tour interactivo para familiarizarse
+
+3. Consulte el manual PDF ante dudas
+
+4. Mantenga backups regulares de su base de datos
+
+5. Actualice el sistema cuando haya nuevas versiones
+
+
+═══════════════════════════════════════════════════════════
+
+¡Está listo para comenzar!
+
+Haga clic en "Finalizar" para cerrar este asistente.
+
+Puede iniciar FincaFacil desde:
+  • Escritorio (si creó acceso directo)
+  • Menú Inicio > FincaFacil
+
+═══════════════════════════════════════════════════════════
+
+¡Que tenga una excelente experiencia con FincaFacil!
+
+═══════════════════════════════════════════════════════════

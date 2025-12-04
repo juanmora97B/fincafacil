@@ -17,13 +17,17 @@ class ProcedenciaFrame(ctk.CTkFrame):
         self.cargar_procedencias()
 
     def crear_widgets(self):
+        # Frame scrollable principal para toda la interfaz
+        scroll_container = ctk.CTkScrollableFrame(self)
+        scroll_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
         # Título
-        titulo = ctk.CTkLabel(self, text="📍 Configuración de Procedencias", font=("Segoe UI", 20, "bold"))
+        titulo = ctk.CTkLabel(scroll_container, text="📍 Configuración de Procedencias", font=("Segoe UI", 20, "bold"))
         titulo.pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self, corner_radius=10)
-        form_frame.pack(pady=10, padx=20, fill="x")
+        form_frame = ctk.CTkFrame(scroll_container, corner_radius=10)
+        form_frame.pack(pady=10, padx=4, fill="x")
 
         ctk.CTkLabel(form_frame, text="📝 Nueva Procedencia", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
 
@@ -31,10 +35,10 @@ class ProcedenciaFrame(ctk.CTkFrame):
         row1 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row1.pack(fill="x", pady=5)
         ctk.CTkLabel(row1, text="Código *:", width=100).pack(side="left", padx=5)
-        self.entry_codigo = ctk.CTkEntry(row1, width=150, )
+        self.entry_codigo = ctk.CTkEntry(row1, width=150)
         self.entry_codigo.pack(side="left", padx=5)
         ctk.CTkLabel(row1, text="Descripción *:", width=100).pack(side="left", padx=5)
-        self.entry_descripcion = ctk.CTkEntry(row1, width=200,)
+        self.entry_descripcion = ctk.CTkEntry(row1, width=200)
         self.entry_descripcion.pack(side="left", padx=5)
 
         row2 = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -49,7 +53,7 @@ class ProcedenciaFrame(ctk.CTkFrame):
         row3 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row3.pack(fill="x", pady=5)
         ctk.CTkLabel(row3, text="Ubicación:", width=100).pack(side="left", padx=5)
-        self.entry_ubicacion = ctk.CTkEntry(row3, width=200,)
+        self.entry_ubicacion = ctk.CTkEntry(row3, width=200)
         self.entry_ubicacion.pack(side="left", padx=5)
 
         row4 = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -67,11 +71,11 @@ class ProcedenciaFrame(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text="🔄 Limpiar", command=self.limpiar_formulario).pack(side="left", padx=5)
 
         # Separador
-        ctk.CTkLabel(self, text="📋 Procedencias Registradas", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=20)
+        ctk.CTkLabel(scroll_container, text="📋 Procedencias Registradas", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=4)
 
         # Frame de la tabla
-        table_frame = ctk.CTkFrame(self)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        table_frame = ctk.CTkFrame(scroll_container)
+        table_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         # Tabla
         self.tabla = ttk.Treeview(table_frame, columns=("codigo", "descripcion", "tipo_procedencia", "ubicacion", "comentario"), show="headings", height=12)
@@ -96,7 +100,7 @@ class ProcedenciaFrame(ctk.CTkFrame):
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
-        action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_frame = ctk.CTkFrame(scroll_container, fg_color="transparent")
         action_frame.pack(pady=10)
 
         ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_procedencia).pack(side="left", padx=5)
@@ -105,7 +109,7 @@ class ProcedenciaFrame(ctk.CTkFrame):
         ctk.CTkButton(action_frame, text="📥 Importar Excel", command=self.importar_excel).pack(side="left", padx=5)
         ctk.CTkButton(action_frame, text="🔄 Actualizar Lista", command=self.cargar_procedencias).pack(side="left", padx=5)    
     def guardar_procedencia(self):
-        """Guarda una nueva procedencia"""
+        """Guarda una nueva procedencia o actualiza si está en edición"""
         codigo = self.entry_codigo.get().strip()
         descripcion = self.entry_descripcion.get().strip()
         
@@ -116,20 +120,33 @@ class ProcedenciaFrame(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO procedencia (codigo, descripcion, tipo_procedencia, ubicacion, comentario, estado)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    codigo,
-                    descripcion,
-                    self.combo_tipo.get(),
-                    self.entry_ubicacion.get().strip(),
-                    self.text_comentario.get("1.0", "end-1c").strip(),
-                    "Activo"
-                ))
+                if self.entry_codigo.cget("state") == "disabled":
+                    cursor.execute("""
+                        UPDATE procedencia 
+                        SET descripcion = ?, tipo_procedencia = ?, ubicacion = ?, comentario = ?
+                        WHERE codigo = ?
+                    """, (
+                        descripcion,
+                        self.combo_tipo.get(),
+                        self.entry_ubicacion.get().strip(),
+                        self.text_comentario.get("1.0", "end-1c").strip(),
+                        codigo
+                    ))
+                else:
+                    cursor.execute("""
+                        INSERT INTO procedencia (codigo, descripcion, tipo_procedencia, ubicacion, comentario, estado)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        codigo,
+                        descripcion,
+                        self.combo_tipo.get(),
+                        self.entry_ubicacion.get().strip(),
+                        self.text_comentario.get("1.0", "end-1c").strip(),
+                        "Activo"
+                    ))
                 conn.commit()
 
-            messagebox.showinfo("Éxito", "Procedencia guardada correctamente.")
+            messagebox.showinfo("Éxito", "Procedencia guardada correctamente." if self.entry_codigo.cget("state") != "disabled" else "Procedencia actualizada correctamente.")
             self.limpiar_formulario()
             self.cargar_procedencias()
             
@@ -149,7 +166,8 @@ class ProcedenciaFrame(ctk.CTkFrame):
                 cursor.execute("SELECT codigo, descripcion, tipo_procedencia, ubicacion, comentario FROM procedencia WHERE estado = 'Activo'")
                 
                 for fila in cursor.fetchall():
-                    self.tabla.insert("", "end", values=fila)
+                    valores = tuple(str(v) if v is not None else "" for v in fila)
+                    self.tabla.insert("", "end", values=valores)
                     
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las procedencias:\n{e}")
@@ -159,7 +177,29 @@ class ProcedenciaFrame(ctk.CTkFrame):
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione una procedencia para editar.")
             return
-        messagebox.showinfo("Editar", "Funcionalidad de edición en desarrollo")
+        codigo = self.tabla.item(seleccionado[0])["values"][0]
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT codigo, descripcion, tipo_procedencia, ubicacion, comentario FROM procedencia WHERE codigo = ?", (codigo,))
+                row = cursor.fetchone()
+                if not row:
+                    messagebox.showerror("Error", "No se encontró la procedencia")
+                    return
+                self.entry_codigo.delete(0, "end")
+                self.entry_codigo.insert(0, str(row[0]))
+                self.entry_codigo.configure(state="disabled")
+                self.entry_descripcion.delete(0, "end")
+                self.entry_descripcion.insert(0, str(row[1]))
+                if row[2]:
+                    self.combo_tipo.set(str(row[2]))
+                self.entry_ubicacion.delete(0, "end")
+                self.entry_ubicacion.insert(0, str(row[3] or ""))
+                self.text_comentario.delete("1.0", "end")
+                if row[4]:
+                    self.text_comentario.insert("1.0", str(row[4]))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar la procedencia:\n{e}")
 
     def eliminar_procedencia(self):
         seleccionado = self.tabla.selection()
@@ -168,11 +208,11 @@ class ProcedenciaFrame(ctk.CTkFrame):
             return
         
         codigo = self.tabla.item(seleccionado[0])["values"][0]
-        if messagebox.askyesno("Confirmar", f"¿Eliminar la procedencia '{codigo}'?"):
+        if messagebox.askyesno("Confirmar", f"¿Eliminar la procedencia '{codigo}'?\n\nEsta acción no se puede deshacer."):
             try:
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE procedencia SET estado = 'Inactivo' WHERE codigo = ?", (codigo,))
+                    cursor.execute("DELETE FROM procedencia WHERE codigo = ?", (codigo,))
                     conn.commit()
                 messagebox.showinfo("Éxito", "Procedencia eliminada.")
                 self.cargar_procedencias()
@@ -180,6 +220,7 @@ class ProcedenciaFrame(ctk.CTkFrame):
                 messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
 
     def limpiar_formulario(self):
+        self.entry_codigo.configure(state="normal")
         self.entry_codigo.delete(0, "end")
         self.entry_descripcion.delete(0, "end")
         self.entry_ubicacion.delete(0, "end")

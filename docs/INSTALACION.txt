@@ -1,0 +1,154 @@
+═══════════════════════════════════════════════════════════
+    FINCAFACIL - SISTEMA DE GESTIÓN GANADERA
+    INFORMACIÓN DE INSTALACIÓN
+═══════════════════════════════════════════════════════════
+
+BIENVENIDO A FINCAFACIL v1.0
+
+FincaFacil es un sistema completo de gestión para fincas ganaderas
+que le ayudará a administrar de manera eficiente todos los aspectos
+de su operación.
+
+
+REQUISITOS DEL SISTEMA
+═══════════════════════════════════════════════════════════
+
+Sistema Operativo:
+  ✓ Windows 10 (64 bits) o superior
+  ✓ Windows 11
+
+Hardware Mínimo:
+  ✓ Procesador: Intel Core i3 o equivalente
+  ✓ RAM: 4 GB (recomendado 8 GB)
+  ✓ Disco Duro: 500 MB de espacio libre
+  ✓ Resolución: 1366x768 píxeles mínimo
+
+Conectividad:
+  • Internet NO es obligatorio
+  • El sistema funciona completamente offline
+
+
+CONTENIDO DE LA INSTALACIÓN
+═══════════════════════════════════════════════════════════
+
+El instalador incluye:
+
+1. Aplicación principal (FincaFacil.exe)
+2. Base de datos SQLite integrada
+3. Sistema de respaldo automático
+4. Generador de reportes PDF
+5. Exportador de datos a Excel
+6. Manual de usuario completo
+7. Tour interactivo para nuevos usuarios
+
+
+MÓDULOS INCLUIDOS
+═══════════════════════════════════════════════════════════
+
+✓ Dashboard          - Panel de control con métricas
+✓ Animales           - Registro e inventario completo
+✓ Reproducción       - Control de servicios y partos
+✓ Salud              - Historial médico y tratamientos
+✓ Potreros           - Gestión de ubicaciones
+✓ Tratamientos       - Registro de medicamentos
+✓ Ventas             - Control de comercialización
+✓ Insumos            - Inventario de suministros
+✓ Herramientas       - Gestión de equipos
+✓ Reportes           - Informes detallados
+✓ Nómina             - Gestión de empleados
+✓ Configuración      - Personalización del sistema
+
+
+CARACTERÍSTICAS DESTACADAS
+═══════════════════════════════════════════════════════════
+
+🔒 Seguridad de Datos
+   • Backup automático cada 24 horas
+   • Protección de información crítica
+   • Sistema de logs detallado
+
+📊 Reportes Profesionales
+   • Generación de PDF de alta calidad
+   • Exportación a Excel
+   • Gráficos y estadísticas
+
+🔔 Notificaciones Inteligentes
+   • Alertas de partos próximos
+   • Avisos de bajo stock
+   • Recordatorios de tratamientos
+
+✨ Interfaz Moderna
+   • Diseño intuitivo y limpio
+   • Tour interactivo incluido
+   • Manual PDF integrado
+
+
+PROCESO DE INSTALACIÓN
+═══════════════════════════════════════════════════════════
+
+1. Seleccione la ubicación de instalación
+   (Se recomienda: C:\Program Files\FincaFacil)
+
+2. Elija si desea crear accesos directos
+
+3. Confirme la instalación
+
+4. Espere mientras se copian los archivos
+
+5. ¡Listo! La aplicación estará lista para usar
+
+
+NOTAS IMPORTANTES
+═══════════════════════════════════════════════════════════
+
+⚠️ PERMISOS DE ADMINISTRADOR
+   La instalación requiere permisos de administrador para
+   crear la estructura de carpetas y registrar la aplicación.
+
+📁 DATOS DEL USUARIO
+   La base de datos y configuraciones se guardan en:
+   C:\Program Files\FincaFacil\database\
+
+🔄 ACTUALIZACIONES
+   Para actualizar, simplemente ejecute el nuevo instalador.
+   Sus datos se conservarán automáticamente.
+
+
+DESINSTALACIÓN
+═══════════════════════════════════════════════════════════
+
+Para desinstalar FincaFacil:
+
+1. Panel de Control > Programas > Desinstalar un programa
+2. Seleccione "FincaFacil"
+3. Haga clic en "Desinstalar"
+
+IMPORTANTE: Al desinstalar, se le preguntará si desea
+conservar la base de datos. Si planea reinstalar o actualizar,
+responda SÍ para conservar sus datos.
+
+
+SOPORTE TÉCNICO
+═══════════════════════════════════════════════════════════
+
+Documentación:
+  • Manual de usuario incluido en la instalación
+  • Ubicación: Menú Inicio > FincaFacil > Manual de Usuario
+
+Repositorio:
+  • GitHub: https://github.com/juanmora97B/FincaFacil
+
+
+PRIVACIDAD
+═══════════════════════════════════════════════════════════
+
+FincaFacil NO recopila información personal.
+Todos los datos permanecen en su computadora.
+No se envía información a servidores externos.
+
+
+═══════════════════════════════════════════════════════════
+
+Haga clic en "Siguiente" para continuar con la instalación.
+
+═══════════════════════════════════════════════════════════

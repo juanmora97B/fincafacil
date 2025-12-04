@@ -1,3 +1,3 @@
-from modules.ajustes.ajustes_main import AjustesFrame
+from .ajustes_main import AjustesFrame
 
-__all__ = ["AjustesFrame"]
+__all__ = ['AjustesFrame']

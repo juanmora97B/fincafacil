@@ -17,13 +17,17 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         self.cargar_condiciones()
 
     def crear_widgets(self):
+        # Frame scrollable principal para toda la interfaz
+        scroll_container = ctk.CTkScrollableFrame(self)
+        scroll_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
         # Título
-        titulo = ctk.CTkLabel(self, text="⚖️ Configuración de Condiciones Corporales", font=("Segoe UI", 20, "bold"))
+        titulo = ctk.CTkLabel(scroll_container, text="⚖️ Configuración de Condiciones Corporales", font=("Segoe UI", 20, "bold"))
         titulo.pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self, corner_radius=10)
-        form_frame.pack(pady=10, padx=20, fill="x")
+        form_frame = ctk.CTkFrame(scroll_container, corner_radius=10)
+        form_frame.pack(pady=10, padx=4, fill="x")
 
         ctk.CTkLabel(form_frame, text="📝 Nueva Condición Corporal", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
 
@@ -79,11 +83,11 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text="🔄 Limpiar", command=self.limpiar_formulario).pack(side="left", padx=5)
 
         # Separador
-        ctk.CTkLabel(self, text="📋 Condiciones Corporales Registradas", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=20)
+        ctk.CTkLabel(scroll_container, text="📋 Condiciones Corporales Registradas", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=4)
 
         # Frame de la tabla
-        table_frame = ctk.CTkFrame(self)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        table_frame = ctk.CTkFrame(scroll_container)
+        table_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
         # Tabla
         self.tabla = ttk.Treeview(table_frame, columns=("codigo", "descripcion", "puntuacion", "escala", "especie"), show="headings", height=12)
@@ -108,7 +112,7 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
-        action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_frame = ctk.CTkFrame(scroll_container, fg_color="transparent")
         action_frame.pack(pady=10)
         
         ctk.CTkButton(action_frame, text="👁️ Ver Detalles", command=self.ver_detalles).pack(side="left", padx=5)
@@ -156,23 +160,43 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO condicion_corporal 
-                    (codigo, descripcion, puntuacion, escala, especie, caracteristicas, recomendaciones, estado)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    codigo,
-                    descripcion,
-                    puntuacion,
-                    self.combo_escala.get(),
-                    self.combo_especie.get(),
-                    self.text_caracteristicas.get("1.0", "end-1c").strip(),
-                    self.text_recomendaciones.get("1.0", "end-1c").strip(),
-                    "Activo"
-                ))
+                
+                # Verificar si está en modo edición
+                if self.entry_codigo.cget("state") == "disabled":
+                    cursor.execute("""
+                        UPDATE condicion_corporal 
+                        SET descripcion = ?, puntuacion = ?, escala = ?, especie = ?, 
+                            caracteristicas = ?, recomendaciones = ?
+                        WHERE codigo = ?
+                    """, (
+                        descripcion,
+                        puntuacion,
+                        self.combo_escala.get(),
+                        self.combo_especie.get(),
+                        self.text_caracteristicas.get("1.0", "end-1c").strip(),
+                        self.text_recomendaciones.get("1.0", "end-1c").strip(),
+                        codigo
+                    ))
+                    messagebox.showinfo("Éxito", "Condición corporal actualizada correctamente.")
+                else:
+                    cursor.execute("""
+                        INSERT INTO condicion_corporal 
+                        (codigo, descripcion, puntuacion, escala, especie, caracteristicas, recomendaciones, estado)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        codigo,
+                        descripcion,
+                        puntuacion,
+                        self.combo_escala.get(),
+                        self.combo_especie.get(),
+                        self.text_caracteristicas.get("1.0", "end-1c").strip(),
+                        self.text_recomendaciones.get("1.0", "end-1c").strip(),
+                        "Activo"
+                    ))
+                    messagebox.showinfo("Éxito", "Condición corporal guardada correctamente.")
+                
                 conn.commit()
 
-            messagebox.showinfo("Éxito", "Condición corporal guardada correctamente.")
             self.limpiar_formulario()
             self.cargar_condiciones()
             
@@ -197,7 +221,15 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
                 """)
                 
                 for fila in cursor.fetchall():
-                    self.tabla.insert("", "end", values=fila)
+                    # Convertir explícitamente a strings
+                    valores = (
+                        str(fila[0]) if fila[0] is not None else "",
+                        str(fila[1]) if fila[1] is not None else "",
+                        str(fila[2]) if fila[2] is not None else "",
+                        str(fila[3]) if fila[3] is not None else "",
+                        str(fila[4]) if fila[4] is not None else ""
+                    )
+                    self.tabla.insert("", "end", values=valores)
                     
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las condiciones:\n{e}")
@@ -224,16 +256,17 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
                 if resultado:
                     descripcion, puntuacion, escala, especie, caracteristicas, recomendaciones = resultado
                     
-                    # Crear ventana de detalles
+                    # Crear ventana de detalles (más grande y con scroll)
                     detalles_window = ctk.CTkToplevel(self)
                     detalles_window.title(f"Detalles - {codigo}")
-                    detalles_window.geometry("600x500")
+                    detalles_window.geometry("800x600")
                     detalles_window.transient(self)
                     detalles_window.grab_set()
-                    
-                    # Contenido de la ventana
-                    frame = ctk.CTkFrame(detalles_window)
-                    frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+                    # Contenido scrollable
+                    frame = ctk.CTkScrollableFrame(detalles_window)
+                    # Compactar ancho (20→4)
+                    frame.pack(fill="both", expand=True, padx=4, pady=20)
                     
                     ctk.CTkLabel(frame, text=f"📋 Detalles de Condición Corporal", 
                                 font=("Segoe UI", 18, "bold")).pack(pady=10)
@@ -259,7 +292,7 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
                     # Características
                     ctk.CTkLabel(frame, text="📝 Características Físicas:", 
                                 font=("Segoe UI", 14, "bold")).pack(anchor="w", pady=(20,5))
-                    text_caracteristicas = ctk.CTkTextbox(frame, height=80)
+                    text_caracteristicas = ctk.CTkTextbox(frame, height=160)
                     text_caracteristicas.pack(fill="x", pady=5)
                     text_caracteristicas.insert("1.0", caracteristicas or "No especificado")
                     text_caracteristicas.configure(state="disabled")
@@ -267,7 +300,7 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
                     # Recomendaciones
                     ctk.CTkLabel(frame, text="💡 Recomendaciones:", 
                                 font=("Segoe UI", 14, "bold")).pack(anchor="w", pady=(20,5))
-                    text_recomendaciones = ctk.CTkTextbox(frame, height=80)
+                    text_recomendaciones = ctk.CTkTextbox(frame, height=160)
                     text_recomendaciones.pack(fill="x", pady=5)
                     text_recomendaciones.insert("1.0", recomendaciones or "No especificado")
                     text_recomendaciones.configure(state="disabled")
@@ -286,7 +319,53 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione una condición para editar.")
             return
-        messagebox.showinfo("Editar", "Funcionalidad de edición en desarrollo")
+        
+        # Obtener valores de la fila seleccionada
+        valores = self.tabla.item(seleccionado[0])["values"]
+        codigo = valores[0]
+        
+        # Obtener todos los datos de la BD
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT codigo, descripcion, puntuacion, escala, especie, 
+                           caracteristicas, recomendaciones
+                    FROM condicion_corporal WHERE codigo = ?
+                """, (codigo,))
+                row = cursor.fetchone()
+                
+                if not row:
+                    messagebox.showerror("Error", "No se encontró la condición")
+                    return
+                
+                # Cargar en el formulario
+                self.entry_codigo.delete(0, "end")
+                self.entry_codigo.insert(0, str(row[0]))
+                self.entry_codigo.configure(state="disabled")
+                
+                self.entry_descripcion.delete(0, "end")
+                self.entry_descripcion.insert(0, str(row[1]))
+                
+                self.entry_puntuacion.delete(0, "end")
+                self.entry_puntuacion.insert(0, str(row[2]))
+                
+                if row[3]:
+                    self.combo_escala.set(str(row[3]))
+                
+                if row[4]:
+                    self.combo_especie.set(str(row[4]))
+                
+                self.text_caracteristicas.delete("1.0", "end")
+                if row[5]:
+                    self.text_caracteristicas.insert("1.0", str(row[5]))
+                
+                self.text_recomendaciones.delete("1.0", "end")
+                if row[6]:
+                    self.text_recomendaciones.insert("1.0", str(row[6]))
+                    
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al cargar datos:\n{e}")
 
     def eliminar_condicion(self):
         seleccionado = self.tabla.selection()
@@ -297,18 +376,19 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
         codigo = self.tabla.item(seleccionado[0])["values"][0]
         descripcion = self.tabla.item(seleccionado[0])["values"][1]
         
-        if messagebox.askyesno("Confirmar", f"¿Eliminar la condición '{codigo} - {descripcion}'?"):
+        if messagebox.askyesno("Confirmar", f"¿Eliminar la condición '{codigo} - {descripcion}'?\n\nEsta acción no se puede deshacer."):
             try:
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE condicion_corporal SET estado = 'Inactivo' WHERE codigo = ?", (codigo,))
+                    cursor.execute("DELETE FROM condicion_corporal WHERE codigo = ?", (codigo,))
                     conn.commit()
-                messagebox.showinfo("Éxito", "Condición corporal eliminada.")
+                messagebox.showinfo("Éxito", "Condición corporal eliminada correctamente.")
                 self.cargar_condiciones()
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
 
     def limpiar_formulario(self):
+        self.entry_codigo.configure(state="normal")
         self.entry_codigo.delete(0, "end")
         self.entry_descripcion.delete(0, "end")
         self.entry_puntuacion.delete(0, "end")
@@ -334,11 +414,66 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
             messagebox.showinfo("Importar", "No se encontraron filas para importar.")
             return
 
-        # Validar que existan columnas requeridas
+        # Validar que existan columnas requeridas (con soporte a formato antiguo)
+        primera = filas[0]
+
+        formato_antiguo_detectado = False
+        if ('codigo' not in primera or 'puntuacion' not in primera) and 'condicion_corporal' in primera:
+            formato_antiguo_detectado = True
+            # Adaptar filas del formato antiguo al nuevo
+            secuencial_puntuacion = 1
+            for fila in filas:
+                # Mapear condicion_corporal -> codigo
+                if 'codigo' not in fila and 'condicion_corporal' in fila:
+                    fila['codigo'] = str(fila.get('condicion_corporal') or '').strip()
+                # Si falta descripcion usar condicion_corporal como descripcion
+                if ('descripcion' not in fila or not fila.get('descripcion')) and fila.get('condicion_corporal'):
+                    fila['descripcion'] = str(fila.get('condicion_corporal')).strip()
+                # Derivar puntuacion si falta utilizando rango_inferior / rango_superior
+                if 'puntuacion' not in fila:
+                    ri = fila.get('rango_inferior')
+                    rs = fila.get('rango_superior')
+                    puntuacion_val = None
+                    # Intentar usar rango_inferior como puntuación
+                    for candidato in (ri, rs):
+                        if candidato is None or str(candidato).strip() == '':
+                            continue
+                        try:
+                            puntuacion_val = float(str(candidato).replace(',', '.'))
+                            break
+                        except ValueError:
+                            continue
+                    if puntuacion_val is not None:
+                        fila['puntuacion'] = str(int(puntuacion_val) if float(puntuacion_val).is_integer() else puntuacion_val)
+                # Asignar puntuacion secuencial si todavía falta
+                if not fila.get('puntuacion'):
+                    fila['puntuacion'] = str(secuencial_puntuacion)
+                    secuencial_puntuacion += 1
+                # Mapear recomendacion/comentario a caracteristicas/recomendaciones si no existen
+                if 'caracteristicas' not in fila and 'comentario' in fila:
+                    fila['caracteristicas'] = fila.get('comentario')
+                if 'recomendaciones' not in fila and 'recomendacion' in fila:
+                    fila['recomendaciones'] = fila.get('recomendacion')
+                # Estado por defecto
+                if 'estado' not in fila:
+                    fila['estado'] = 'Activo'
+
+        # Re-validar después de adaptación
         primera = filas[0]
         if 'codigo' not in primera or 'descripcion' not in primera or 'puntuacion' not in primera:
-            messagebox.showerror("Error", "El archivo debe tener las columnas 'codigo', 'descripcion' y 'puntuacion'.")
+            messagebox.showerror(
+                "Error",
+                "El archivo debe tener las columnas requeridas. Formatos aceptados:\n"
+                "Nuevo: codigo, descripcion, puntuacion, escala, especie, caracteristicas, recomendaciones, estado\n"
+                "Antiguo: condicion_corporal, rango_inferior, rango_superior, descripcion, recomendacion, comentario"
+            )
             return
+
+        if formato_antiguo_detectado:
+            messagebox.showinfo(
+                "Compatibilidad",
+                "Se detectó formato antiguo y se adaptó automáticamente (condicion_corporal -> codigo, rango_inferior -> puntuacion)."
+            )
 
         importados = 0
         errores = []

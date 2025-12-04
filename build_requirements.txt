@@ -1,0 +1,7 @@
+# Dependencias adicionales para compilación
+pyinstaller==6.3.0
+customtkinter
+pillow
+tkcalendar
+matplotlib
+openpyxl

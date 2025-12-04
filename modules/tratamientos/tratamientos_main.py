@@ -6,28 +6,39 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from database import db
+from modules.utils.ui import get_theme_colors, add_tooltip, style_treeview
+from modules.utils.date_picker import attach_date_picker
 
 
 class TratamientosModule(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        # Colores y modo adaptativos
+        colors = get_theme_colors()
+        self._modo = colors["mode"]
+        self._fg_card = colors["fg"]
+        self._sel = colors["sel"]
+        self._hover = colors["hover"]
+
         self.crear_widgets()
         self.cargar_tratamientos()
         self.crear_tabla_tratamientos()
 
     def crear_widgets(self):
-        # Título
+        # Título compacto
         titulo = ctk.CTkLabel(
             self,
             text="🏥 Gestión de Tratamientos y Vacunas",
-            font=("Segoe UI", 22, "bold")
+            font=("Segoe UI", 22, "bold"),
+            text_color=self._sel
         )
-        titulo.pack(pady=15)
+        titulo.pack(pady=(10, 5))
+        add_tooltip(titulo, "Registre y consulte tratamientos y vacunas de los animales")
 
-        # Frame principal con tabs
+        # Notebook expandido para ocupar toda la altura disponible
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        self.notebook.pack(fill="both", expand=True, padx=2, pady=(5, 10))
 
         # Tab: Nuevo Tratamiento
         self.frame_nuevo = ctk.CTkFrame(self.notebook)
@@ -49,32 +60,37 @@ class TratamientosModule(ctk.CTkFrame):
     def crear_formulario(self):
         """Crea el formulario para registrar un tratamiento"""
         main_frame = ctk.CTkScrollableFrame(self.frame_nuevo)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
-        ctk.CTkLabel(
+        header_form = ctk.CTkLabel(
             main_frame,
             text="📝 Registrar Nuevo Tratamiento",
-            font=("Segoe UI", 18, "bold")
-        ).pack(pady=(0, 20))
+            font=("Segoe UI", 18, "bold"),
+            text_color=self._sel
+        )
+        header_form.pack(pady=(0, 15))
+        add_tooltip(header_form, "Complete los campos y guarde el tratamiento")
 
         # Campos
         campos_frame = ctk.CTkFrame(main_frame)
-        campos_frame.pack(fill="x", pady=10, padx=10)
+        campos_frame.pack(fill="both", expand=True, pady=5, padx=10)
 
         # Animal
         row1 = ctk.CTkFrame(campos_frame, fg_color="transparent")
         row1.pack(fill="x", pady=8)
         ctk.CTkLabel(row1, text="Animal *:", width=150, font=("Segoe UI", 12)).pack(side="left", padx=5)
         self.combo_animal = ctk.CTkComboBox(row1, width=300, font=("Segoe UI", 12))
+        self.combo_animal.set("Seleccione el animal")
         self.combo_animal.pack(side="left", padx=5, fill="x", expand=True)
 
         # Fecha
         row2 = ctk.CTkFrame(campos_frame, fg_color="transparent")
         row2.pack(fill="x", pady=8)
         ctk.CTkLabel(row2, text="Fecha Tratamiento *:", width=150, font=("Segoe UI", 12)).pack(side="left", padx=5)
-        self.entry_fecha = ctk.CTkEntry(row2, width=300, font=("Segoe UI", 12))
+        self.entry_fecha = ctk.CTkEntry(row2, width=260, font=("Segoe UI", 12), placeholder_text="YYYY-MM-DD")
         self.entry_fecha.insert(0, datetime.now().strftime("%Y-%m-%d"))
-        self.entry_fecha.pack(side="left", padx=5, fill="x", expand=True)
+        self.entry_fecha.pack(side="left", padx=5)
+        attach_date_picker(row2, self.entry_fecha)
 
         # Tipo
         row3 = ctk.CTkFrame(campos_frame, fg_color="transparent")
@@ -86,7 +102,7 @@ class TratamientosModule(ctk.CTkFrame):
             width=300,
             font=("Segoe UI", 12)
         )
-        self.combo_tipo.set("Vacunación")
+        self.combo_tipo.set("Seleccione tipo")
         self.combo_tipo.pack(side="left", padx=5, fill="x", expand=True)
 
         # Producto
@@ -114,46 +130,53 @@ class TratamientosModule(ctk.CTkFrame):
         row7 = ctk.CTkFrame(campos_frame, fg_color="transparent")
         row7.pack(fill="x", pady=8)
         ctk.CTkLabel(row7, text="Próxima Aplicación:", width=150, font=("Segoe UI", 12)).pack(side="left", padx=5)
-        self.entry_proxima = ctk.CTkEntry(row7, width=300, font=("Segoe UI", 12), 
-                                         placeholder_text="YYYY-MM-DD (opcional)")
-        self.entry_proxima.pack(side="left", padx=5, fill="x", expand=True)
+        self.entry_proxima = ctk.CTkEntry(row7, width=260, font=("Segoe UI", 12), 
+                         placeholder_text="YYYY-MM-DD (opcional)")
+        self.entry_proxima.pack(side="left", padx=5)
+        attach_date_picker(row7, self.entry_proxima)
 
         # Comentario
         row8 = ctk.CTkFrame(campos_frame, fg_color="transparent")
-        row8.pack(fill="x", pady=8)
+        row8.pack(fill="both", expand=True, pady=8)
         ctk.CTkLabel(row8, text="Comentarios:", width=150, font=("Segoe UI", 12)).pack(side="left", padx=5, anchor="n")
-        self.text_comentario = ctk.CTkTextbox(row8, width=300, height=100, font=("Segoe UI", 12))
-        self.text_comentario.pack(side="left", padx=5, fill="x", expand=True)
+        self.text_comentario = ctk.CTkTextbox(row8, width=300, height=150, font=("Segoe UI", 12))
+        self.text_comentario.pack(side="left", padx=5, fill="both", expand=True)
 
-        # Botones
-        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        btn_frame.pack(fill="x", pady=20)
-        
-        ctk.CTkButton(
+        # Botones del formulario
+        btn_frame = ctk.CTkFrame(campos_frame, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=5)
+
+        btn_guardar = ctk.CTkButton(
             btn_frame,
             text="💾 Guardar Tratamiento",
             command=self.guardar_tratamiento,
-            fg_color="green",
-            hover_color="#006400",
+            fg_color=self._sel,
+            hover_color=self._hover,
             width=180,
             font=("Segoe UI", 12, "bold")
-        ).pack(side="left", padx=5)
-        
-        ctk.CTkButton(
+        )
+        btn_guardar.pack(side="left", padx=5)
+        add_tooltip(btn_guardar, "Guardar tratamiento y actualizar listados")
+
+        btn_limpiar = ctk.CTkButton(
             btn_frame,
             text="🔄 Limpiar Formulario",
             command=self.limpiar_formulario,
             width=150,
             font=("Segoe UI", 12)
-        ).pack(side="left", padx=5)
+        )
+        btn_limpiar.pack(side="left", padx=5)
+        add_tooltip(btn_limpiar, "Vaciar campos del formulario")
 
-        ctk.CTkButton(
+        btn_hist = ctk.CTkButton(
             btn_frame,
             text="📋 Ver Historial",
             command=lambda: self.notebook.select(1),
             width=150,
             font=("Segoe UI", 12)
-        ).pack(side="left", padx=5)
+        )
+        btn_hist.pack(side="left", padx=5)
+        add_tooltip(btn_hist, "Ir a la tabla de historial de tratamientos")
 
         # Cargar animales
         self.cargar_animales()
@@ -161,37 +184,48 @@ class TratamientosModule(ctk.CTkFrame):
     def crear_historial(self):
         """Crea la tabla de historial"""
         main_frame = ctk.CTkFrame(self.frame_historial)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=5)
 
         # Header
         header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         header_frame.pack(fill="x", pady=(0, 10))
 
-        ctk.CTkLabel(
+        header_label = ctk.CTkLabel(
             header_frame,
             text="📋 Historial de Tratamientos",
-            font=("Segoe UI", 18, "bold")
-        ).pack(side="left")
+            font=("Segoe UI", 18, "bold"),
+            text_color=self._sel
+        )
+        header_label.pack(side="left")
+        add_tooltip(header_label, "Tratamientos registrados recientemente")
 
         # Botones de acción
         action_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         action_frame.pack(side="right")
 
-        ctk.CTkButton(
+        btn_actualizar = ctk.CTkButton(
             action_frame,
             text="🔄 Actualizar",
             command=self.cargar_tratamientos,
             width=120,
-            font=("Segoe UI", 12)
-        ).pack(side="left", padx=5)
+            font=("Segoe UI", 12),
+            fg_color=self._sel,
+            hover_color=self._hover
+        )
+        btn_actualizar.pack(side="left", padx=5)
+        add_tooltip(btn_actualizar, "Recargar la tabla de tratamientos")
 
-        ctk.CTkButton(
+        btn_nuevo = ctk.CTkButton(
             action_frame,
             text="➕ Nuevo",
             command=lambda: self.notebook.select(0),
             width=120,
-            font=("Segoe UI", 12)
-        ).pack(side="left", padx=5)
+            font=("Segoe UI", 12),
+            fg_color=self._sel,
+            hover_color=self._hover
+        )
+        btn_nuevo.pack(side="left", padx=5)
+        add_tooltip(btn_nuevo, "Ir al formulario para crear un tratamiento")
 
         # Tabla
         table_frame = ctk.CTkFrame(main_frame)
@@ -205,6 +239,8 @@ class TratamientosModule(ctk.CTkFrame):
             parent = self.frame_historial
 
         # Tabla
+        style_treeview()
+
         self.tabla_tratamientos = ttk.Treeview(
             parent,
             columns=("id", "fecha", "animal", "tipo", "producto", "dosis", "veterinario", "proxima", "comentario"),
@@ -241,13 +277,16 @@ class TratamientosModule(ctk.CTkFrame):
     def crear_proximos_tratamientos(self):
         """Crea la sección de próximos tratamientos"""
         main_frame = ctk.CTkFrame(self.frame_proximos)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=4, pady=5)
 
-        ctk.CTkLabel(
+        header_prox = ctk.CTkLabel(
             main_frame,
             text="📅 Próximos Tratamientos Programados",
-            font=("Segoe UI", 18, "bold")
-        ).pack(pady=(0, 10))
+            font=("Segoe UI", 18, "bold"),
+            text_color=self._sel
+        )
+        header_prox.pack(pady=(0, 10))
+        add_tooltip(header_prox, "Tratamientos programados a futuro")
 
         # Información
         info_frame = ctk.CTkFrame(main_frame)
@@ -260,15 +299,19 @@ class TratamientosModule(ctk.CTkFrame):
             justify="left",
             anchor="nw"
         )
-        self.label_proximos.pack(pady=20, padx=20, fill="both", expand=True)
+        self.label_proximos.pack(pady=5, padx=4, fill="both", expand=True)
 
         # Botón actualizar
-        ctk.CTkButton(
+        btn_refrescar_prox = ctk.CTkButton(
             main_frame,
             text="🔄 Actualizar",
             command=self.cargar_proximos_tratamientos,
-            width=150
-        ).pack(pady=10)
+            width=150,
+            fg_color=self._sel,
+            hover_color=self._hover
+        )
+        btn_refrescar_prox.pack(pady=10)
+        add_tooltip(btn_refrescar_prox, "Recargar próximos tratamientos")
 
         # Cargar datos iniciales
         self.cargar_proximos_tratamientos()
@@ -294,13 +337,13 @@ class TratamientosModule(ctk.CTkFrame):
     def guardar_tratamiento(self):
         """Guarda un nuevo tratamiento"""
         # Validaciones
-        if not self.combo_animal.get():
+        if not self.combo_animal.get() or "Seleccione" in self.combo_animal.get():
             messagebox.showwarning("Atención", "Seleccione un animal")
             return
         if not self.entry_fecha.get():
             messagebox.showwarning("Atención", "Ingrese la fecha del tratamiento")
             return
-        if not self.combo_tipo.get():
+        if not self.combo_tipo.get() or "Seleccione" in self.combo_tipo.get():
             messagebox.showwarning("Atención", "Seleccione el tipo de tratamiento")
             return
         if not self.entry_producto.get():
@@ -308,7 +351,8 @@ class TratamientosModule(ctk.CTkFrame):
             return
 
         try:
-            codigo_animal = self.combo_animal.get().split(" - ")[0]
+            # Extraer código del animal (formato: "CODIGO - NOMBRE")
+            codigo_animal = self.combo_animal.get().split(" - ")[0].strip()
             
             with db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -332,14 +376,14 @@ class TratamientosModule(ctk.CTkFrame):
                     )
                 """)
 
-                # Obtener ID del animal
-                cursor.execute("SELECT id FROM animal WHERE codigo = ?", (codigo_animal,))
+                # Obtener ID del animal por código
+                cursor.execute("SELECT id FROM animal WHERE codigo = ? AND estado = 'Activo'", (codigo_animal,))
                 animal_row = cursor.fetchone()
                 if not animal_row:
-                    messagebox.showerror("Error", "Animal no encontrado")
+                    messagebox.showerror("Error", f"Animal con código '{codigo_animal}' no encontrado o inactivo")
                     return
                 
-                id_animal = animal_row[0]
+                id_animal = animal_row[0] if hasattr(animal_row, '__getitem__') else animal_row['id']
 
                 # Insertar tratamiento
                 cursor.execute("""
@@ -537,3 +581,5 @@ class TratamientosModule(ctk.CTkFrame):
         
         # Recargar animales para asegurar que esté actualizado
         self.cargar_animales()
+
+    # Tooltips ahora provienen de modules.utils.ui.add_tooltip

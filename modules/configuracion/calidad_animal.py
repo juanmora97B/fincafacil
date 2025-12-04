@@ -18,13 +18,17 @@ class CalidadAnimalFrame(ctk.CTkFrame):
         self.cargar_calidades()
 
     def crear_widgets(self):
+        # Frame scrollable principal para toda la interfaz
+        scroll_container = ctk.CTkScrollableFrame(self)
+        scroll_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
         # Título
-        titulo = ctk.CTkLabel(self, text="⭐ Configuración de Calidad Animal", font=("Segoe UI", 20, "bold"))
+        titulo = ctk.CTkLabel(scroll_container, text="⭐ Configuración de Calidad Animal", font=("Segoe UI", 20, "bold"))
         titulo.pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self)
-        form_frame.pack(pady=10, padx=20, fill="x")
+        form_frame = ctk.CTkFrame(scroll_container)
+        form_frame.pack(pady=10, padx=4, fill="x")
 
         # Campos del formulario
         row1 = ctk.CTkFrame(form_frame)
@@ -46,13 +50,13 @@ class CalidadAnimalFrame(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(form_frame)
         btn_frame.pack(fill="x", pady=10)
         
-        ctk.CTkButton(btn_frame, text="Guardar", command=self.guardar_calidad).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text="Limpiar", command=self.limpiar_formulario).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text="Importar Excel", command=self.importar_excel).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="💾 Guardar", command=self.guardar_calidad,
+                     fg_color="green", hover_color="#006400", height=36).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="🔄 Limpiar", command=self.limpiar_formulario, height=36).pack(side="left", padx=5)
 
         # Tabla
-        table_frame = ctk.CTkFrame(self)
-        table_frame.pack(padx=20, pady=10, fill="both", expand=True)
+        table_frame = ctk.CTkFrame(scroll_container)
+        table_frame.pack(padx=4, pady=10, fill="both", expand=True)
 
         # Crear el treeview
         columns = ("codigo", "descripcion", "comentario")
@@ -76,14 +80,14 @@ class CalidadAnimalFrame(ctk.CTkFrame):
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
-        action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_frame = ctk.CTkFrame(scroll_container, fg_color="transparent")
         action_frame.pack(pady=10)
         
-        ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_calidad).pack(side="left", padx=5)
+        ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_calidad, height=36).pack(side="left", padx=5)
         ctk.CTkButton(action_frame, text="🗑️ Eliminar Seleccionado", command=self.eliminar_calidad, 
-                     fg_color="red", hover_color="#8B0000").pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="📥 Importar Excel", command=self.importar_excel).pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="🔄 Actualizar Lista", command=self.cargar_calidades).pack(side="left", padx=5)
+                     fg_color="red", hover_color="#8B0000", height=36).pack(side="left", padx=5)
+        ctk.CTkButton(action_frame, text="📥 Importar Excel", command=self.importar_excel, height=36).pack(side="left", padx=5)
+        ctk.CTkButton(action_frame, text="🔄 Actualizar Lista", command=self.cargar_calidades, height=36).pack(side="left", padx=5)
 
         # Agregar menú contextual como alternativa
         self.menu_contextual = Menu(self, tearoff=0)
@@ -120,6 +124,8 @@ class CalidadAnimalFrame(ctk.CTkFrame):
                     """, (codigo, descripcion, comentario))
                     messagebox.showinfo("Éxito", "Calidad animal guardada")
                 
+                conn.commit()  # Confirmar cambios en la base de datos
+                
             self.limpiar_formulario()
             self.cargar_calidades()
         except sqlite3.IntegrityError:
@@ -136,7 +142,13 @@ class CalidadAnimalFrame(ctk.CTkFrame):
                 cursor = conn.cursor()
                 cursor.execute("SELECT codigo, descripcion, comentario FROM calidad_animal")
                 for calidad in cursor.fetchall():
-                    self.tabla.insert("", "end", values=calidad)
+                    # Convertir explícitamente a strings
+                    valores = (
+                        str(calidad[0]) if calidad[0] is not None else "",
+                        str(calidad[1]) if calidad[1] is not None else "",
+                        str(calidad[2]) if calidad[2] is not None else ""
+                    )
+                    self.tabla.insert("", "end", values=valores)
         except Exception as e:
             messagebox.showerror("Error", f"Error al cargar datos: {str(e)}")
 
@@ -166,15 +178,16 @@ class CalidadAnimalFrame(ctk.CTkFrame):
             return
 
         codigo = self.tabla.item(selected[0])["values"][0]
-        if not messagebox.askyesno("Confirmar", f"¿Eliminar la calidad {codigo}?"):
+        if not messagebox.askyesno("Confirmar", f"¿Está seguro de eliminar la calidad '{codigo}'?\n\nEsta acción no se puede deshacer."):
             return
 
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM calidad_animal WHERE codigo = ?", (codigo,))
+                conn.commit()  # Agregar commit
+            messagebox.showinfo("Éxito", "Calidad eliminada correctamente.")
             self.cargar_calidades()
-            messagebox.showinfo("Éxito", "Calidad eliminada")
         except Exception as e:
             messagebox.showerror("Error", f"Error al eliminar: {str(e)}")
 
@@ -193,27 +206,44 @@ class CalidadAnimalFrame(ctk.CTkFrame):
             return
 
         try:
-            registros = parse_excel_to_dicts(file_path)
+            registros, errores_parse = parse_excel_to_dicts(file_path)
+            
+            if errores_parse:
+                messagebox.showerror("Error", "\n".join(errores_parse))
+                return
+            
+            if not registros:
+                messagebox.showinfo("Importar", "No se encontraron filas para importar.")
+                return
+            
+            importados = 0
+            errores = []
+            
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                for reg in registros:
+                for idx, reg in enumerate(registros, start=2):
                     try:
                         cursor.execute("""
                             INSERT INTO calidad_animal (codigo, descripcion, comentario)
                             VALUES (?, ?, ?)
                         """, (
-                            reg.get('codigo', '').strip(),
-                            reg.get('descripcion', '').strip(),
-                            reg.get('comentario', '').strip()
+                            str(reg.get('codigo', '')).strip(),
+                            str(reg.get('descripcion', '')).strip(),
+                            str(reg.get('comentario', '')).strip()
                         ))
+                        importados += 1
                     except sqlite3.IntegrityError:
-                        messagebox.showwarning(
-                            "Advertencia", 
-                            f"Se omitió el código {reg.get('codigo')} - ya existe"
-                        )
+                        errores.append(f"Fila {idx}: código duplicado")
+                    except Exception as e:
+                        errores.append(f"Fila {idx}: {e}")
+                conn.commit()
             
+            mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
+            if errores:
+                mensaje += "\nPrimeros errores:\n" + "\n".join(errores[:10])
+            
+            messagebox.showinfo("Importación", mensaje)
             self.cargar_calidades()
-            messagebox.showinfo("Éxito", "Importación completada")
         except Exception as e:
             messagebox.showerror("Error", f"Error en importación: {str(e)}")
     

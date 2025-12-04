@@ -7,12 +7,31 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from database import get_db_connection
+from modules.utils.units_helper import units_helper
+from modules.utils.date_picker import attach_date_picker
+from modules.utils.ui import add_tooltip
+from modules.utils.validators import animal_validator  # Validaciones centralizadas
+from modules.utils.constants_ui import truncate  # Truncado estándar de campos
+# Autocomplete deshabilitado por solicitud del usuario: función no-op para compatibilidad
+def set_autocomplete_mode(*args, **kwargs):
+    return None
 
 
 class RegistroAnimalFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        # Inicializar logger seguro (evita AttributeError si se usa antes de definir)
+        try:
+            import logging
+            self.logger = logging.getLogger(__name__)
+        except Exception:
+            class _DummyLogger:
+                def debug(self, *a, **k): pass
+                def info(self, *a, **k): pass
+                def warning(self, *a, **k): pass
+                def error(self, *a, **k): pass
+            self.logger = _DummyLogger()
         self.foto_path = None
         self.crear_widgets()
         self.cargar_datos_combos()
@@ -22,9 +41,11 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         titulo = ctk.CTkLabel(self, text="📝 Registro de Animales", font=("Segoe UI", 20, "bold"))
         titulo.pack(pady=10)
 
+        # Eliminado: Toggle de Autocomplete global según solicitud del usuario
+
         # ======== NOTEBOOK PARA TIPO DE REGISTRO ========
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        self.notebook.pack(fill="both", expand=True, padx=2, pady=8)
 
         # Pestaña Nacimiento
         self.tab_nacimiento = ctk.CTkFrame(self.notebook)
@@ -42,17 +63,24 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(self)
         btn_frame.pack(pady=10)
 
-        ctk.CTkButton(btn_frame, text="💾 Guardar Animal", command=self.guardar_animal, 
-                     fg_color="green", hover_color="#006400").pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text="📥 Importar desde Excel", command=self.importar_excel,
-                     fg_color="#1976D2", hover_color="#1565C0").pack(side="left", padx=5)
+        # Guardar individual
+        ctk.CTkButton(btn_frame, text="💾 Guardar Animal", command=self.guardar_animal,
+                      fg_color="green", hover_color="#006400").pack(side="left", padx=5)
+        # Importación general (Nacimiento + Compra)
+        ctk.CTkButton(btn_frame, text="📥 Importar Excel (General)", command=self.importar_excel,
+                      fg_color="#1976D2", hover_color="#1565C0").pack(side="left", padx=5)
+        # Importación específica de compras
+        ctk.CTkButton(btn_frame, text="💰 Importar Excel (Compras)", command=self.importar_excel_compras,
+                      fg_color="#455A64", hover_color="#37474F").pack(side="left", padx=5)
+        # Utilidades
         ctk.CTkButton(btn_frame, text="🔄 Limpiar Formulario", command=self.limpiar_formulario).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="🔄 Refrescar Listas", command=self.refrescar_listas).pack(side="left", padx=5)
 
     def configurar_tab_nacimiento(self):
         """Configura la pestaña de registro por nacimiento"""
         # Frame principal con scroll
         main_frame = ctk.CTkScrollableFrame(self.tab_nacimiento)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        main_frame.pack(fill="both", expand=True, padx=2, pady=8)
 
         # INFORMACIÓN BÁSICA
         frame_basica = ctk.CTkFrame(main_frame)
@@ -65,19 +93,26 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         row1 = ctk.CTkFrame(frame_basica, fg_color="transparent")
         row1.pack(fill="x", pady=5)
         
+        lbl_codigo = ctk.CTkLabel(row1, text="Código Animal *:", width=120)
+        lbl_codigo.pack(side="left", padx=5)
         self.entry_codigo_nac = ctk.CTkEntry(row1, placeholder_text="Código Animal *", width=200)
         self.entry_codigo_nac.pack(side="left", padx=5)
+        add_tooltip(lbl_codigo, "Campo obligatorio - Identificador único del animal")
         
+        lbl_nombre = ctk.CTkLabel(row1, text="Nombre:", width=80)
+        lbl_nombre.pack(side="left", padx=5)
         self.entry_nombre_nac = ctk.CTkEntry(row1, placeholder_text="Nombre Animal", width=200)
         self.entry_nombre_nac.pack(side="left", padx=5)
+        add_tooltip(lbl_nombre, "Nombre opcional para identificar fácilmente al animal")
 
         # Fecha y Sexo
         row2 = ctk.CTkFrame(frame_basica, fg_color="transparent")
         row2.pack(fill="x", pady=5)
         
-        self.entry_fecha_nac = ctk.CTkEntry(row2, placeholder_text="Fecha Nacimiento (YYYY-MM-DD) *", width=200)
+        self.entry_fecha_nac = ctk.CTkEntry(row2, placeholder_text="Fecha Nacimiento (YYYY-MM-DD) *", width=180)
         self.entry_fecha_nac.insert(0, datetime.now().strftime("%Y-%m-%d"))
         self.entry_fecha_nac.pack(side="left", padx=5)
+        attach_date_picker(row2, self.entry_fecha_nac)
         
         self.combo_sexo_nac = ctk.CTkComboBox(row2, values=["Macho", "Hembra"], width=200)
         self.combo_sexo_nac.set("Macho")
@@ -87,9 +122,16 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         row2b = ctk.CTkFrame(frame_basica, fg_color="transparent")
         row2b.pack(fill="x", pady=5)
         
-        ctk.CTkLabel(row2b, text="Peso al Nacer (kg):", width=120).pack(side="left", padx=5)
+        ctk.CTkLabel(row2b, text=f"Peso al Nacer ({units_helper.weight_unit}):", width=160).pack(side="left", padx=5)
         self.entry_peso_nacimiento = ctk.CTkEntry(row2b, placeholder_text="Peso al nacer", width=150)
         self.entry_peso_nacimiento.pack(side="left", padx=5)
+
+        # Grupo (clasificación)
+        ctk.CTkLabel(row2b, text="Grupo:", width=80).pack(side="left", padx=5)
+        self.combo_grupo_nac = ctk.CTkComboBox(row2b, values=["Toros", "Vacas", "Terneros", "Novillos"], width=150)
+        self.combo_grupo_nac.set("Terneros")
+        self.combo_grupo_nac.pack(side="left", padx=5)
+        add_tooltip(self.combo_grupo_nac, "Clasificación del animal al nacer.")
 
         # INFORMACIÓN DE PADRES
         frame_padres = ctk.CTkFrame(main_frame)
@@ -104,6 +146,7 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         
         ctk.CTkLabel(row3, text="Madre:", width=100).pack(side="left", padx=5)
         self.combo_madre_nac = ctk.CTkComboBox(row3, width=300)
+        self.combo_madre_nac.set("Seleccione la madre")
         self.combo_madre_nac.pack(side="left", padx=5)
 
         # Padre y Tipo Concepción
@@ -112,6 +155,7 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         
         ctk.CTkLabel(row4, text="Padre:", width=100).pack(side="left", padx=5)
         self.combo_padre_nac = ctk.CTkComboBox(row4, width=200)
+        self.combo_padre_nac.set("Seleccione el padre")
         self.combo_padre_nac.pack(side="left", padx=5)
         
         ctk.CTkLabel(row4, text="Concepción:", width=80).pack(side="left", padx=5)
@@ -128,66 +172,103 @@ class RegistroAnimalFrame(ctk.CTkFrame):
     def configurar_tab_compra(self):
         """Configura la pestaña de registro por compra"""
         main_frame = ctk.CTkScrollableFrame(self.tab_compra)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        main_frame.pack(fill="both", expand=True, padx=2, pady=8)
 
         # INFORMACIÓN BÁSICA
         frame_basica = ctk.CTkFrame(main_frame)
         frame_basica.pack(fill="x", pady=5)
 
-        ctk.CTkLabel(frame_basica, text="📋 INFORMACIÓN BÁSICA", 
-                    font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
+        header_basica = ctk.CTkLabel(frame_basica, text="📋 INFORMACIÓN BÁSICA", 
+                                      font=("Segoe UI", 16, "bold"))
+        header_basica.pack(anchor="w", pady=(10, 2))
+        helper_basica = ctk.CTkLabel(frame_basica, text="Campos marcados con * son obligatorios. Código y Fecha Compra requeridos.",
+                                     font=("Segoe UI", 11, "italic"))
+        helper_basica.pack(anchor="w", pady=(0, 6))
+        add_tooltip(header_basica, "Datos generales del animal adquirido")
+        add_tooltip(helper_basica, "Guía rápida de requisitos para el registro por compra")
 
         # Código y Nombre
         row1 = ctk.CTkFrame(frame_basica, fg_color="transparent")
         row1.pack(fill="x", pady=5)
-        
+
         self.entry_codigo_comp = ctk.CTkEntry(row1, placeholder_text="Código Animal *", width=200)
         self.entry_codigo_comp.pack(side="left", padx=5)
-        
-        self.entry_nombre_comp = ctk.CTkEntry(row1, placeholder_text="Nombre Animal", width=200)
+        add_tooltip(self.entry_codigo_comp, "Identificador único. No repetir códigos.")
+
+        self.entry_nombre_comp = ctk.CTkEntry(row1, placeholder_text="Nombre (Opcional)", width=200)
         self.entry_nombre_comp.pack(side="left", padx=5)
+        add_tooltip(self.entry_nombre_comp, "Nombre para referencia interna. Puede quedar vacío.")
 
         # Fechas y Sexo
         row2 = ctk.CTkFrame(frame_basica, fg_color="transparent")
         row2.pack(fill="x", pady=5)
-        
-        self.entry_fecha_nac_comp = ctk.CTkEntry(row2, placeholder_text="Fecha Nacimiento (YYYY-MM-DD)", width=200)
+
+        self.entry_fecha_nac_comp = ctk.CTkEntry(row2, placeholder_text="Fecha Nacimiento (YYYY-MM-DD)", width=180)
         self.entry_fecha_nac_comp.pack(side="left", padx=5)
-        
-        self.entry_fecha_compra = ctk.CTkEntry(row2, placeholder_text="Fecha Compra (YYYY-MM-DD) *", width=200)
+        attach_date_picker(row2, self.entry_fecha_nac_comp)
+        add_tooltip(self.entry_fecha_nac_comp, "Solo si se conoce; de lo contrario dejar vacío.")
+
+        self.entry_fecha_compra = ctk.CTkEntry(row2, placeholder_text="Fecha Compra (YYYY-MM-DD) *", width=180)
         self.entry_fecha_compra.insert(0, datetime.now().strftime("%Y-%m-%d"))
         self.entry_fecha_compra.pack(side="left", padx=5)
-        
+        attach_date_picker(row2, self.entry_fecha_compra)
+        add_tooltip(self.entry_fecha_compra, "Día en que se adquirió el animal. Obligatorio.")
+
         self.combo_sexo_comp = ctk.CTkComboBox(row2, values=["Macho", "Hembra"], width=150)
         self.combo_sexo_comp.set("Macho")
         self.combo_sexo_comp.pack(side="left", padx=5)
+        add_tooltip(self.combo_sexo_comp, "Seleccione el sexo del animal.")
 
         # INFORMACIÓN COMPRA
         frame_compra = ctk.CTkFrame(main_frame)
         frame_compra.pack(fill="x", pady=5)
 
-        ctk.CTkLabel(frame_compra, text="💰 INFORMACIÓN DE COMPRA", 
-                    font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
+        header_compra = ctk.CTkLabel(frame_compra, text="💰 INFORMACIÓN DE COMPRA", 
+                                     font=("Segoe UI", 16, "bold"))
+        header_compra.pack(anchor="w", pady=(10, 2))
+        helper_compra = ctk.CTkLabel(frame_compra, text="Origen, precio y peso ayudan a análisis de costos y conversión.",
+                                     font=("Segoe UI", 11, "italic"))
+        helper_compra.pack(anchor="w", pady=(0, 6))
+        add_tooltip(header_compra, "Datos específicos de la transacción de compra")
+        add_tooltip(helper_compra, "Recomendado completar para métricas económicas")
 
         # Vendedor y Precio
         row3 = ctk.CTkFrame(frame_compra, fg_color="transparent")
         row3.pack(fill="x", pady=5)
-        
-        ctk.CTkLabel(row3, text="Vendedor:", width=100).pack(side="left", padx=5)
+
+        lbl_origen = ctk.CTkLabel(row3, text="Origen (Procedencia/Vendedor):", width=180)
+        lbl_origen.pack(side="left", padx=5)
         self.combo_vendedor = ctk.CTkComboBox(row3, width=300)
+        self.combo_vendedor.set("Seleccione procedencia o vendedor")
         self.combo_vendedor.pack(side="left", padx=5)
-        
-        ctk.CTkLabel(row3, text="Precio $:", width=80).pack(side="left", padx=5)
-        self.entry_precio = ctk.CTkEntry(row3, placeholder_text="0.00", width=150)
+        add_tooltip(lbl_origen, "Seleccione primero una procedencia; si no existe, el vendedor.")
+        add_tooltip(self.combo_vendedor, "Lista prioriza procedencias; luego vendedores.")
+
+        lbl_precio = ctk.CTkLabel(row3, text="Precio Compra ($):", width=130)
+        lbl_precio.pack(side="left", padx=5)
+        self.entry_precio = ctk.CTkEntry(row3, placeholder_text="Ej: 1250.50", width=150)
         self.entry_precio.pack(side="left", padx=5)
+        add_tooltip(lbl_precio, "Valor pagado por el animal.")
+        add_tooltip(self.entry_precio, "Use punto para decimales. Puede dejarse vacío si no aplica.")
 
         # Peso Compra
         row4 = ctk.CTkFrame(frame_compra, fg_color="transparent")
         row4.pack(fill="x", pady=5)
-        
-        ctk.CTkLabel(row4, text="Peso Compra (kg):", width=120).pack(side="left", padx=5)
-        self.entry_peso_compra = ctk.CTkEntry(row4, placeholder_text="Peso al momento de compra", width=200)
+
+        lbl_peso_compra = ctk.CTkLabel(row4, text=f"Peso al Comprar ({units_helper.weight_unit}):", width=180)
+        lbl_peso_compra.pack(side="left", padx=5)
+        self.entry_peso_compra = ctk.CTkEntry(row4, placeholder_text="Peso estimado en la compra", width=200)
         self.entry_peso_compra.pack(side="left", padx=5)
+        add_tooltip(lbl_peso_compra, "Peso aproximado al momento de la compra.")
+        add_tooltip(self.entry_peso_compra, "Puede dejarse vacío; ayudará a evaluar ganancias de peso.")
+
+        # Grupo de compra
+        lbl_grupo = ctk.CTkLabel(row4, text="Grupo:", width=80)
+        lbl_grupo.pack(side="left", padx=5)
+        self.combo_grupo_comp = ctk.CTkComboBox(row4, values=["Toros", "Vacas", "Terneros", "Novillos"], width=150)
+        self.combo_grupo_comp.set("Novillos")
+        self.combo_grupo_comp.pack(side="left", padx=5)
+        add_tooltip(self.combo_grupo_comp, "Clasificación del animal al momento de la compra.")
 
         # UBICACIÓN
         self.configurar_ubicacion(main_frame, "comp")
@@ -209,39 +290,47 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         
         ctk.CTkLabel(row1, text="Finca:", width=100).pack(side="left", padx=5)
         if tipo == "nac":
-            self.combo_finca_nac = ctk.CTkComboBox(row1, width=300)
+            self.combo_finca_nac = ctk.CTkComboBox(row1, width=300, state="readonly",
+                                                    command=lambda _: self.on_finca_change("nac"))
             self.combo_finca_nac.pack(side="left", padx=5)
         else:
-            self.combo_finca_comp = ctk.CTkComboBox(row1, width=300)
+            self.combo_finca_comp = ctk.CTkComboBox(row1, width=300, state="readonly",
+                                                     command=lambda _: self.on_finca_change("comp"))
             self.combo_finca_comp.pack(side="left", padx=5)
 
-        # Potrero, Lote y Grupo
+    # Potrero, Lote y Sector (antes 'Grupo')
         row2 = ctk.CTkFrame(frame_ubicacion, fg_color="transparent")
         row2.pack(fill="x", pady=5)
         
         ctk.CTkLabel(row2, text="Potrero:", width=100).pack(side="left", padx=5)
         if tipo == "nac":
             self.combo_potrero_nac = ctk.CTkComboBox(row2, width=200)
+            self.combo_potrero_nac.set("Seleccione un potrero")
             self.combo_potrero_nac.pack(side="left", padx=5)
         else:
             self.combo_potrero_comp = ctk.CTkComboBox(row2, width=200)
+            self.combo_potrero_comp.set("Seleccione un potrero")
             self.combo_potrero_comp.pack(side="left", padx=5)
         
         ctk.CTkLabel(row2, text="Lote:", width=80).pack(side="left", padx=5)
         if tipo == "nac":
             self.combo_lote_nac = ctk.CTkComboBox(row2, width=150)
+            self.combo_lote_nac.set("Seleccione un lote")
             self.combo_lote_nac.pack(side="left", padx=5)
         else:
             self.combo_lote_comp = ctk.CTkComboBox(row2, width=150)
+            self.combo_lote_comp.set("Seleccione un lote")
             self.combo_lote_comp.pack(side="left", padx=5)
         
-        ctk.CTkLabel(row2, text="Grupo:", width=80).pack(side="left", padx=5)
+        ctk.CTkLabel(row2, text="Sector:", width=80).pack(side="left", padx=5)
         if tipo == "nac":
-            self.combo_grupo_nac = ctk.CTkComboBox(row2, width=150)
-            self.combo_grupo_nac.pack(side="left", padx=5)
+            self.combo_sector_nac = ctk.CTkComboBox(row2, width=150)
+            self.combo_sector_nac.set("Seleccione un sector")
+            self.combo_sector_nac.pack(side="left", padx=5)
         else:
-            self.combo_grupo_comp = ctk.CTkComboBox(row2, width=150)
-            self.combo_grupo_comp.pack(side="left", padx=5)
+            self.combo_sector_comp = ctk.CTkComboBox(row2, width=150)
+            self.combo_sector_comp.set("Seleccione un sector")
+            self.combo_sector_comp.pack(side="left", padx=5)
 
     def configurar_informacion_adicional(self, parent, tipo):
         """Configura la sección de información adicional"""
@@ -257,10 +346,12 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         
         ctk.CTkLabel(row1, text="Raza:", width=100).pack(side="left", padx=5)
         if tipo == "nac":
-            self.combo_raza_nac = ctk.CTkComboBox(row1, width=200)
+            self.combo_raza_nac = ctk.CTkComboBox(row1, width=200, state="readonly")
+            self.combo_raza_nac.set("Seleccione una raza")
             self.combo_raza_nac.pack(side="left", padx=5)
         else:
-            self.combo_raza_comp = ctk.CTkComboBox(row1, width=200)
+            self.combo_raza_comp = ctk.CTkComboBox(row1, width=200, state="readonly")
+            self.combo_raza_comp.set("Seleccione una raza")
             self.combo_raza_comp.pack(side="left", padx=5)
         
         ctk.CTkLabel(row1, text="Salud:", width=80).pack(side="left", padx=5)
@@ -272,6 +363,19 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             self.combo_salud_comp = ctk.CTkComboBox(row1, values=["Sano", "Enfermo"], width=150)
             self.combo_salud_comp.set("Sano")
             self.combo_salud_comp.pack(side="left", padx=5)
+
+        # Condición Corporal (cargada desde BD)
+        ctk.CTkLabel(row1, text="Condición Corporal:", width=130).pack(side="left", padx=5)
+        if tipo == "nac":
+            self.combo_condicion_nac = ctk.CTkComboBox(row1, values=[], width=200)
+            self.combo_condicion_nac.set("")
+            self.combo_condicion_nac.pack(side="left", padx=5)
+            add_tooltip(self.combo_condicion_nac, "Condición corporal del animal (escala BCS)")
+        else:
+            self.combo_condicion_comp = ctk.CTkComboBox(row1, values=[], width=200)
+            self.combo_condicion_comp.set("")
+            self.combo_condicion_comp.pack(side="left", padx=5)
+            add_tooltip(self.combo_condicion_comp, "Condición corporal del animal (escala BCS)")
 
         # Estado
         row2 = ctk.CTkFrame(frame_adicional, fg_color="transparent")
@@ -329,15 +433,15 @@ class RegistroAnimalFrame(ctk.CTkFrame):
 
         # Comentarios
         row5 = ctk.CTkFrame(frame_adicional, fg_color="transparent")
-        row5.pack(fill="x", pady=5)
+        row5.pack(fill="both", expand=True, pady=5)
         
         ctk.CTkLabel(row5, text="Comentarios:", width=100).pack(side="left", padx=5, anchor="n")
         if tipo == "nac":
-            self.text_comentarios_nac = ctk.CTkTextbox(row5, width=400, height=60)
-            self.text_comentarios_nac.pack(side="left", padx=5, fill="x", expand=True)
+            self.text_comentarios_nac = ctk.CTkTextbox(row5, width=400, height=100)
+            self.text_comentarios_nac.pack(side="left", padx=5, fill="both", expand=True)
         else:
-            self.text_comentarios_comp = ctk.CTkTextbox(row5, width=400, height=60)
-            self.text_comentarios_comp.pack(side="left", padx=5, fill="x", expand=True)
+            self.text_comentarios_comp = ctk.CTkTextbox(row5, width=400, height=100)
+            self.text_comentarios_comp.pack(side="left", padx=5, fill="both", expand=True)
 
         # Foto
         row6 = ctk.CTkFrame(frame_adicional, fg_color="transparent")
@@ -356,52 +460,126 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             self.label_foto_comp.pack(side="left", padx=5)
 
     def cargar_datos_combos(self):
-        """Carga los datos en los combobox"""
+        """Carga datos base (fincas, razas) y deja dependientes vacíos hasta seleccionar finca."""
+        # Cache: si existe y no forzado y dentro de TTL, reutilizar
+        import time
+        TTL = 60  # segundos
+        if getattr(self, '_combo_cache', None):
+            ts = self._combo_cache.get('timestamp', 0)
+            if time.time() - ts < TTL and not getattr(self, '_force_reload', False):
+                datos = self._combo_cache['data']
+                self._apply_cached_combo_data(datos)
+                return
+        self._force_reload = False
         try:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Cargar fincas
-                cursor.execute("SELECT id, nombre FROM finca WHERE estado = 'Activa' OR estado = 'Activo'")
-                fincas = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                # Cargar fincas (filtrar inactivas/eliminadas)
+                cursor.execute("SELECT id, nombre, estado FROM finca")
+                raw_fincas = cursor.fetchall()
+                excluir = {'eliminada','eliminado','inactiva','inactivo'}
+                finca_rows = [r for r in raw_fincas if (r[2] or '').lower() not in excluir]
+                if not finca_rows:
+                    finca_rows = raw_fincas  # fallback si quedara vacío tras filtro
+                # Construir valores visibles con ID-prefijo: "<id> - <nombre>"
+                fincas = [f"{row[0]} - {row[1]}" for row in finca_rows]
+                # Mapas para uso interno
+                self._finca_id_map = {row[1]: row[0] for row in finca_rows}
+                self._finca_display_to_id = {f"{row[0]} - {row[1]}": row[0] for row in finca_rows}
+                # Leer finca por defecto usando ID almacenado
+                default_finca_key = None
+                try:
+                    cursor.execute("SELECT valor FROM app_settings WHERE clave = 'default_finca_id'")
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        dfid = int(str(row[0]).strip())
+                        for nombre, _id in self._finca_id_map.items():
+                            if _id == dfid:
+                                default_finca_key = nombre
+                                break
+                except Exception:
+                    pass
                 
-                # Cargar razas
-                cursor.execute("SELECT id, nombre FROM raza WHERE estado = 'Activa' OR estado = 'Activo'")
-                razas = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                # Cargar razas (ampliar criterios)
+                cursor.execute("SELECT id, nombre, estado FROM raza")
+                raw_razas = cursor.fetchall()
+                raza_rows = [r for r in raw_razas if (r[2] or '').lower() not in ('inactiva','eliminada')]
+                if not raza_rows:
+                    raza_rows = raw_razas
+                razas = [f"{row[0]} - {row[1]}" for row in raza_rows]
+                self._raza_id_map = {row[1]: row[0] for row in raza_rows}
+                self._raza_display_to_id = {f"{row[0]} - {row[1]}": row[0] for row in raza_rows}
                 
-                # Cargar animales para padres (solo hembras para madres, machos para padres)
-                cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado = 'Activo' AND sexo = 'Hembra'")
-                madres = [f"{row[0]}-{row[1]} ({row[2] or 'Sin nombre'})" for row in cursor.fetchall()]
+                # Cargar condiciones corporales desde BD
+                cursor.execute("SELECT codigo, descripcion FROM condicion_corporal WHERE estado='Activo' ORDER BY codigo")
+                condicion_rows = cursor.fetchall()
+                condiciones = [f"{row[0]} - {row[1]}" for row in condicion_rows]
+                self._condicion_map = {f"{row[0]} - {row[1]}": row[0] for row in condicion_rows}
                 
-                cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado = 'Activo' AND sexo = 'Macho'")
-                padres = [f"{row[0]}-{row[1]} ({row[2] or 'Sin nombre'})" for row in cursor.fetchall()]
+                # No cargar padres globales; se cargarán al elegir finca
+                madres = []
+                padres = []
+                self._madre_id_map = {}
+                self._padre_id_map = {}
                 
-                # Cargar vendedores
-                cursor.execute("SELECT id, nombre FROM vendedor WHERE estado = 'Activo'")
-                vendedores = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                # No cargar procedencias/vendedores globales; se filtrarán por finca si existe FK
+                procedencias = []
+                vendedores = []
+                self._procedencia_id_map = {}
+                self._vendedor_id_map = {}
                 
-                # Cargar potreros, lotes y grupos
-                cursor.execute("SELECT id, nombre FROM potrero WHERE estado = 'Activo'")
-                potreros = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
-                
-                cursor.execute("SELECT id, nombre FROM lote WHERE estado = 'Activo'")
-                lotes = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
-                
-                cursor.execute("SELECT id, nombre FROM grupo WHERE estado = 'Activo'")
-                grupos = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
+                # No cargar potreros/lotes/grupos hasta elegir finca
+                potreros = []
+                lotes = []
+                grupos = []
+                self._potrero_id_map = {}
+                self._lote_id_map = {}
+                self._grupo_id_map = {}
                 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los datos:\n{e}")
             return
         
+        # DEBUG: Imprimir datos cargados para verificar
+        print(f"\n{'='*60}")
+        print(f"DATOS CARGADOS EN REGISTRO DE ANIMALES")
+        print(f"{'='*60}")
+        print(f"\n🏢 FINCAS cargadas: {len(fincas)}")
+        for i, f in enumerate(fincas, 1):
+            print(f"   {i}. {f}")
+        print(f"\n🐄 RAZAS cargadas: {len(razas)}")
+        for i, r in enumerate(razas, 1):
+            print(f"   {i:2d}. {r}")
+        print(f"{'='*60}\n")
+        
         # Asignar a combos de nacimiento
         if hasattr(self, 'combo_finca_nac'):
             self.combo_finca_nac.configure(values=fincas)
-            if fincas: self.combo_finca_nac.set(fincas[0])
+            if fincas:
+                # Selección por defecto: si hay default_finca_key (nombre), conviértelo a display con ID
+                default_display = None
+                if default_finca_key:
+                    dfid = self._finca_id_map.get(default_finca_key)
+                    if dfid is not None:
+                        for disp, did in self._finca_display_to_id.items():
+                            if did == dfid:
+                                default_display = disp
+                                break
+                self.combo_finca_nac.set(default_display or fincas[0])
+            print(f"✓ Combo finca_nac configurado con {len(fincas)} fincas")
             
         if hasattr(self, 'combo_raza_nac'):
             self.combo_raza_nac.configure(values=razas)
-            if razas: self.combo_raza_nac.set(razas[0])
+            if razas:
+                self.combo_raza_nac.set(razas[0])
+            print(f"✓ Combo raza_nac configurado con {len(razas)} razas")
+        
+        # Condiciones corporales para nacimiento
+        if hasattr(self, 'combo_condicion_nac'):
+            self.combo_condicion_nac.configure(values=condiciones)
+            if condiciones:
+                self.combo_condicion_nac.set(condiciones[0])
             
         if hasattr(self, 'combo_madre_nac'):
             self.combo_madre_nac.configure(values=madres)
@@ -410,35 +588,380 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             self.combo_padre_nac.configure(values=padres)
             
         if hasattr(self, 'combo_potrero_nac'):
-            self.combo_potrero_nac.configure(values=potreros)
-            
+            self.combo_potrero_nac.configure(values=["Seleccione finca primero"])
+            self.combo_potrero_nac.set("Seleccione finca primero")
         if hasattr(self, 'combo_lote_nac'):
-            self.combo_lote_nac.configure(values=lotes)
-            
-        if hasattr(self, 'combo_grupo_nac'):
-            self.combo_grupo_nac.configure(values=grupos)
+            self.combo_lote_nac.configure(values=["Seleccione finca primero"])
+            self.combo_lote_nac.set("Seleccione finca primero")
+        if hasattr(self, 'combo_sector_nac'):
+            self.combo_sector_nac.configure(values=["Seleccione finca primero"])
+            self.combo_sector_nac.set("Seleccione finca primero")
         
         # Asignar a combos de compra
         if hasattr(self, 'combo_finca_comp'):
             self.combo_finca_comp.configure(values=fincas)
-            if fincas: self.combo_finca_comp.set(fincas[0])
+            if fincas:
+                self.combo_finca_comp.set(default_display or fincas[0])
+            print(f"✓ Combo finca_comp configurado con {len(fincas)} fincas")
             
         if hasattr(self, 'combo_raza_comp'):
             self.combo_raza_comp.configure(values=razas)
-            if razas: self.combo_raza_comp.set(razas[0])
+            if razas:
+                self.combo_raza_comp.set(razas[0])
+            print(f"✓ Combo raza_comp configurado con {len(razas)} razas")
+        
+        # Condiciones corporales para compra
+        if hasattr(self, 'combo_condicion_comp'):
+            self.combo_condicion_comp.configure(values=condiciones)
+            if condiciones:
+                self.combo_condicion_comp.set(condiciones[0])
             
         if hasattr(self, 'combo_vendedor'):
-            self.combo_vendedor.configure(values=vendedores)
-            if vendedores: self.combo_vendedor.set(vendedores[0])
+            # Inicialmente vacío, se carga al seleccionar finca
+            self.combo_vendedor.configure(values=["Seleccione finca primero"])
+            self.combo_vendedor.set("Seleccione finca primero")
             
         if hasattr(self, 'combo_potrero_comp'):
+            self.combo_potrero_comp.configure(values=["Seleccione finca primero"])
+            self.combo_potrero_comp.set("Seleccione finca primero")
+        if hasattr(self, 'combo_lote_comp'):
+            self.combo_lote_comp.configure(values=["Seleccione finca primero"])
+            self.combo_lote_comp.set("Seleccione finca primero")
+        if hasattr(self, 'combo_sector_comp'):
+            self.combo_sector_comp.configure(values=["Seleccione finca primero"])
+            self.combo_sector_comp.set("Seleccione finca primero")
+
+        # Guardar en cache
+        try:
+            import time
+            self._combo_cache = {
+                'timestamp': time.time(),
+                'data': {
+                    'fincas': fincas, 'razas': razas, 'madres': madres, 'padres': padres,
+                    'procedencias': procedencias, 'vendedores': vendedores, 'potreros': potreros,
+                    'lotes': lotes, 'sectores': grupos, 'default_finca': default_finca_key
+                }
+            }
+        except Exception:
+            pass
+
+        # Autocomplete deshabilitado por solicitud del usuario
+        # ===== Cargar datos dependientes de la finca por defecto =====
+        # Ejecutar on_finca_change automáticamente para ambas pestañas si hay finca seleccionada
+        try:
+            if fincas:
+                if hasattr(self, 'combo_finca_nac') and self.combo_finca_nac.get():
+                    self.on_finca_change("nac")
+                if hasattr(self, 'combo_finca_comp') and self.combo_finca_comp.get():
+                    self.on_finca_change("comp")
+        except Exception as e:
+            self.logger.warning(f"Error al cargar datos dependientes iniciales: {e}")
+
+    def _apply_cached_combo_data(self, data):
+        fincas = data.get('fincas', [])
+        razas = data.get('razas', [])
+        madres = data.get('madres', [])
+        padres = data.get('padres', [])
+        procedencias = data.get('procedencias', [])
+        vendedores = data.get('vendedores', [])
+        potreros = data.get('potreros', [])
+        lotes = data.get('lotes', [])
+        # Backward compatibility: aceptar clave antigua 'grupos'
+        grupos = data.get('sectores', data.get('grupos', []))
+        default_finca_key = data.get('default_finca')
+        # Reaplicar valores
+        if hasattr(self, 'combo_finca_nac'):
+            self.combo_finca_nac.configure(values=fincas)
+        if hasattr(self, 'combo_finca_comp'):
+            self.combo_finca_comp.configure(values=fincas)
+        if hasattr(self, 'combo_raza_nac'):
+            self.combo_raza_nac.configure(values=razas)
+        if hasattr(self, 'combo_raza_comp'):
+            self.combo_raza_comp.configure(values=razas)
+        if hasattr(self, 'combo_madre_nac'):
+            self.combo_madre_nac.configure(values=madres)
+        if hasattr(self, 'combo_padre_nac'):
+            self.combo_padre_nac.configure(values=padres)
+        if hasattr(self, 'combo_vendedor'):
+            base_vend = procedencias or vendedores
+            self.combo_vendedor.configure(values=base_vend)
+        if hasattr(self, 'combo_potrero_nac'):
+            self.combo_potrero_nac.configure(values=potreros)
+        if hasattr(self, 'combo_potrero_comp'):
             self.combo_potrero_comp.configure(values=potreros)
-            
+        if hasattr(self, 'combo_lote_nac'):
+            self.combo_lote_nac.configure(values=lotes)
         if hasattr(self, 'combo_lote_comp'):
             self.combo_lote_comp.configure(values=lotes)
+        if hasattr(self, 'combo_sector_nac'):
+            self.combo_sector_nac.configure(values=grupos)
+        if hasattr(self, 'combo_sector_comp'):
+            self.combo_sector_comp.configure(values=grupos)
+        # Autocomplete deshabilitado
+
+    def refrescar_listas(self):
+        # Forzar recarga ignorando cache
+        self._force_reload = True
+        super_reload = getattr(super(), 'refrescar_listas', None)
+        # Reusar ya existente lógica de recarga combos
+        self.cargar_datos_combos()
+        modo = self._get_autocomplete_mode()
+        self._apply_mode_all_combos(modo)
+        messagebox.showinfo("Refrescado", "Listas recargadas (cache actualizado).")
+
+    # ---------------- Autocomplete global mode persistence -----------------
+    def _get_autocomplete_mode(self) -> str:
+        try:
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT valor FROM app_settings WHERE clave='autocomplete_match_mode'")
+                row = cur.fetchone()
+                if row and row[0] in ("contains", "startswith"):
+                    return row[0]
+        except Exception:
+            pass
+        return "contains"
+
+    def _save_autocomplete_mode(self, modo: str):
+        try:
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("UPDATE app_settings SET valor=? WHERE clave='autocomplete_match_mode'", (modo,))
+                if cur.rowcount == 0:
+                    cur.execute("INSERT INTO app_settings (clave, valor) VALUES (?, ?)", ("autocomplete_match_mode", modo))
+                conn.commit()
+        except Exception:
+            pass
+
+    def _init_global_autocomplete_switch(self):
+        modo = self._get_autocomplete_mode()
+        if modo == 'startswith':
+            try: self.switch_autocomplete_global.select()
+            except Exception: pass
+        else:
+            try: self.switch_autocomplete_global.deselect()
+            except Exception: pass
+
+    def _apply_mode_all_combos(self, modo: str):
+        combos = [
+            'combo_finca_nac','combo_finca_comp','combo_raza_nac','combo_raza_comp',
+            'combo_madre_nac','combo_padre_nac','combo_vendedor','combo_potrero_nac',
+            'combo_potrero_comp','combo_lote_nac','combo_lote_comp','combo_sector_nac','combo_sector_comp'
+        ]
+        for attr in combos:
+            combo = getattr(self, attr, None)
+            if combo is not None:
+                try:
+                    set_autocomplete_mode(combo, modo)
+                except Exception:
+                    pass
+
+    def _toggle_global_autocomplete_mode(self):
+        try:
+            estado = self.switch_autocomplete_global.get()
+        except Exception:
+            estado = 0
+        modo = 'startswith' if estado == 1 else 'contains'
+        self._save_autocomplete_mode(modo)
+        self._apply_mode_all_combos(modo)
+
+    def on_finca_change(self, tipo):
+        """Filtra potreros y lotes cuando cambia la finca seleccionada"""
+        try:
+            # Obtener finca seleccionada
+            if tipo == "nac":
+                finca_str = self.combo_finca_nac.get()
+            else:
+                finca_str = self.combo_finca_comp.get()
             
-        if hasattr(self, 'combo_grupo_comp'):
-            self.combo_grupo_comp.configure(values=grupos)
+            if not finca_str:
+                return
+            
+            # Obtener ID de la finca desde el mapa (sin prefijo en display)
+            finca_id = None
+            if hasattr(self, '_finca_id_map') and finca_str in self._finca_id_map:
+                finca_id = self._finca_id_map[finca_str]
+            else:
+                # Fallback por compatibilidad si viniera con formato antiguo
+                if '-' in finca_str:
+                    try:
+                        finca_id = int(finca_str.split('-',1)[0].strip())
+                    except Exception:
+                        finca_id = None
+            if finca_id is None:
+                return
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                # Detectar nombre de columna FK hacia finca para cada tabla
+                def _fk_col(tabla):
+                    try:
+                        cursor.execute(f"PRAGMA table_info({tabla})")
+                        cols = [r[1] for r in cursor.fetchall()]
+                        for cand in ("id_finca", "finca_id"):
+                            if cand in cols:
+                                return cand
+                    except Exception:
+                        return None
+                    return None
+
+                potrero_fk = _fk_col("potrero") or "id_finca"  # potrero migraciones usan id_finca
+                lote_fk = _fk_col("lote") or "finca_id"        # migración 008D usa finca_id
+                grupo_fk = _fk_col("grupo")  # Puede no existir relación
+
+                # Cargar padres (animales activos en esa finca)
+                try:
+                    cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado='Activo' AND sexo='Hembra' AND id_finca=?", (finca_id,))
+                    madre_rows = cursor.fetchall()
+                    madres = [f"{row[1]} ({row[2] or 'Sin nombre'})" for row in madre_rows]
+                    self._madre_id_map = {f"{row[1]} ({row[2] or 'Sin nombre'})": row[0] for row in madre_rows}
+                    cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado='Activo' AND sexo='Macho' AND id_finca=?", (finca_id,))
+                    padre_rows = cursor.fetchall()
+                    padres = [f"{row[1]} ({row[2] or 'Sin nombre'})" for row in padre_rows]
+                    self._padre_id_map = {f"{row[1]} ({row[2] or 'Sin nombre'})": row[0] for row in padre_rows}
+                except Exception:
+                    madres, padres = [], []
+
+                # Cargar potreros filtrados
+                potrero_sql = f"SELECT id, nombre FROM potrero WHERE {potrero_fk} = ? AND (estado = 'Activo' OR estado = 'Disponible') ORDER BY nombre" if potrero_fk else "SELECT id, nombre FROM potrero WHERE (estado = 'Activo' OR estado = 'Disponible') ORDER BY nombre"
+                params_potrero = (finca_id,) if potrero_fk else ()
+                cursor.execute(potrero_sql, params_potrero)
+                potrero_rows = cursor.fetchall()
+                potreros = [row[1] for row in potrero_rows]
+                self._potrero_id_map = {row[1]: row[0] for row in potrero_rows}
+                # Cargar lotes filtrados
+                lote_sql = f"SELECT id, nombre FROM lote WHERE {lote_fk} = ? ORDER BY nombre" if lote_fk else "SELECT id, nombre FROM lote ORDER BY nombre"
+                params_lote = (finca_id,) if lote_fk else ()
+                try:
+                    cursor.execute(lote_sql, params_lote)
+                    lote_rows = cursor.fetchall()
+                except sqlite3.Error as e:
+                    # Fallback sin filtro si columna no existe por algún motivo
+                    cursor.execute("SELECT id, nombre FROM lote ORDER BY nombre")
+                    lote_rows = cursor.fetchall()
+                lotes = [row[1] for row in lote_rows]
+                self._lote_id_map = {row[1]: row[0] for row in lote_rows}
+                
+                # Cargar sectores filtrados (reemplaza uso de grupos en UI)
+                grupos = []  # reutilizamos variable 'grupos' para minimizar cambios posteriores
+                try:
+                    cursor.execute("SELECT id, nombre FROM sector WHERE finca_id = ? AND estado='Activo' ORDER BY nombre", (finca_id,))
+                    sector_rows = cursor.fetchall()
+                    grupos = [row[1] for row in sector_rows]
+                    # Mapa de sectores (usamos nombre de variable legacy para compatibilidad en resto del código)
+                    self._sector_id_map = {row[1]: row[0] for row in sector_rows}
+                except Exception:
+                    pass
+
+                # Cargar origen unificado si existe tabla 'origen'; si no, usar procedencia/vendedor
+                procedencias = []
+                vendedores = []
+                base_origen = []
+                self._origen_id_map = {}
+                try:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='origen'")
+                    if cursor.fetchone():
+                        # Usar origen consolidado
+                        cursor.execute("SELECT id, tipo, nombre FROM origen WHERE (id_finca = ? OR id_finca IS NULL) AND estado='Activo' ORDER BY nombre", (finca_id,))
+                        origen_rows = cursor.fetchall()
+                        base_origen = [r[2] for r in origen_rows]
+                        self._origen_id_map = {r[2]: r[0] for r in origen_rows}
+                    else:
+                        # Procedencia + vendedor legacy
+                        proc_fk = _fk_col("procedencia")
+                        vend_fk = _fk_col("vendedor")
+                        if proc_fk:
+                            cursor.execute(f"SELECT id, descripcion FROM procedencia WHERE {proc_fk}=? AND (estado='Activo' OR estado IS NULL) ORDER BY descripcion", (finca_id,))
+                        else:
+                            cursor.execute("SELECT id, descripcion FROM procedencia WHERE estado='Activo' OR estado IS NULL ORDER BY descripcion")
+                        proc_rows = cursor.fetchall()
+                        procedencias = [r[1] for r in proc_rows]
+                        self._procedencia_id_map = {r[1]: r[0] for r in proc_rows}
+                        if not procedencias:
+                            if vend_fk:
+                                cursor.execute(f"SELECT id, nombre FROM vendedor WHERE {vend_fk}=? AND (estado='Activo' OR estado IS NULL) ORDER BY nombre", (finca_id,))
+                            else:
+                                cursor.execute("SELECT id, nombre FROM vendedor WHERE estado='Activo' OR estado IS NULL ORDER BY nombre")
+                            vend_rows = cursor.fetchall()
+                            vendedores = [r[1] for r in vend_rows]
+                            self._vendedor_id_map = {r[1]: r[0] for r in vend_rows}
+                        else:
+                            vendedores = []
+                            self._vendedor_id_map = {}
+                except Exception:
+                    base_origen = []
+                    procedencias = []
+                    vendedores = []
+                
+                # Actualizar combos según tipo
+                if tipo == "nac":
+                    if hasattr(self, 'combo_potrero_nac'):
+                        self.combo_potrero_nac.configure(values=potreros)
+                        if potreros:
+                            self.combo_potrero_nac.set(potreros[0])
+                        else:
+                            self.combo_potrero_nac.set("")
+                    
+                    if hasattr(self, 'combo_lote_nac'):
+                        self.combo_lote_nac.configure(values=lotes)
+                        if lotes:
+                            self.combo_lote_nac.set(lotes[0])
+                        else:
+                            self.combo_lote_nac.set("")
+                    # Actualizar sectores (variables renombradas de grupo a sector)
+                    if hasattr(self, 'combo_sector_nac'):
+                        self.combo_sector_nac.configure(values=grupos if grupos else ["Sin sectores"])
+                        if grupos:
+                            self.combo_sector_nac.set(grupos[0])
+                        else:
+                            self.combo_sector_nac.set("Sin sectores")
+                    # Actualizar padres
+                    if hasattr(self, 'combo_madre_nac'):
+                        self.combo_madre_nac.configure(values=madres)
+                        if madres:
+                            self.combo_madre_nac.set(madres[0])
+                        else:
+                            self.combo_madre_nac.set("")
+                    if hasattr(self, 'combo_padre_nac'):
+                        self.combo_padre_nac.configure(values=padres)
+                        if padres:
+                            self.combo_padre_nac.set(padres[0])
+                        else:
+                            self.combo_padre_nac.set("")
+                else:
+                    if hasattr(self, 'combo_potrero_comp'):
+                        self.combo_potrero_comp.configure(values=potreros)
+                        if potreros:
+                            self.combo_potrero_comp.set(potreros[0])
+                        else:
+                            self.combo_potrero_comp.set("")
+                    
+                    if hasattr(self, 'combo_lote_comp'):
+                        self.combo_lote_comp.configure(values=lotes)
+                        if lotes:
+                            self.combo_lote_comp.set(lotes[0])
+                        else:
+                            self.combo_lote_comp.set("")
+                    # Actualizar sectores (variables renombradas de grupo a sector)
+                    if hasattr(self, 'combo_sector_comp'):
+                        self.combo_sector_comp.configure(values=grupos if grupos else ["Sin sectores"])
+                        if grupos:
+                            self.combo_sector_comp.set(grupos[0])
+                        else:
+                            self.combo_sector_comp.set("Sin sectores")
+                    # Actualizar origen/vendedor para compra
+                    if hasattr(self, 'combo_vendedor'):
+                        base_vend = base_origen or procedencias or vendedores
+                        self.combo_vendedor.configure(values=base_vend)
+                        if base_vend:
+                            self.combo_vendedor.set(base_vend[0])
+                        else:
+                            self.combo_vendedor.set("Sin datos")
+                            
+        except sqlite3.Error as e:
+            messagebox.showerror("Error de Base de Datos", f"No se pudieron cargar los datos de la finca: {e}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado al filtrar por finca: {e}")
 
     def cargar_foto_nac(self):
         self.cargar_foto("nac")
@@ -461,16 +984,34 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 self.label_foto_comp.configure(text=f"Foto: {os.path.basename(file_path)}")
 
     def validar_datos(self, tipo):
-        """Valida los datos antes de guardar - VERSIÓN SIMPLIFICADA"""
+        """Valida los datos antes de guardar - VERSIÓN MEJORADA"""
         if tipo == "nac":
             codigo = self.entry_codigo_nac.get().strip()
             fecha_nac = self.entry_fecha_nac.get().strip()
+            finca = self.combo_finca_nac.get().strip()
+            sexo = self.combo_sexo_nac.get().strip()
+            raza = self.combo_raza_nac.get().strip()
         else:
             codigo = self.entry_codigo_comp.get().strip()
             fecha_compra = self.entry_fecha_compra.get().strip()
+            finca = self.combo_finca_comp.get().strip()
+            sexo = self.combo_sexo_comp.get().strip()
+            raza = self.combo_raza_comp.get().strip()
 
         if not codigo:
             messagebox.showwarning("Atención", "El código del animal es obligatorio.")
+            return False
+        
+        if not finca or finca in ("", "Seleccione una finca"):
+            messagebox.showwarning("Atención", "Debe seleccionar una finca.")
+            return False
+        
+        if not sexo or sexo in ("", "Seleccione el sexo"):
+            messagebox.showwarning("Atención", "Debe seleccionar el sexo del animal.")
+            return False
+        
+        if not raza or raza in ("", "Seleccione una raza"):
+            messagebox.showwarning("Atención", "Debe seleccionar una raza.")
             return False
             
         if tipo == "nac" and not fecha_nac:
@@ -499,51 +1040,140 @@ class RegistroAnimalFrame(ctk.CTkFrame):
 
         try:
             # Recoger datos
-            codigo = self.entry_codigo_nac.get().strip().upper()
-            nombre = self.entry_nombre_nac.get().strip() or None
+            codigo = truncate(self.entry_codigo_nac.get().strip().upper(), "codigo_animal")
+            nombre = truncate(self.entry_nombre_nac.get().strip(), "nombre_animal") or None
             fecha_nacimiento = self.entry_fecha_nac.get().strip()
             sexo = self.combo_sexo_nac.get()
             
-            # Obtener IDs
-            id_finca = int(self.combo_finca_nac.get().split("-")[0]) if self.combo_finca_nac.get() else None
-            raza_nombre = self.combo_raza_nac.get().split("-", 1)[1] if self.combo_raza_nac.get() and "-" in self.combo_raza_nac.get() else (self.combo_raza_nac.get() or None)
-            id_madre = int(self.combo_madre_nac.get().split("-")[0]) if self.combo_madre_nac.get() else None
-            id_padre = int(self.combo_padre_nac.get().split("-")[0]) if self.combo_padre_nac.get() else None
-            id_potrero = int(self.combo_potrero_nac.get().split("-")[0]) if self.combo_potrero_nac.get() else None
-            id_lote = int(self.combo_lote_nac.get().split("-")[0]) if self.combo_lote_nac.get() else None
-            id_grupo = int(self.combo_grupo_nac.get().split("-")[0]) if self.combo_grupo_nac.get() else None
+            # Función auxiliar para extraer ID de forma segura
+            def extraer_id(valor_combo, mapa=None):
+                """Obtiene el ID desde el display 'ID - Nombre' o usando mapa nombre->id si existe."""
+                if not valor_combo:
+                    return None
+                valor_combo = valor_combo.strip()
+                # Si el valor viene como 'ID - Nombre', tomar el prefijo ID
+                if '-' in valor_combo:
+                    try:
+                        return int(valor_combo.split('-',1)[0].strip())
+                    except Exception:
+                        return None
+                # Si se pasa solo el nombre y existe mapa nombre->id
+                if mapa and valor_combo in mapa:
+                    return mapa[valor_combo]
+                return None
+            
+            # Obtener IDs de forma segura
+            id_finca = extraer_id(self.combo_finca_nac.get(), getattr(self, '_finca_id_map', None))
+            raza_id = extraer_id(self.combo_raza_nac.get(), getattr(self, '_raza_id_map', None))
+            id_madre = extraer_id(self.combo_madre_nac.get(), getattr(self, '_madre_id_map', None))
+            id_padre = extraer_id(self.combo_padre_nac.get(), getattr(self, '_padre_id_map', None))
+            id_potrero = extraer_id(self.combo_potrero_nac.get(), getattr(self, '_potrero_id_map', None))
+            id_lote = extraer_id(self.combo_lote_nac.get(), getattr(self, '_lote_id_map', None))
+            # Obtener id_grupo (tabla animal usa id_grupo para almacenar sector)
+            id_sector = extraer_id(self.combo_sector_nac.get(), getattr(self, '_sector_id_map', None))
+            
+            # Convertir peso al nacer a kg para almacenar en BD
+            peso_nac_input = self.entry_peso_nacimiento.get().strip()
+            peso_nac_kg = None
+            if peso_nac_input:
+                try:
+                    peso_nac_kg = units_helper.convert_weight_to_kg(float(peso_nac_input))
+                except ValueError:
+                    messagebox.showwarning("Atención", "Peso al nacer debe ser numérico.")
+                    return
+
+            # Validar campos obligatorios
+            if not codigo or not codigo.strip():
+                messagebox.showerror("Error de Validación", "El código del animal es obligatorio.")
+                return
+            
+            if not fecha_nacimiento or not fecha_nacimiento.strip():
+                messagebox.showerror("Error de Validación", "La fecha de nacimiento es obligatoria.")
+                return
+            
+            # Validar formato de fecha
+            try:
+                datetime.strptime(fecha_nacimiento, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Error de Validación", "Formato de fecha inválido. Use YYYY-MM-DD.")
+                return
+            
+            # Validar conjunto de datos antes de insertar
+            es_valido, errores = animal_validator.validar_animal_completo({
+                'codigo': codigo,
+                'peso_nacimiento': peso_nac_kg,
+                'fecha_nacimiento': fecha_nacimiento,
+                'sexo': sexo,
+            })
+            if not es_valido:
+                messagebox.showerror("Validación", "\n".join(errores[:6]))
+                return
+            
+            # Obtener grupo y condicion_corporal
+            grupo_nac = self.combo_grupo_nac.get() if hasattr(self, 'combo_grupo_nac') else None
+            condicion_nac = extraer_id(self.combo_condicion_nac.get(), getattr(self, '_condicion_map', None)) if hasattr(self, 'combo_condicion_nac') else None
             
             # Preparar datos para inserción
             datos_insercion = (
-                id_finca, codigo, nombre, 'Nacimiento', sexo, raza_nombre,
-                id_potrero, id_lote, id_grupo, fecha_nacimiento, None,  # fecha_compra
-                float(self.entry_peso_nacimiento.get()) if self.entry_peso_nacimiento.get().strip() else None,  # peso_nacimiento
-                None,  # peso_compra
-                None,  # id_vendedor
-                None,  # precio_compra
+                id_finca, codigo, nombre, 'Nacimiento', sexo, raza_id,
+                id_potrero, id_lote, id_sector, fecha_nacimiento, None,
+                peso_nac_kg,
+                None,
+                None,
+                None,
                 id_padre, id_madre, self.combo_concepcion_nac.get(),
-                self.combo_salud_nac.get(), self.combo_estado_nac.get(), 0,  # inventariado
+                self.combo_salud_nac.get(), self.combo_estado_nac.get(), 0,
                 self.entry_color_nac.get().strip() or None,
                 self.entry_hierro_nac.get().strip() or None,
                 int(self.entry_num_hierros_nac.get().strip()) if self.entry_num_hierros_nac.get().strip() else 0,
                 self.entry_composicion_nac.get().strip() or None,
                 self.text_comentarios_nac.get("1.0", "end-1c").strip() or None,
                 self.foto_path,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                grupo_nac,  # categoria
+                grupo_nac,  # grupo_compra
+                condicion_nac
             )
             
             # Insertar en BD
             with get_db_connection() as conn:
                 cursor = conn.cursor()
+                # Validar unicidad explícita antes de intentar insertar para mensaje amigable
+                cursor.execute("SELECT 1 FROM animal WHERE codigo = ?", (codigo,))
+                if cursor.fetchone():
+                    messagebox.showerror("Duplicado", f"El código '{codigo}' ya existe.")
+                    return
+                # Validaciones de FK previas para mensajes claros
+                fk_checks = [
+                    (id_finca, 'finca'), (raza_id, 'raza'), (id_potrero, 'potrero'),
+                    (id_lote, 'lote'), (id_sector, 'sector')
+                ]
+                for val, tabla in fk_checks:
+                    if val is not None:
+                        cursor.execute(f"SELECT 1 FROM {tabla} WHERE id=?", (val,))
+                        if cursor.fetchone() is None:
+                            messagebox.showerror("Validación", f"El {tabla} seleccionado no existe.")
+                            return
+
                 cursor.execute("""
                     INSERT INTO animal (
-                        id_finca, codigo, nombre, tipo_ingreso, sexo, raza, id_potrero, 
-                        id_lote, id_grupo, fecha_nacimiento, fecha_compra, peso_nacimiento, 
-                        peso_compra, id_vendedor, precio_compra, id_padre, id_madre, 
-                        tipo_concepcion, salud, estado, inventariado, color, hierro, 
-                        numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        id_finca, codigo, nombre, tipo_ingreso, sexo, raza_id, id_potrero,
+                        lote_id, id_sector, fecha_nacimiento, fecha_compra, peso_nacimiento,
+                        peso_compra, id_vendedor, precio_compra, id_padre, id_madre,
+                        tipo_concepcion, salud, estado, inventariado, color, hierro,
+                        numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro,
+                        categoria, grupo_compra, condicion_corporal
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, datos_insercion)
+                # Establecer ultimo_peso inicial si se proporcionó peso de nacimiento
+                if peso_nac_kg is not None:
+                    try:
+                        cursor.execute(
+                            "UPDATE animal SET ultimo_peso = ?, fecha_ultimo_peso = ? WHERE codigo = ?",
+                            (peso_nac_kg, datetime.now().strftime('%Y-%m-%d'), codigo)
+                        )
+                    except Exception:
+                        pass
                 conn.commit()
                 
             messagebox.showinfo("Éxito", "✅ Animal registrado por nacimiento correctamente.")
@@ -559,51 +1189,145 @@ class RegistroAnimalFrame(ctk.CTkFrame):
 
         try:
             # Recoger datos
-            codigo = self.entry_codigo_comp.get().strip().upper()
-            nombre = self.entry_nombre_comp.get().strip() or None
+            codigo = truncate(self.entry_codigo_comp.get().strip().upper(), "codigo_animal")
+            nombre = truncate(self.entry_nombre_comp.get().strip(), "nombre_animal") or None
             fecha_nacimiento = self.entry_fecha_nac_comp.get().strip() or None
             fecha_compra = self.entry_fecha_compra.get().strip()
             sexo = self.combo_sexo_comp.get()
             
-            # Obtener IDs
-            id_finca = int(self.combo_finca_comp.get().split("-")[0]) if self.combo_finca_comp.get() else None
-            raza_nombre = self.combo_raza_comp.get().split("-", 1)[1] if self.combo_raza_comp.get() and "-" in self.combo_raza_comp.get() else (self.combo_raza_comp.get() or None)
-            id_vendedor = int(self.combo_vendedor.get().split("-")[0]) if self.combo_vendedor.get() else None
-            id_potrero = int(self.combo_potrero_comp.get().split("-")[0]) if self.combo_potrero_comp.get() else None
-            id_lote = int(self.combo_lote_comp.get().split("-")[0]) if self.combo_lote_comp.get() else None
-            id_grupo = int(self.combo_grupo_comp.get().split("-")[0]) if self.combo_grupo_comp.get() else None
+            # Función auxiliar para extraer ID de forma segura
+            def extraer_id(valor_combo, mapa=None):
+                """Obtiene el ID usando mapa nombre->id si existe, sino intenta parsear prefijo."""
+                if not valor_combo:
+                    return None
+                valor_combo = valor_combo.strip()
+                if mapa and valor_combo in mapa:
+                    return mapa[valor_combo]
+                if '-' in valor_combo:
+                    try:
+                        return int(valor_combo.split('-',1)[0].strip())
+                    except Exception:
+                        return None
+                return None
+            
+            # Obtener IDs de forma segura
+            id_finca = extraer_id(self.combo_finca_comp.get(), getattr(self, '_finca_id_map', None))
+            raza_id = extraer_id(self.combo_raza_comp.get(), getattr(self, '_raza_id_map', None))
+            # Procedencia o vendedor (ambos usan mismo combo)
+            # Importante: Solo aceptar id_vendedor cuando proviene realmente de la tabla vendedor
+            id_vendedor = None
+            try:
+                sel_origen = (self.combo_vendedor.get() or '').strip()
+            except Exception:
+                sel_origen = ''
+            # Si tenemos mapa de vendedores y el valor pertenece a vendedores, usar ese ID
+            vend_map = getattr(self, '_vendedor_id_map', {}) or {}
+            if sel_origen in vend_map:
+                id_vendedor = vend_map[sel_origen]
+            else:
+                # Si se estuviera mostrando con prefijo "ID - nombre", intentar parsear y validar contra vendedor
+                if '-' in sel_origen:
+                    try:
+                        posible_id = int(sel_origen.split('-', 1)[0].strip())
+                        # Validar que exista en vendedor
+                        with get_db_connection() as _c:
+                            _cu = _c.cursor()
+                            _cu.execute("SELECT 1 FROM vendedor WHERE id=?", (posible_id,))
+                            if _cu.fetchone():
+                                id_vendedor = posible_id
+                    except Exception:
+                        id_vendedor = None
+            id_potrero = extraer_id(self.combo_potrero_comp.get(), getattr(self, '_potrero_id_map', None))
+            id_lote = extraer_id(self.combo_lote_comp.get(), getattr(self, '_lote_id_map', None))
+            # Obtener id_grupo (tabla animal usa id_grupo para almacenar sector)
+            id_sector = extraer_id(self.combo_sector_comp.get(), getattr(self, '_sector_id_map', None))
+            
+            # Convertir peso de compra a kg para almacenar en BD
+            peso_comp_input = self.entry_peso_compra.get().strip()
+            peso_comp_kg = None
+            if peso_comp_input:
+                try:
+                    peso_comp_kg = units_helper.convert_weight_to_kg(float(peso_comp_input))
+                except ValueError:
+                    messagebox.showwarning("Atención", "Peso de compra debe ser numérico.")
+                    return
+
+            # Validar conjunto de datos antes de insertar
+            es_valido, errores = animal_validator.validar_animal_completo({
+                'codigo': codigo,
+                'peso_compra': peso_comp_kg,
+                'fecha_nacimiento': fecha_nacimiento,
+                'fecha_compra': fecha_compra,
+                'precio_compra': self.entry_precio.get().strip() or None,
+                'sexo': sexo,
+            })
+            if not es_valido:
+                messagebox.showerror("Validación", "\n".join(errores[:6]))
+                return
+            
+            # Obtener grupo y condicion_corporal
+            grupo_comp = self.combo_grupo_comp.get() if hasattr(self, 'combo_grupo_comp') else None
+            condicion_comp = extraer_id(self.combo_condicion_comp.get(), getattr(self, '_condicion_map', None)) if hasattr(self, 'combo_condicion_comp') else None
             
             # Preparar datos para inserción
             datos_insercion = (
-                id_finca, codigo, nombre, 'Compra', sexo, raza_nombre,
-                id_potrero, id_lote, id_grupo, fecha_nacimiento, fecha_compra,
-                None,  # peso_nacimiento
-                float(self.entry_peso_compra.get()) if self.entry_peso_compra.get().strip() else None,  # peso_compra
+                id_finca, codigo, nombre, 'Compra', sexo, raza_id,
+                id_potrero, id_lote, id_sector, fecha_nacimiento, fecha_compra,
+                None,
+                peso_comp_kg,
                 id_vendedor,
-                float(self.entry_precio.get()) if self.entry_precio.get().strip() else None,  # precio_compra
-                None, None, None,  # id_padre, id_madre, tipo_concepcion
-                self.combo_salud_comp.get(), self.combo_estado_comp.get(), 0,  # inventariado
+                float(self.entry_precio.get()) if self.entry_precio.get().strip() else None,
+                None, None, None,
+                self.combo_salud_comp.get(), self.combo_estado_comp.get(), 0,
                 self.entry_color_comp.get().strip() or None,
                 self.entry_hierro_comp.get().strip() or None,
                 int(self.entry_num_hierros_comp.get().strip()) if self.entry_num_hierros_comp.get().strip() else 0,
                 self.entry_composicion_comp.get().strip() or None,
                 self.text_comentarios_comp.get("1.0", "end-1c").strip() or None,
                 self.foto_path,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                grupo_comp,  # categoria
+                grupo_comp,  # grupo_compra
+                condicion_comp
             )
             
             # Insertar en BD
             with get_db_connection() as conn:
                 cursor = conn.cursor()
+                cursor.execute("SELECT 1 FROM animal WHERE codigo = ?", (codigo,))
+                if cursor.fetchone():
+                    messagebox.showerror("Duplicado", f"El código '{codigo}' ya existe.")
+                    return
+                # Validaciones de FK previas para mensajes claros
+                fk_checks = [
+                    (id_finca, 'finca'), (raza_id, 'raza'), (id_potrero, 'potrero'),
+                    (id_lote, 'lote'), (id_sector, 'sector'), (id_vendedor, 'vendedor')
+                ]
+                for val, tabla in fk_checks:
+                    if val is not None:
+                        cursor.execute(f"SELECT 1 FROM {tabla} WHERE id=?", (val,))
+                        if cursor.fetchone() is None:
+                            messagebox.showerror("Validación", f"El {tabla} seleccionado no existe.")
+                            return
                 cursor.execute("""
                     INSERT INTO animal (
-                        id_finca, codigo, nombre, tipo_ingreso, sexo, raza, id_potrero, 
-                        id_lote, id_grupo, fecha_nacimiento, fecha_compra, peso_nacimiento, 
-                        peso_compra, id_vendedor, precio_compra, id_padre, id_madre, 
-                        tipo_concepcion, salud, estado, inventariado, color, hierro, 
-                        numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        id_finca, codigo, nombre, tipo_ingreso, sexo, raza_id, id_potrero,
+                        lote_id, id_sector, fecha_nacimiento, fecha_compra, peso_nacimiento,
+                        peso_compra, id_vendedor, precio_compra, id_padre, id_madre,
+                        tipo_concepcion, salud, estado, inventariado, color, hierro,
+                        numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro,
+                        categoria, grupo_compra, condicion_corporal
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, datos_insercion)
+                # Establecer ultimo_peso inicial si se proporcionó peso de compra
+                if peso_comp_kg is not None:
+                    try:
+                        cursor.execute(
+                            "UPDATE animal SET ultimo_peso = ?, fecha_ultimo_peso = ? WHERE codigo = ?",
+                            (peso_comp_kg, datetime.now().strftime('%Y-%m-%d'), codigo)
+                        )
+                    except Exception:
+                        pass
                 conn.commit()
                 
             messagebox.showinfo("Éxito", "✅ Animal registrado por compra correctamente.")
@@ -657,3 +1381,112 @@ class RegistroAnimalFrame(ctk.CTkFrame):
         importar_animales_desde_excel()
         # Recargar datos si es necesario
         self.cargar_datos_combos()
+
+    def importar_excel_compras(self):
+        """Importa animales por compra desde Excel (requiere columnas compra)"""
+        from tkinter import filedialog
+        from modules.utils.importador_excel import importar_animales_desde_excel
+        ruta = filedialog.askopenfilename(title="Seleccionar archivo Excel de compras",
+                                          filetypes=[("Excel files", "*.xlsx *.xls")])
+        if not ruta:
+            return
+        registros, errores = importar_animales_desde_excel(ruta)
+        if errores:
+            messagebox.showerror("Errores de Importación", "\n".join(errores))
+            return
+        # Filtrar sólo tipo_ingreso Compra
+        registros_compra = [r for r in registros if r.get('tipo_ingreso') == 'Compra']
+        if not registros_compra:
+            messagebox.showwarning("Importación", "No se encontraron registros de tipo Compra en el archivo.")
+            return
+        insertados = 0
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            # Importar helpers para búsquedas case-insensitive
+            from modules.utils.database_helpers import (
+                buscar_finca_id,
+                buscar_raza_id,
+                buscar_potrero_id,
+                buscar_lote_id,
+                buscar_sector_id,
+                buscar_vendedor_id
+            )
+            
+            for r in registros_compra:
+                try:
+                    # Resolución de IDs usando helpers case-insensitive
+                    id_finca = buscar_finca_id(cur, r.get('finca'))
+                    raza_id = buscar_raza_id(cur, r.get('raza'))
+                    id_potrero = buscar_potrero_id(cur, r.get('potrero'), id_finca)
+                    id_lote = buscar_lote_id(cur, r.get('lote'))
+                    id_sector = buscar_sector_id(cur, r.get('sector'))
+                    id_vendedor = buscar_vendedor_id(cur, r.get('vendedor'))
+
+                    cur.execute("""
+                        INSERT INTO animal (
+                            id_finca, codigo, nombre, tipo_ingreso, sexo, raza_id, id_potrero, lote_id, id_sector,
+                            fecha_nacimiento, fecha_compra, peso_nacimiento, peso_compra, id_vendedor, precio_compra,
+                            id_padre, id_madre, tipo_concepcion, salud, estado, inventariado, color, hierro,
+                            numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro, grupo_compra
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        id_finca, r.get('codigo'), r.get('nombre'), 'Compra', r.get('sexo'), raza_id,
+                        id_potrero, id_lote, id_sector, r.get('fecha_nacimiento'), r.get('fecha_compra'),
+                        None, r.get('peso_compra'), id_vendedor, r.get('precio_compra'),
+                        None, None, None, r.get('salud') or 'Sano', 'Activo', 0,
+                        r.get('color'), r.get('hierro'), r.get('numero_hierros') or 0,
+                        None, r.get('observaciones'), None, datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        r.get('grupo')
+                    ))
+                    # Actualizar ultimo_peso para importaciones si se proporcionó peso_compra
+                    try:
+                        peso_import = r.get('peso_compra')
+                        if peso_import not in (None, '', '0'):
+                            peso_float = float(peso_import)
+                            cur.execute(
+                                "UPDATE animal SET ultimo_peso = ?, fecha_ultimo_peso = ? WHERE codigo = ?",
+                                (peso_float, datetime.now().strftime('%Y-%m-%d'), r.get('codigo'))
+                            )
+                    except Exception:
+                        pass
+                    insertados += 1
+                except Exception as e:
+                    print(f"Error insertando registro compra {r.get('codigo')}: {e}")
+            conn.commit()
+        messagebox.showinfo("Importación Compras", f"Registros de compra importados: {insertados}")
+        self.cargar_datos_combos()
+        
+        # Notificar al módulo padre para que refresque el inventario
+        self.notificar_cambios_inventario()
+    
+    def notificar_cambios_inventario(self):
+        try:
+            # Recorrer jerarquía para encontrar InventarioGeneralFrame o frame_inventario
+            from modules.animales.inventario_v2 import InventarioGeneralFrame
+            parent = self.winfo_toplevel()
+            objetivos = []
+            def _collect(fr):
+                try:
+                    for ch in fr.winfo_children():
+                        if isinstance(ch, InventarioGeneralFrame):
+                            objetivos.append(ch)
+                        _collect(ch)
+                except Exception:
+                    pass
+            _collect(parent)
+            # Fallback: atributo frame_inventario con métodos de refresco antiguos
+            if hasattr(parent, 'frame_inventario'):
+                objetivos.append(parent.frame_inventario)
+            usados = 0
+            for obj in objetivos:
+                if hasattr(obj, 'refrescar_inventario_externo'):
+                    obj.refrescar_inventario_externo()
+                    usados += 1
+                elif hasattr(obj, 'refrescar_inventario'):
+                    obj.refrescar_inventario()
+                    usados += 1
+            if self.logger:
+                self.logger.info(f"Inventario refrescado tras registro (targets={usados})")
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"No se pudo notificar cambios al inventario: {e}")

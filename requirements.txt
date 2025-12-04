@@ -5,8 +5,9 @@
 # GUI Moderna
 customtkinter==5.2.2
 
-# Manejo de imágenes
-Pillow==10.2.0
+# Manejo de imágenes (compatible con Python 3.14)
+# Usamos un rango para que pip elija una versión con wheel disponible en tu versión de Python
+Pillow>=11.0.0,<13
 
 # Base de datos SQLite (herramientas extra)
 sqlite-utils==3.34
@@ -20,12 +21,19 @@ requests==2.32.3
 # Manejo de fechas avanzadas
 python-dateutil==2.9.0
 
-# Validación de datos y utilidades
-pydantic==2.7.1
+# Validación de datos y utilidades (compatibles con Python 3.14)
+pydantic>=2.10,<3
 
-# Generación de reportes PDF/Excel (si en un futuro lo usas)
-reportlab==4.0.8
-openpyxl==3.1.2
+# Generación de reportes PDF/Excel (rango compatible)
+reportlab>=4,<5
+openpyxl>=3.1,<4
+markdown>=3.5,<4
 
 # Logs y debug
 loguru==0.7.2
+
+# Gráficos y visualización (rango para compatibilidad con 3.14)
+matplotlib>=3.9,<4
+
+# Testing
+pytest==8.3.2

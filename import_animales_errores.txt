@@ -1,0 +1,13 @@
+Errores de importación de animales
+Total errores: 10
+
+PR-001: Código duplicado (omitido)
+PR-002: Código duplicado (omitido)
+PR-003: Código duplicado (omitido)
+PR-004: Código duplicado (omitido)
+PR-005: Código duplicado (omitido)
+PR-006: Código duplicado (omitido)
+PR-007: Código duplicado (omitido)
+PR-008: Código duplicado (omitido)
+PR-009: Código duplicado (omitido)
+PR-010: Código duplicado (omitido)

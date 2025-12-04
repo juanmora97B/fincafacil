@@ -18,13 +18,17 @@ class PotrerosFrame(ctk.CTkFrame):
         self.cargar_potreros()
 
     def crear_widgets(self):
+        # Frame scrollable principal para toda la interfaz
+        scroll_container = ctk.CTkScrollableFrame(self)
+        scroll_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
         # Título
-        titulo = ctk.CTkLabel(self, text="📍 Configuración de Potreros", font=("Segoe UI", 20, "bold"))
+        titulo = ctk.CTkLabel(scroll_container, text="📍 Configuración de Potreros", font=("Segoe UI", 20, "bold"))
         titulo.pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self, corner_radius=10)
-        form_frame.pack(pady=10, padx=20, fill="x")
+        form_frame = ctk.CTkFrame(scroll_container, corner_radius=10)
+        form_frame.pack(pady=10, padx=4, fill="x")
 
         ctk.CTkLabel(form_frame, text="📝 Nuevo Potrero", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=10)
 
@@ -35,7 +39,7 @@ class PotrerosFrame(ctk.CTkFrame):
         row1 = ctk.CTkFrame(form_frame, fg_color="transparent")
         row1.pack(fill="x", pady=5)
         ctk.CTkLabel(row1, text="Finca *:", width=120).pack(side="left", padx=5)
-        self.combo_finca = ctk.CTkComboBox(row1, width=300)
+        self.combo_finca = ctk.CTkComboBox(row1, width=300, command=self.on_finca_seleccionada)
         self.combo_finca.pack(side="left", padx=5, fill="x", expand=True)
 
         # Nombre y Sector
@@ -45,8 +49,12 @@ class PotrerosFrame(ctk.CTkFrame):
         self.entry_nombre = ctk.CTkEntry(row2, width=140)
         self.entry_nombre.pack(side="left", padx=5)
         ctk.CTkLabel(row2, text="Sector:", width=80).pack(side="left", padx=5)
-        self.entry_sector = ctk.CTkEntry(row2, width=140)
-        self.entry_sector.pack(side="left", padx=5)
+        self.combo_sector = ctk.CTkComboBox(row2, width=140, values=["Sin Sector"])
+        self.combo_sector.set("Sin Sector")
+        self.combo_sector.pack(side="left", padx=5)
+        
+        # Mapa para sectores {nombre: id}
+        self._sector_map = {}
 
         # Área y Capacidad
         row3 = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -86,16 +94,21 @@ class PotrerosFrame(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text="🔄 Limpiar", command=self.limpiar_formulario).pack(side="left", padx=5)
 
         # Separador
-        ctk.CTkLabel(self, text="📋 Potreros Registrados", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=20)
+        ctk.CTkLabel(scroll_container, text="📋 Potreros Registrados", font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(20,5), padx=4)
 
         # Frame de la tabla
-        table_frame = ctk.CTkFrame(self)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        table_frame = ctk.CTkFrame(scroll_container)
+        table_frame.pack(fill="both", expand=True, padx=4, pady=10)
 
-        # Tabla
-        self.tabla = ttk.Treeview(table_frame, columns=("finca", "nombre", "sector", "area", "capacidad", "pasto", "estado"), show="headings", height=12)
+        # Tabla (incluir columna id oculta para búsqueda confiable)
+        self.tabla = ttk.Treeview(table_frame, 
+                                  columns=("id", "finca", "nombre", "sector", "area", "capacidad", "pasto", "estado"), 
+                                  show="headings", 
+                                  displaycolumns=("finca", "nombre", "sector", "area", "capacidad", "pasto", "estado"),  # Ocultar id
+                                  height=12)
         
         column_config = [
+            ("id", "ID", 50),  # Oculto pero necesario
             ("finca", "Finca", 150),
             ("nombre", "Potrero", 120),
             ("sector", "Sector", 100),
@@ -117,7 +130,7 @@ class PotrerosFrame(ctk.CTkFrame):
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
-        action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_frame = ctk.CTkFrame(scroll_container, fg_color="transparent")
         action_frame.pack(pady=10)
         
         ctk.CTkButton(action_frame, text="✏️ Editar Seleccionado", command=self.editar_potrero).pack(side="left", padx=5)
@@ -132,23 +145,56 @@ class PotrerosFrame(ctk.CTkFrame):
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, nombre FROM finca WHERE estado = 'Activa' OR estado = 'Activo'")
-                fincas = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
-                self.combo_finca.configure(values=fincas)
-                if fincas:
-                    self.combo_finca.set(fincas[0])
+                rows = cursor.fetchall()
+                # Mapa interno nombre->id (en minúsculas para búsqueda robusta)
+                self._finca_map = {str(r[1]).strip(): int(r[0]) for r in rows if r[1] is not None}
+                nombres = list(self._finca_map.keys())
+                self.combo_finca.configure(values=nombres)
+                if nombres:
+                    self.combo_finca.set(nombres[0])
+                    self.on_finca_seleccionada(nombres[0])
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las fincas:\n{e}")
+
+    def on_finca_seleccionada(self, nombre_finca):
+        """Carga los sectores de la finca seleccionada"""
+        finca_id = self._finca_map.get(nombre_finca)
+        if not finca_id:
+            return
+        
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, nombre FROM sector 
+                    WHERE finca_id = ? AND (estado = 'Activo' OR estado = 'Activa')
+                    ORDER BY nombre
+                """, (finca_id,))
+                rows = cursor.fetchall()
+                
+                # Mapa interno nombre->id para sectores
+                self._sector_map = {str(r[1]).strip(): int(r[0]) for r in rows if r[1] is not None}
+                nombres_sectores = ["Sin Sector"] + list(self._sector_map.keys())
+                
+                self.combo_sector.configure(values=nombres_sectores)
+                self.combo_sector.set("Sin Sector")
+        except Exception as e:
+            print(f"Error cargando sectores: {e}")
 
     def actualizar_potrero(self, id_finca, nombre_original):
         """Actualiza un potrero existente"""
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
+                # Obtener id_sector del combo
+                sector_seleccionado = self.combo_sector.get().strip()
+                id_sector = self._sector_map.get(sector_seleccionado) if sector_seleccionado != "Sin Sector" else None
+                
                 cursor.execute("""
                     UPDATE potrero SET 
                         id_finca = ?,
                         nombre = ?,
-                        sector = ?,
+                        id_sector = ?,
                         area_hectareas = ?,
                         capacidad_maxima = ?,
                         tipo_pasto = ?,
@@ -159,7 +205,7 @@ class PotrerosFrame(ctk.CTkFrame):
                 """, (
                     id_finca,
                     self.entry_nombre.get().strip(),
-                    self.entry_sector.get().strip(),
+                    id_sector,
                     float(self.entry_area.get() or 0),
                     int(self.entry_capacidad.get() or 0),
                     self.combo_pasto.get(),
@@ -185,7 +231,12 @@ class PotrerosFrame(ctk.CTkFrame):
             return
 
         try:
-            id_finca = int(self.combo_finca.get().split("-")[0])
+            # Obtener id_finca desde el mapa interno usando el nombre seleccionado
+            nombre_finca_sel = self.combo_finca.get().strip()
+            id_finca = self._finca_map.get(nombre_finca_sel)
+            if not id_finca:
+                messagebox.showwarning("Atención", "La finca seleccionada no es válida.")
+                return
             nombre = self.entry_nombre.get().strip()
             
             with db.get_connection() as conn:
@@ -205,15 +256,20 @@ class PotrerosFrame(ctk.CTkFrame):
                 else:
                     # Generar código único para el potrero
                     codigo = f"{id_finca}-{nombre}"
+                    
+                    # Obtener id_sector del mapa
+                    sector_seleccionado = self.combo_sector.get().strip()
+                    id_sector = self._sector_map.get(sector_seleccionado) if sector_seleccionado != "Sin Sector" else None
+                    
                     cursor.execute("""
-                        INSERT INTO potrero (codigo, id_finca, nombre, sector, area_hectareas, capacidad_maxima, 
+                        INSERT INTO potrero (codigo, id_finca, nombre, id_sector, area_hectareas, capacidad_maxima, 
                                             tipo_pasto, descripcion, estado)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         codigo,
                         id_finca,
                         nombre,
-                        self.entry_sector.get().strip(),
+                        id_sector,
                         float(self.entry_area.get() or 0),
                         int(self.entry_capacidad.get() or 0),
                         self.combo_pasto.get(),
@@ -237,15 +293,27 @@ class PotrerosFrame(ctk.CTkFrame):
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT f.nombre as finca, p.nombre, p.sector, p.area_hectareas, 
+                    SELECT p.id, f.nombre as finca, p.nombre, s.nombre as sector, p.area_hectareas, 
                            p.capacidad_maxima, p.tipo_pasto, p.estado
                     FROM potrero p
-                    JOIN finca f ON p.id_finca = f.id
+                    LEFT JOIN finca f ON p.id_finca = f.id
+                    LEFT JOIN sector s ON p.id_sector = s.id
                     WHERE p.estado = 'Activo'
                 """)
 
                 for fila in cursor.fetchall():
-                    self.tabla.insert("", "end", values=fila)
+                    # Convertir explícitamente cada valor a string para evitar problemas de serialización
+                    valores = (
+                        str(fila[0]) if fila[0] is not None else "",  # id
+                        str(fila[1]) if fila[1] is not None else "Sin Finca",  # finca
+                        str(fila[2]) if fila[2] is not None else "",  # nombre
+                        str(fila[3]) if fila[3] is not None else "Sin Sector",  # sector
+                        str(fila[4]) if fila[4] is not None else "0",  # area
+                        str(fila[5]) if fila[5] is not None else "0",  # capacidad
+                        str(fila[6]) if fila[6] is not None else "",  # pasto
+                        str(fila[7]) if fila[7] is not None else ""   # estado
+                    )
+                    self.tabla.insert("", "end", values=valores)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los potreros:\n{e}")
 
@@ -259,16 +327,15 @@ class PotrerosFrame(ctk.CTkFrame):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                finca_nombre = self.tabla.item(seleccionado[0])["values"][0]  # nombre de la finca
-                potrero_nombre = self.tabla.item(seleccionado[0])["values"][1]  # nombre del potrero
+                potrero_id = self.tabla.item(seleccionado[0])["values"][0]  # ID del potrero
                 
-                # Obtener datos completos del potrero
+                # Obtener datos completos del potrero usando el ID
                 cursor.execute("""
                     SELECT p.*, f.nombre as finca_nombre 
                     FROM potrero p
                     JOIN finca f ON p.id_finca = f.id
-                    WHERE p.nombre = ? AND f.nombre = ?
-                """, (potrero_nombre, finca_nombre))
+                    WHERE p.id = ?
+                """, (potrero_id,))
                 potrero = cursor.fetchone()
                 
                 if not potrero:
@@ -276,18 +343,27 @@ class PotrerosFrame(ctk.CTkFrame):
                     return
                 
                 # Cargar datos en formulario
-                cursor.execute("SELECT id, nombre FROM finca")
-                fincas = [f"{row[0]}-{row[1]}" for row in cursor.fetchall()]
-                self.combo_finca.configure(values=fincas)
-                finca_item = next((f for f in fincas if str(potrero["id_finca"]) in f), None)
-                if finca_item:
-                    self.combo_finca.set(finca_item)
+                cursor.execute("SELECT id, nombre FROM finca WHERE estado = 'Activa' OR estado = 'Activo'")
+                rows = cursor.fetchall()
+                self._finca_map = {str(r[1]).strip(): int(r[0]) for r in rows if r[1] is not None}
+                nombres = list(self._finca_map.keys())
+                self.combo_finca.configure(values=nombres)
+                # Establecer seleccionado por id_finca
+                nombre_sel = next((n for n, fid in self._finca_map.items() if fid == potrero["id_finca"]), None)
+                if nombre_sel:
+                    self.combo_finca.set(nombre_sel)
                 
                 self.entry_nombre.delete(0, "end")
                 self.entry_nombre.insert(0, potrero["nombre"])
                 
-                self.entry_sector.delete(0, "end")
-                self.entry_sector.insert(0, potrero["sector"] or "")
+                # Cargar sectores de la finca y establecer el seleccionado
+                self.on_finca_seleccionada(nombre_sel)
+                if potrero.get("id_sector"):
+                    # Buscar nombre del sector por id
+                    sector_nombre = next((n for n, sid in self._sector_map.items() if sid == potrero["id_sector"]), "Sin Sector")
+                    self.combo_sector.set(sector_nombre)
+                else:
+                    self.combo_sector.set("Sin Sector")
                 
                 self.entry_area.delete(0, "end")
                 self.entry_area.insert(0, str(potrero["area_hectareas"] or ""))
@@ -308,22 +384,23 @@ class PotrerosFrame(ctk.CTkFrame):
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione un potrero para eliminar.")
             return
-        
-        nombre = self.tabla.item(seleccionado[0])["values"][1]
-        if messagebox.askyesno("Confirmar", f"¿Eliminar el potrero '{nombre}'?"):
+        # Usar ID de potrero para eliminar de forma segura
+        potrero_id = self.tabla.item(seleccionado[0])["values"][0]
+        nombre = self.tabla.item(seleccionado[0])["values"][2]
+        if messagebox.askyesno("Confirmar", f"¿Eliminar el potrero '{nombre}'?\n\nEsta acción no se puede deshacer."):
             try:
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE potrero SET estado = 'Inactivo' WHERE nombre = ?", (nombre,))
+                    cursor.execute("DELETE FROM potrero WHERE id = ?", (potrero_id,))
                     conn.commit()
-                messagebox.showinfo("Éxito", "Potrero eliminado.")
+                messagebox.showinfo("Éxito", "Potrero eliminado correctamente.")
                 self.cargar_potreros()
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
 
     def limpiar_formulario(self):
         self.entry_nombre.delete(0, "end")
-        self.entry_sector.delete(0, "end")
+        self.combo_sector.set("Sin Sector")
         self.entry_area.delete(0, "end")
         self.entry_capacidad.delete(0, "end")
         self.text_descripcion.delete("1.0", "end")
@@ -361,36 +438,60 @@ class PotrerosFrame(ctk.CTkFrame):
                 cursor = conn.cursor()
                 
                 # Obtener diccionario de fincas {nombre: id}
-                cursor.execute("SELECT id, nombre FROM finca WHERE estado = 'Activa' OR estado = 'Activo'")
-                fincas_dict = {row[1]: row[0] for row in cursor.fetchall()}
+                cursor.execute("SELECT id, nombre FROM finca")
+                fincas_dict = {}
+                for row in cursor.fetchall():
+                    finca_id = row[0]
+                    finca_nombre = str(row[1]).strip().lower() if row[1] else ""
+                    fincas_dict[finca_nombre] = finca_id
 
                 for idx, fila in enumerate(filas, start=2):
-                    nombre_finca = str(fila.get('finca') or "").strip()
+                    nombre_finca_raw = str(fila.get('finca') or "").strip()
                     nombre = str(fila.get('nombre') or "").strip()
 
-                    if not nombre_finca or not nombre:
+                    if not nombre_finca_raw or not nombre:
                         errores.append(f"Fila {idx}: falta finca o nombre")
                         continue
 
-                    if nombre_finca not in fincas_dict:
-                        errores.append(f"Fila {idx}: finca '{nombre_finca}' no encontrada o inactiva")
+                    # Buscar finca por nombre (ignorando el formato "id-nombre")
+                    nombre_finca_buscar = nombre_finca_raw.lower()
+                    # Si tiene formato "4-finca el prado", extraer solo "finca el prado"
+                    if '-' in nombre_finca_buscar:
+                        partes = nombre_finca_buscar.split('-', 1)
+                        if len(partes) == 2:
+                            nombre_finca_buscar = partes[1].strip()
+                    
+                    if nombre_finca_buscar not in fincas_dict:
+                        errores.append(f"Fila {idx}: finca '{nombre_finca_raw}' no encontrada")
                         continue
+                    
+                    id_finca = fincas_dict[nombre_finca_buscar]
 
                     try:
-                        codigo = f"{fincas_dict[nombre_finca]}-{nombre}"
+                        # Obtener código del Excel o generar uno
+                        codigo = str(fila.get('codigo') or f"P{id_finca}-{idx}").strip()
+                        
+                        # Buscar id_sector si se proporciona nombre de sector
+                        id_sector = None
+                        sector_nombre = str(fila.get('sector') or "").strip()
+                        if sector_nombre:
+                            cursor.execute("SELECT id FROM sector WHERE LOWER(nombre) = LOWER(?) LIMIT 1", (sector_nombre,))
+                            sector_row = cursor.fetchone()
+                            if sector_row:
+                                id_sector = sector_row[0]
+                        
                         cursor.execute("""
-                            INSERT INTO potrero (codigo, id_finca, nombre, sector, area_hectareas, capacidad_animales, capacidad_maxima, 
+                            INSERT INTO potrero (codigo, id_finca, nombre, id_sector, area_hectareas, capacidad_maxima, 
                                 tipo_pasto, estado, descripcion)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             codigo,
-                            fincas_dict[nombre_finca],
+                            id_finca,
                             nombre,
-                            str(fila.get('sector') or "").strip() or None,
-                            float(fila.get('area') or 0),
-                            int(fila.get('capacidad') or 0),
-                            int(fila.get('capacidad') or 0),
-                            str(fila.get('pasto') or "Brachiaria").strip(),
+                            id_sector,
+                            float(fila.get('area_hectareas') or fila.get('area') or 0),
+                            int(fila.get('capacidad_maxima') or fila.get('capacidad') or 0),
+                            str(fila.get('tipo_pasto') or fila.get('pasto') or "").strip() or None,
                             str(fila.get('estado') or "Activo").strip(),
                             str(fila.get('descripcion') or "").strip() or None
                         ))

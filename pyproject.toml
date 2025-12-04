@@ -1,0 +1,39 @@
+[project]
+name = "fincafacil"
+version = "2.0.0"
+description = "Sistema de gestión ganadera FincaFacil"
+requires-python = ">=3.11"
+authors = [ {name = "Equipo FincaFacil"} ]
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
+ignore = ["E501"]
+exclude = ["build", "dist", "__pycache__", "installer", "scripts/migrations"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+strict_optional = true
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+
+[tool.coverage.run]
+branch = true
+source = ["modules", "database", "utils"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
