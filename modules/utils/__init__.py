@@ -47,6 +47,13 @@ except ImportError:
     obtener_tour_interactivo = None
 
 try:
+    from modules.utils.tour_manager import TourManager, TourStep, ModuleTourHelper
+except ImportError:
+    TourManager = None
+    TourStep = None
+    ModuleTourHelper = None
+
+try:
     from modules.utils.metadata import GestorMetadatos, obtener_gestor_metadatos
 except ImportError:
     GestorMetadatos = None

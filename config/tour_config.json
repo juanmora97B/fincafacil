@@ -1,0 +1,338 @@
+{
+  "dashboard": {
+    "name": "Dashboard / Inicio",
+    "description": "Tour por el Dashboard principal",
+    "steps": [
+      {
+        "title": "Bienvenido al Dashboard 🎉",
+        "description": "Este es tu centro de control principal. Aquí podrás ver un resumen completo de tu finca y las métricas más importantes.",
+        "widget_name": null,
+        "duration": 0
+      },
+      {
+        "title": "Resumen de Inventario 📊",
+        "description": "Muestra el total de animales en tu finca, valor del inventario, y animales activos. Actualiza automáticamente según tus registros.",
+        "widget_name": "dashboard_summary",
+        "duration": 0
+      },
+      {
+        "title": "Gráficas de Producción 📈",
+        "description": "Visualiza tendencias de producción, categorías de animales, y comparativas de períodos anteriores.",
+        "widget_name": "dashboard_charts",
+        "duration": 0
+      },
+      {
+        "title": "Eventos Recientes ⏱️",
+        "description": "Últimos movimientos y eventos registrados: nuevos animales, muertes, ventas, cambios de estado.",
+        "widget_name": "dashboard_events",
+        "duration": 0
+      },
+      {
+        "title": "Alertas Importantes ⚠️",
+        "description": "Notificaciones sobre animales con problemas, falta de datos, o acciones pendientes.",
+        "widget_name": "dashboard_alerts",
+        "duration": 0
+      }
+    ]
+  },
+  "animales": {
+    "name": "Registro de Animales",
+    "description": "Tour completo por el módulo de Animales",
+    "steps": [
+      {
+        "title": "Módulo de Animales 🐄",
+        "description": "Aquí registras, buscas y gestionas todos tus animales. Es el corazón del sistema.",
+        "widget_name": null,
+        "duration": 0
+      },
+      {
+        "title": "Nuevo Registro",
+        "description": "Haz clic aquí para registrar un nuevo animal en tu finca. Deberás completar: nombre/código, raza, sexo, fecha nacimiento, finca, potrero.",
+        "widget_name": "btn_new_animal",
+        "duration": 0
+      },
+      {
+        "title": "Inventario General 📋",
+        "description": "Tabla con todos tus animales. Puedes buscar por código, nombre, o aplicar filtros por finca, categoría, estado, etc.",
+        "widget_name": "tabla_animales",
+        "duration": 0
+      },
+      {
+        "title": "Filtros Avanzados 🔍",
+        "description": "Filtra por: Finca, Sector, Potrero, Lote, Categoría, Sexo, Estado. Combina múltiples filtros para búsquedas precisas.",
+        "widget_name": "filtros_frame",
+        "duration": 0
+      },
+      {
+        "title": "Ver Ficha del Animal 👁️",
+        "description": "Haz doble clic en un animal o usa el botón 'Ver' para abrir su ficha completa con historial, peso, salud, etc.",
+        "widget_name": "btn_view",
+        "duration": 0
+      },
+      {
+        "title": "Acciones por Animal ⚙️",
+        "description": "Editar, eliminar, exportar datos, o ver gráficas comparativas del animal.",
+        "widget_name": "btn_actions",
+        "duration": 0
+      }
+    ]
+  },
+  "ficha_animal": {
+    "name": "Ficha Individual del Animal",
+    "description": "Tour por la ficha completa de un animal",
+    "steps": [
+      {
+        "title": "Información General 📝",
+        "description": "Código, nombre, raza, fecha de nacimiento, edad actual, sexo, color, características distintivas.",
+        "widget_name": "info_general",
+        "duration": 0
+      },
+      {
+        "title": "Imagen del Animal 📷",
+        "description": "Foto del animal para identificación visual. Puedes agregar o cambiar la foto.",
+        "widget_name": "animal_image",
+        "duration": 0
+      },
+      {
+        "title": "Procedencia y Origen 🏠",
+        "description": "De dónde viene el animal: nacido en finca, comprado, procedencia. Rastreabilidad completa.",
+        "widget_name": "procedencia_section",
+        "duration": 0
+      },
+      {
+        "title": "Registro de Peso 📊",
+        "description": "Histórico de pesajes. Visualiza la ganancia de peso del animal con gráficas comparativas.",
+        "widget_name": "peso_section",
+        "duration": 0
+      },
+      {
+        "title": "Salud Veterinaria 🏥",
+        "description": "Diagnósticos, tratamientos, medicinas aplicadas. Registro completo de eventos de salud.",
+        "widget_name": "salud_section",
+        "duration": 0
+      },
+      {
+        "title": "Reproducción 🤰",
+        "description": "Servicios (monta o IA), partos, descendientes. Control reproductivo del animal.",
+        "widget_name": "reproduccion_section",
+        "duration": 0
+      },
+      {
+        "title": "Bitácora de Comentarios 📝",
+        "description": "Notas adicionales sobre el animal. Historial de observaciones de usuarios.",
+        "widget_name": "bitacora_section",
+        "duration": 0
+      },
+      {
+        "title": "Historial de Reubicaciones 🚚",
+        "description": "Cambios de finca y potrero. Seguimiento de movimientos del animal.",
+        "widget_name": "reubicaciones_section",
+        "duration": 0
+      }
+    ]
+  },
+  "reubicacion": {
+    "name": "Sistema de Reubicación",
+    "description": "Tour por el módulo de movimiento de animales",
+    "steps": [
+      {
+        "title": "Reubicación de Animales 🚚",
+        "description": "Mueve animales entre fincas y potreros. El sistema actualiza el inventario automáticamente.",
+        "widget_name": null,
+        "duration": 0
+      },
+      {
+        "title": "Seleccionar Animales 🐄",
+        "description": "Elige uno o varios animales del inventario. Puedes filtrar por finca actual, categoría, etc.",
+        "widget_name": "seleccionar_animales",
+        "duration": 0
+      },
+      {
+        "title": "Finca Origen",
+        "description": "Finca donde están actualmente los animales seleccionados.",
+        "widget_name": "finca_origen",
+        "duration": 0
+      },
+      {
+        "title": "Finca Destino 🎯",
+        "description": "Hacia dónde quieres mover los animales. El potrero disponible se actualiza según esta finca.",
+        "widget_name": "finca_destino",
+        "duration": 0
+      },
+      {
+        "title": "Potreros Disponibles 🌿",
+        "description": "Potreros de la finca destino filtrados automáticamente. Muestra capacidad disponible.",
+        "widget_name": "potrero_destino",
+        "duration": 0
+      },
+      {
+        "title": "Motivo del Cambio 📋",
+        "description": "Razón de la reubicación: rotación de pastoreo, cambio de manejo, etc.",
+        "widget_name": "motivo_reubicacion",
+        "duration": 0
+      },
+      {
+        "title": "Confirmar y Guardar ✅",
+        "description": "Revisa todos los datos y confirma. El inventario se actualiza inmediatamente.",
+        "widget_name": "btn_confirmar",
+        "duration": 0
+      }
+    ]
+  },
+  "reportes": {
+    "name": "Reportes y Gráficas",
+    "description": "Tour por el sistema de análisis y reportes",
+    "steps": [
+      {
+        "title": "Módulo de Reportes 📊",
+        "description": "Genera análisis completos de tu finca. Exporta a Excel, visualiza tendencias, compara períodos.",
+        "widget_name": null,
+        "duration": 0
+      },
+      {
+        "title": "Seleccionar Finca 🎯",
+        "description": "Elige la finca a analizar. Puedes comparar múltiples fincas en modo comparativo.",
+        "widget_name": "select_finca",
+        "duration": 0
+      },
+      {
+        "title": "Rango de Fechas 📅",
+        "description": "Define período de análisis: mes actual, trimestre, año, o rango personalizado.",
+        "widget_name": "fecha_range",
+        "duration": 0
+      },
+      {
+        "title": "Gráfica: Categorías 🐄🐂",
+        "description": "Distribución de animales por categoría (vacas, terneros, toros, etc). Visualiza composición del rebaño.",
+        "widget_name": "grafica_categorias",
+        "duration": 0
+      },
+      {
+        "title": "Gráfica: Sexo 👨👩",
+        "description": "Proporción de machos vs hembras. Importante para gestión reproductiva.",
+        "widget_name": "grafica_sexo",
+        "duration": 0
+      },
+      {
+        "title": "Gráfica: Origen 🏠🛒",
+        "description": "Animales nacidos en finca vs comprados. Rastreabilidad de origen.",
+        "widget_name": "grafica_origen",
+        "duration": 0
+      },
+      {
+        "title": "Gráfica: Muertes ⚠️",
+        "description": "Registro de muertes y causas. Análisis de mortalidad en período.",
+        "widget_name": "grafica_muertes",
+        "duration": 0
+      },
+      {
+        "title": "Ganancia de Peso 📈",
+        "description": "Comparativa de ganancia de peso vs inventario anterior. Indicador de productividad.",
+        "widget_name": "grafica_peso",
+        "duration": 0
+      },
+      {
+        "title": "Modo Comparativo 🔄",
+        "description": "Compara múltiples fincas lado a lado. Análisis competitivo entre localidades.",
+        "widget_name": "modo_comparativo",
+        "duration": 0
+      },
+      {
+        "title": "Exportar Reportes 📥",
+        "description": "Descarga datos en Excel. Incluye tablas, gráficas, y análisis detallado.",
+        "widget_name": "btn_exportar",
+        "duration": 0
+      }
+    ]
+  },
+  "ajustes": {
+    "name": "Configuración y Ajustes",
+    "description": "Tour por preferencias del sistema",
+    "steps": [
+      {
+        "title": "Ajustes del Sistema ⚙️",
+        "description": "Configura preferencias, tema, vista avanzada, y opciones de seguridad.",
+        "widget_name": null,
+        "duration": 0
+      },
+      {
+        "title": "Datos de Finca 🏠",
+        "description": "Nombre, ubicación, información de contacto, y detalles generales de tu finca.",
+        "widget_name": "datos_finca",
+        "duration": 0
+      },
+      {
+        "title": "Tema Visual 🎨",
+        "description": "Elige entre tema claro u oscuro. Adapta la interfaz a tu preferencia.",
+        "widget_name": "toggle_tema",
+        "duration": 0
+      },
+      {
+        "title": "Vista Avanzada 🔬",
+        "description": "Habilita funciones avanzadas como: análisis estadísticos, APIs, exportaciones especializadas.",
+        "widget_name": "toggle_avanzado",
+        "duration": 0
+      },
+      {
+        "title": "Respaldos de Seguridad 💾",
+        "description": "Crea copias de seguridad manual o automática. Restaura datos si es necesario.",
+        "widget_name": "backup_section",
+        "duration": 0
+      },
+      {
+        "title": "Usuarios y Acceso 👥",
+        "description": "Gestiona usuarios, permisos, y control de acceso al sistema.",
+        "widget_name": "usuarios_section",
+        "duration": 0
+      },
+      {
+        "title": "Acerca de FincaFácil ℹ️",
+        "description": "Versión del software, información de licencia, y contacto soporte.",
+        "widget_name": "about_section",
+        "duration": 0
+      }
+    ]
+  },
+  "quick_start": {
+    "name": "Tour Rápido para Nuevos Usuarios",
+    "description": "Tour express de las funciones principales",
+    "steps": [
+      {
+        "title": "Bienvenido a FincaFácil 🎉",
+        "description": "Sistema profesional para gestión de ganado. Este tour te mostrará lo esencial.",
+        "widget_name": null,
+        "duration": 2
+      },
+      {
+        "title": "Primeros Pasos 🚀",
+        "description": "1. Configura tu finca\n2. Registra tus animales\n3. Usa potreros para organizar\n4. Monitorea salud y producción",
+        "widget_name": null,
+        "duration": 3
+      },
+      {
+        "title": "Dashboard Central 📊",
+        "description": "Tu centro de control. Muestra resumen, alertas, y eventos importantes.",
+        "widget_name": "dashboard_summary",
+        "duration": 2
+      },
+      {
+        "title": "Gestión de Animales 🐄",
+        "description": "Módulo principal para registrar y administrar todos tus animales.",
+        "widget_name": "btn_new_animal",
+        "duration": 2
+      },
+      {
+        "title": "Reportes y Análisis 📈",
+        "description": "Genera reportes, gráficas, y análisis para tomar mejores decisiones.",
+        "widget_name": "grafica_categorias",
+        "duration": 2
+      },
+      {
+        "title": "¡Listo! 🎓",
+        "description": "Ahora estás listo para usar FincaFácil. Accede a la ayuda en cada módulo con el botón '❓ Tour'.",
+        "widget_name": null,
+        "duration": 0
+      }
+    ]
+  }
+}
