@@ -497,7 +497,7 @@ class AjustesFrame(ctk.CTkFrame):
         """Abre el manual de usuario en PDF"""
         try:
             sys.path.append(str(Path(__file__).parent.parent.parent))
-            from utils.pdf_generator import abrir_manual_pdf
+            from modules.utils.pdf_generator import abrir_manual_pdf
             
             exito, mensaje = abrir_manual_pdf()
             

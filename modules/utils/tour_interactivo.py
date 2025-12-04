@@ -1,7 +1,10 @@
 """
-Módulo de tour interactivo para la aplicación FincaFácil.
-Proporciona guías paso a paso para los usuarios nuevos.
+Tour Interactivo para Nuevos Usuarios
 """
+import customtkinter as ctk
+from tkinter import messagebox
+import json
+import os
 
 from modules.utils.logger import Logger
 
@@ -9,19 +12,38 @@ logger = Logger(__name__)
 
 
 class TourInteractivo:
-    """Gestor del tour interactivo de la aplicación."""
+    """Sistema de tour interactivo que guía al usuario por primera vez"""
     
-    def __init__(self, ventana_principal=None):
+    def __init__(self, app):
         """
         Inicializa el tour interactivo.
         
         Args:
-            ventana_principal: La ventana principal de la aplicación
+            app: La ventana principal de la aplicación
         """
-        self.ventana_principal = ventana_principal
-        self.pasos_completados = []
-        self.debe_mostrar_tour = False  # Flag para controlar si se debe mostrar el tour
+        self.app = app
+        self.paso_actual = 0
+        self.tour_window = None
+        self.config_file = "config/tour_completado.json"
+        self.pasos = []
         logger.info("Tour interactivo inicializado")
+    
+    def debe_mostrar_tour(self):
+        """Verifica si el tour debe mostrarse (primera vez)"""
+        if not os.path.exists(self.config_file):
+            return True
+        try:
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+                return not config.get('completado', False)
+        except:
+            return True
+    
+    def marcar_tour_completado(self):
+        """Marca el tour como completado"""
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+        with open(self.config_file, 'w') as f:
+            json.dump({'completado': True}, f)
     
     def iniciar_tour(self):
         """Inicia el tour interactivo."""
