@@ -109,3 +109,8 @@ def get_logger(name=None):
 
 # Para compatibilidad con imports anteriores
 log = _default_logger.logger
+
+
+def setup_logger(name="FincaFacil", level=None):
+    """Función de compatibilidad que retorna un logger configurado."""
+    return Logger(name)
