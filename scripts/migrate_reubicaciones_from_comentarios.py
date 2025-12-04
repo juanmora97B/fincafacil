@@ -1,7 +1,7 @@
 import re
 import sqlite3
 from pathlib import Path
-from database.database import get_db_connection
+from database import get_connection
 
 LEGACY_RE = re.compile(r"REUBICACIÓN: De '([^']*)' a '([^']*)'\.")
 META_RE = re.compile(r"\[META\](\{.*\})", re.DOTALL)
@@ -42,7 +42,7 @@ def parse_reubicacion_from_comment(text: str):
 
 
 def migrate(limit: int | None = None):
-    with get_db_connection(str(DB_PATH)) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         # Ensure table exists
         cur.execute("""

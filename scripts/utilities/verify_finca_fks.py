@@ -5,13 +5,13 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from database.database import get_db_connection
+from database import get_connection
 
 print("=" * 60)
 print("VERIFICACIÓN FINAL DE FOREIGN KEYS PARA FINCA")
 print("=" * 60)
 
-with get_db_connection() as conn:
+with get_connection() as conn:
     cur = conn.cursor()
     
     # Obtener todas las tablas

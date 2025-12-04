@@ -8,7 +8,7 @@ Categorías: animal, finca, origen, estructura
 from __future__ import annotations
 import argparse, json
 from typing import Dict, Any
-from database.database import get_db_connection
+from database import get_connection
 
 CATEGORIES = {"animal","finca","origen","estructura"}
 
@@ -66,7 +66,7 @@ CHECKERS = {
 }
 
 def run_checks(focus=None):
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         result = {}
         targets = [focus] if focus else sorted(CATEGORIES)

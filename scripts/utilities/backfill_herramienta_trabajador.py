@@ -9,7 +9,7 @@ from pathlib import Path
 import unicodedata
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from database.database import get_db_connection
+from database import get_connection
 
 
 def _normalize_text(s: str) -> str:
@@ -28,7 +28,7 @@ def main():
     no_encontrados = []
     ambiguos = []
 
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         # Cargar mapa de empleados activos normalizados
         cur.execute("""

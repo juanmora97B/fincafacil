@@ -3,10 +3,10 @@ Migration 008B: Completar fix de FK para finca en tablas restantes
 """
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from database.database import get_db_connection
+from database import get_connection
 
 def run():
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         
         try:

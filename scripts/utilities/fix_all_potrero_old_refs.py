@@ -5,12 +5,12 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from database.database import get_db_connection
+from database import get_connection
 
 def fix_potrero_old_references():
     """Corrige todas las FKs que apuntan a potrero_old"""
     
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         
         try:

@@ -44,11 +44,11 @@ print("\n=== 3. SIMULAR IMPORTACIÓN DE UN SECTOR ===\n")
 test_finca_nombre = "finca el prado"
 print(f"Simulando búsqueda para: '{test_finca_nombre}'")
 
-from database.database import get_db_connection
+from database import get_connection
 
 finca_id = None
 try:
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM finca WHERE LOWER(nombre) = LOWER(?) AND estado = 'Activo' LIMIT 1", (test_finca_nombre,))
         finca_row = cursor.fetchone()

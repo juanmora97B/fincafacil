@@ -1,8 +1,8 @@
 import sys, os
 sys.path.insert(0, os.path.abspath('.'))
-from database.database import get_db_connection
+from database import get_connection
 
-with get_db_connection() as conn:
+with get_connection() as conn:
     cur = conn.cursor()
     print("Columnas de tabla finca:")
     for col in cur.execute('PRAGMA table_info(finca)').fetchall():

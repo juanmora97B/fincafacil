@@ -4,7 +4,7 @@ Idempotente: solo modifica si las columnas no existen.
 """
 import sys, os, sqlite3
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from database.database import get_db_connection
+from database import get_connection
 
 TABLES = [
     ('vendedor', 'id_finca'),
@@ -75,7 +75,7 @@ def rebuild_with_fk(cur, table: str, new_column: str):
 
 
 def run():
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         print("=== Migration 010: Añadir id_finca a vendedor y procedencia ===")
         changed = False

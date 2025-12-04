@@ -5,12 +5,12 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from database.database import get_db_connection
+from database import get_connection
 
 def migrate_sector():
     """Actualiza FK de sector.finca_id a ON DELETE SET NULL"""
     
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         
         try:

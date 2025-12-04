@@ -16,7 +16,7 @@ from datetime import datetime
 import sqlite3
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from database.database import get_db_connection
+from database import get_connection
 
 # Definition of new normalized animal table
 NORMALIZED_DDL = """
@@ -101,7 +101,7 @@ def _build_temp_raza_mapping(cur):
 
 
 def run():
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
 
         # If already normalized skip

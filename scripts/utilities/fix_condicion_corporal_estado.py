@@ -1,10 +1,10 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from database.database import get_db_connection
+from database import get_connection
 
 CLASIFICACIONES = {"Crítico", "Alerta", "Óptimo", "Observación"}
 
-with get_db_connection() as conn:
+with get_connection() as conn:
     cur = conn.cursor()
     cur.execute("SELECT codigo, estado, caracteristicas FROM condicion_corporal")
     rows = cur.fetchall()

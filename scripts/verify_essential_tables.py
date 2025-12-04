@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.database import get_db_connection
+from database import get_connection
 
 print("🔍 Verificando tablas esenciales del sistema...\n")
 
@@ -31,7 +31,7 @@ tablas_a_verificar = {
 
 resultados = {'ok': [], 'error': []}
 
-with get_db_connection() as conn:
+with get_connection() as conn:
     cursor = conn.cursor()
     
     for tabla, descripcion in tablas_a_verificar.items():
@@ -56,7 +56,7 @@ else:
 
 print("\n🔍 Verificando columna 'especie' en tabla raza...")
 try:
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(raza)")
         cols = [c[1] for c in cur.fetchall()]

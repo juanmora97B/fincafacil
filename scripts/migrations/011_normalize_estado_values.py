@@ -4,7 +4,7 @@ Mantiene estados de dominios especializados (servicio, pago, etc.). Idempotente.
 """
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from database.database import get_db_connection
+from database import get_connection
 
 GENERAL_TABLES = [
     'finca','herramienta','animal','potrero','lote','grupo','insumo','procedencia','vendedor'
@@ -17,7 +17,7 @@ MAPPING = {
 }
 
 def run():
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         print('=== Migration 011: Normalizar estado ===')
         for table in GENERAL_TABLES:

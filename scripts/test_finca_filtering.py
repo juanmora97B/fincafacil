@@ -3,14 +3,14 @@ Ejecutar: python scripts/test_finca_filtering.py
 """
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.database import get_db_connection
+from database import get_connection
 
 def test_finca_filtering():
     print("=" * 60)
     print("TEST: Filtrado por Finca en Registro de Animales")
     print("=" * 60)
     
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         
         # 1. Verificar fincas activas

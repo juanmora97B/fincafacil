@@ -74,7 +74,7 @@ if __name__ == '__main__':
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    from database.database import get_db_connection
+    from database import get_connection
     
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         apply_migration(conn)

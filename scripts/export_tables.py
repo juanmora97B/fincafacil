@@ -8,7 +8,7 @@ Por defecto escribe en carpeta 'exports/'.
 from __future__ import annotations
 import argparse, csv, json, os, datetime
 from typing import List
-from database.database import get_db_connection
+from database import get_connection
 
 EXPORT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'exports')
 
@@ -52,7 +52,7 @@ def main():
     os.makedirs(EXPORT_DIR, exist_ok=True)
     ts = args.prefix or datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         available = list_tables(cur)
         if args.all:

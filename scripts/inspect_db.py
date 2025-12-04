@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse, json, re, sys, os
 from typing import Any, Dict
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.database import get_db_connection
+from database import get_connection
 
 MAX_FULL = 200
 SAMPLE = 50
@@ -62,7 +62,7 @@ def main():
     ap.add_argument('--search', help='Texto a buscar en columnas texto')
     args = ap.parse_args()
 
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         tables = list_tables(cur)
         if args.search:

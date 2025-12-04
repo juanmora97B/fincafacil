@@ -3,11 +3,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.database import get_db_connection
+from database import get_connection
 
 print("🔍 Verificando estructura de la tabla 'animal'...\n")
 
-with get_db_connection() as conn:
+with get_connection() as conn:
     cursor = conn.cursor()
     
     # Obtener información de columnas

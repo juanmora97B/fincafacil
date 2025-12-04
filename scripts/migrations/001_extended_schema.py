@@ -6,7 +6,7 @@ from datetime import datetime
 import sqlite3
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from database.database import get_db_connection
+from database import get_connection
 
 # New tables DDL (kept minimal; can be evolved later)
 DDL_STATEMENTS = [
@@ -81,7 +81,7 @@ INDEX_STATEMENTS = [
 
 def run():
     """Execute migration: create extended domain tables & indexes."""
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         for ddl in DDL_STATEMENTS:
             cur.execute(ddl)

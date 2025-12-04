@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.database import get_db_connection
+from database import get_connection
 from datetime import datetime
 
 print("=" * 80)
@@ -43,7 +43,7 @@ tablas_a_verificar = {
 
 resultados_tablas = {'ok': [], 'error': []}
 
-with get_db_connection() as conn:
+with get_connection() as conn:
     cursor = conn.cursor()
     
     for tabla, descripcion in tablas_a_verificar.items():
@@ -68,7 +68,7 @@ verificaciones_columnas = []
 
 # Verificar columna especie en raza
 try:
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(raza)")
         cols_raza = [c[1] for c in cur.fetchall()]
@@ -84,7 +84,7 @@ except Exception as e:
 
 # Verificar columnas clave en tabla animal
 try:
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(animal)")
         cols_animal = {c[1] for c in cur.fetchall()}
@@ -131,7 +131,7 @@ indices_esperados = [
 resultados_indices = {'ok': [], 'error': []}
 
 try:
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
         indices_actuales = {row[0] for row in cur.fetchall()}
@@ -158,7 +158,7 @@ print("-" * 80)
 problemas_integridad = []
 
 try:
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         
         # Verificar animales sin raza válida (post-normalización solo usa raza_id)

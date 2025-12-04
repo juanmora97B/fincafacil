@@ -11,7 +11,7 @@ from pathlib import Path
 # Añadir el directorio raíz al path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.database import get_db_connection
+from database import get_connection
 
 def verificar_foreign_keys():
     """Verifica el estado de las foreign keys en la base de datos"""
@@ -20,7 +20,7 @@ def verificar_foreign_keys():
     print("=" * 70)
     
     try:
-        with get_db_connection() as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             # Habilitar foreign keys (importante)
@@ -74,7 +74,7 @@ def limpiar_referencias_huerfanas():
     print("=" * 70)
     
     try:
-        with get_db_connection() as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("PRAGMA foreign_keys = OFF")  # Temporalmente off para limpieza
             
@@ -303,7 +303,7 @@ def crear_registros_necesarios():
     print("=" * 70)
     
     try:
-        with get_db_connection() as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             # Verificar y crear finca por defecto

@@ -1,28 +1,31 @@
 """
 Paquete de base de datos de FincaFácil
 
-Este módulo expone la API pública del paquete `database`:
-- get_db_connection
-- verificar_base_datos (nueva)
-- inicializar_base_datos (nueva)
-- ejecutar_consulta (nueva)
-- obtener_tablas (nueva)
+API pública:
+- get_connection: Context manager para conexiones
+- db: Instancia global de DatabaseManager
+- DatabaseManager: Manager para operaciones comunes
 """
 
 from __future__ import annotations
 import logging
 from typing import List
+from contextlib import contextmanager
 
-log = logging.getLogger("FincaFacil.database")
-
-# Importar desde el módulo unificado database.py
+# Importar desde los módulos correctos
 try:
+    # Nuevo sistema de conexión
+    from .connection import get_connection, db, DatabaseManager
+    
+    # Importar también desde database.py (ya existente) para compatibilidad
     from .database import (
         get_db_connection,
         verificar_base_datos,
         inicializar_base_datos,
         ejecutar_consulta,
-        obtener_tablas
+        obtener_tablas,
+        asegurar_esquema_minimo,
+        asegurar_esquema_completo
     )
     
     # Alias para compatibilidad
@@ -30,24 +33,8 @@ try:
     init_database = inicializar_base_datos
     get_table_info = obtener_tablas
     
-    # Para compatibilidad con código existente
-    class DatabaseManager:
-        """Clase de compatibilidad para código existente"""
-        def get_connection(self):
-            return get_db_connection()
-            
-        def execute(self, query: str, params: tuple = ()):
-            ejecutar_consulta(query, params, fetch=False)
-            return True
-            
-        def fetchall(self, query: str, params: tuple = ()):
-            return ejecutar_consulta(query, params, fetch=True) or []
-            
-        def fetchone(self, query: str, params: tuple = ()):
-            result = ejecutar_consulta(query, params, fetch=True)
-            return result[0] if result else None
-    
-    db = DatabaseManager()
+    log = logging.getLogger("FincaFacil.database")
+    log.info("Database module cargado correctamente")
     
 except ImportError as exc:
     # Fallback mínimo si el módulo no está disponible

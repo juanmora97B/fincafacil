@@ -18,7 +18,8 @@ else:
     base_path = current_dir
 
 # Agregar el directorio raíz al path para imports absolutos
-sys.path.append(str(current_dir))
+sys.path.insert(0, str(current_dir))
+sys.path.insert(0, str(current_dir / "src"))
 
 # Importaciones de módulos
 try:
@@ -26,7 +27,7 @@ try:
     from modules.ajustes.ajustes_main import AjustesFrame
     from modules.ventas.ventas_main import VentasModule
     from modules.utils.logger import setup_logger, get_logger
-    from database.database import inicializar_base_datos, verificar_base_datos, asegurar_esquema_minimo, asegurar_esquema_completo
+    from database import inicializar_base_datos, verificar_base_datos, asegurar_esquema_minimo, asegurar_esquema_completo
     
     # Configuración global
     from config import config

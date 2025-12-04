@@ -10,7 +10,7 @@ Categorías soportadas: finca, origen, procedencia_vendedor, potrero_lote_grupo,
 from __future__ import annotations
 import argparse, csv, datetime, sys
 from typing import List, Dict, Any
-from database.database import get_db_connection
+from database import get_connection
 
 CATEGORIES = {"finca", "origen", "procedencia_vendedor", "potrero_lote_grupo", "animales_vacios"}
 
@@ -147,7 +147,7 @@ def main():
         selected = requested
 
     recommendations: List[Recommendation] = []
-    with get_db_connection() as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         for cat in sorted(selected):
             recs = ANALYZERS[cat](cur)
