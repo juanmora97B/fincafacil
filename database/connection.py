@@ -69,9 +69,20 @@ class DatabaseManager:
         self.logger = logging.getLogger(f"{__name__}.DatabaseManager")
     
     @contextmanager
+    def get_connection(self) -> Iterator[sqlite3.Connection]:
+        """
+        Obtiene una conexión a la base de datos (context manager público).
+        
+        Yields:
+            sqlite3.Connection: Conexión a la BD
+        """
+        with get_connection(self.db_path) as conn:
+            yield conn
+    
+    @contextmanager
     def _get_conn(self) -> Iterator[sqlite3.Connection]:
         """Context manager interno para conexiones."""
-        with get_connection(self.db_path) as conn:
+        with self.get_connection() as conn:
             yield conn
     
     def execute_query(

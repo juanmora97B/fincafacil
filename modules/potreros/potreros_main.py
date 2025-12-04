@@ -17,6 +17,7 @@ class PotrerosModule(ctk.CTkFrame):
         self._fg_card = self._colors["fg"]
         self._sel_card = self._colors["sel"]
         self._hover_card = self._colors["hover"]
+        self.main_frame = None  # Inicializar atributo
         self.crear_widgets()
         self.cargar_potreros()
 
@@ -32,11 +33,11 @@ class PotrerosModule(ctk.CTkFrame):
         add_tooltip(titulo, "Gestión y visualización de potreros en la finca")
 
         # Frame principal expandido
-        main_frame = ctk.CTkFrame(self)
-        main_frame.pack(fill="both", expand=True, padx=2, pady=(3, 10))
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill="both", expand=True, padx=2, pady=(3, 10))
 
         # Información general
-        info_frame = ctk.CTkFrame(main_frame)
+        info_frame = ctk.CTkFrame(self.main_frame)
         info_frame.pack(fill="x", pady=5)
 
         info_label = ctk.CTkLabel(
@@ -50,11 +51,11 @@ class PotrerosModule(ctk.CTkFrame):
         add_tooltip(info_label, "Acceso rápido a configuración de potreros")
 
         # Métricas rápidas
-        self.crear_metricas_rapidas(main_frame)
+        self.crear_metricas_rapidas(self.main_frame)
 
         # Tabla de potreros
         tabla_label = ctk.CTkLabel(
-            main_frame,
+            self.main_frame,
             text="📋 Potreros Registrados",
             font=("Segoe UI", 18, "bold"),
             text_color=self._sel_card
@@ -63,7 +64,7 @@ class PotrerosModule(ctk.CTkFrame):
         add_tooltip(tabla_label, "Listado de todos los potreros registrados")
 
         # Frame para la tabla
-        table_frame = ctk.CTkFrame(main_frame)
+        table_frame = ctk.CTkFrame(self.main_frame)
         table_frame.pack(fill="both", expand=True)
 
         # Tabla
