@@ -18,23 +18,45 @@ else:
     base_path = current_dir
 
 # Agregar el directorio raíz al path para imports absolutos
-sys.path.insert(0, str(current_dir))
-sys.path.insert(0, str(current_dir / "src"))
+# NOTA: El orden importa. insert(0, ...) inserta al INICIO
+# Si haces insert(0, x) luego insert(0, y), y termina ANTES que x
+sys.path.insert(0, str(current_dir / "src"))  # Primero src/
+sys.path.insert(0, str(current_dir))  # Luego raíz (quedará en posición 0)
 
 # Importaciones de módulos
 try:
+    print("DEBUG: sys.path[0:3] = " + str(sys.path[0:3]))
+    
+    print("DEBUG: Importando DashboardModule...")
     from modules.dashboard.dashboard_main import DashboardModule
+    print("DEBUG: OK - DashboardModule")
+    
+    print("DEBUG: Importando AjustesFrame...")
     from modules.ajustes.ajustes_main import AjustesFrame
+    print("DEBUG: OK - AjustesFrame")
+    
+    print("DEBUG: Importando VentasModule...")
     from modules.ventas.ventas_main import VentasModule
+    print("DEBUG: OK - VentasModule")
+    
+    print("DEBUG: Importando logger...")
     from modules.utils.logger import setup_logger, get_logger
+    print("DEBUG: OK - Logger")
+    
+    print("DEBUG: Importando database...")
     from database import inicializar_base_datos, verificar_base_datos, asegurar_esquema_minimo, asegurar_esquema_completo
+    print("DEBUG: OK - Database")
     
     # Configuración global
+    print("DEBUG: Importando config...")
     from config import config
+    print("DEBUG: OK - Config")
     
 except ImportError as e:
-    # Logger aún no disponible, usar print como última opción
-    print(f"❌ Error crítico: No se pueden importar módulos necesarios: {e}")
+    # Logger aun no disponible, usar print como ultima opcion
+    import traceback
+    print("ERROR CRITICO: No se pueden importar modulos necesarios: " + str(e))
+    traceback.print_exc()
     sys.exit(1)
 
 import customtkinter as ctk
