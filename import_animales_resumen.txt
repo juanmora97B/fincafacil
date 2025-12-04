@@ -1,2 +1,0 @@
-Importados correctamente: 10
-Errores: 10

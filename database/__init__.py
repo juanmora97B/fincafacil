@@ -14,7 +14,7 @@ from contextlib import contextmanager
 
 # Importar desde los módulos correctos
 try:
-    # Nuevo sistema de conexión
+    # Nuevo sistema de conexión (módulo connection.py)
     from .connection import get_connection, db, DatabaseManager
     
     # Importar también desde database.py (ya existente) para compatibilidad
@@ -25,7 +25,8 @@ try:
         ejecutar_consulta,
         obtener_tablas,
         asegurar_esquema_minimo,
-        asegurar_esquema_completo
+        asegurar_esquema_completo,
+        DB_PATH
     )
     
     # Alias para compatibilidad
@@ -68,17 +69,23 @@ except ImportError as exc:
 
 # API pública exportada
 __all__ = [
+    # Nuevo sistema
+    "get_connection",
+    "db",
+    "DatabaseManager",
+    # Sistema legacy (compatibilidad)
     "get_db_connection",
     "verificar_base_datos",
     "inicializar_base_datos", 
     "ejecutar_consulta",
     "obtener_tablas",
-    # Compatibilidad
+    "asegurar_esquema_minimo",
+    "asegurar_esquema_completo",
+    # Aliases para compatibilidad
     "check_database_exists",
     "init_database", 
     "get_table_info",
-    "db",
-    "DatabaseManager"
+    "DB_PATH",
 ]
 
 # Ejecutar solo cuando se corre el módulo directamente
