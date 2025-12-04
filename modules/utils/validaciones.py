@@ -340,3 +340,26 @@ def validar_cantidad(valor: str) -> Tuple[bool, Optional[int], str]:
 def validar_produccion_leche(valor: str) -> Tuple[bool, Optional[float], str]:
     """Valida producción de leche en litros"""
     return Validador.validar_numerico(valor, "Producción", minimo=0, maximo=100)
+
+
+# Funciones de validación adicionales para compatibilidad
+def validar_texto(valor: str, nombre_campo: str = "Campo", minimo: Optional[int] = None,
+                 maximo: Optional[int] = None, permitir_vacio: bool = False) -> Tuple[bool, Optional[str], str]:
+    """Valida texto genérico."""
+    return Validador.validar_texto(valor, nombre_campo, minimo, maximo, permitir_vacio)
+
+
+def validar_numero(valor: str, nombre_campo: str = "Campo", minimo: Optional[float] = None,
+                  maximo: Optional[float] = None) -> Tuple[bool, Optional[float], str]:
+    """Valida números."""
+    return Validador.validar_numerico(valor, nombre_campo, minimo, maximo)
+
+
+def validar_email(email: str) -> Tuple[bool, Optional[str], str]:
+    """Valida formato de correo electrónico."""
+    return Validador.validar_email(email)
+
+
+def validar_telefono(telefono: str) -> Tuple[bool, Optional[str], str]:
+    """Valida formato de teléfono."""
+    return Validador.validar_telefono(telefono)

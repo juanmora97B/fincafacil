@@ -103,3 +103,28 @@ def add_tooltip(widget, text):
         
     except:
         pass
+
+
+# Funciones de diálogo UI
+def mostrar_error(titulo, mensaje):
+    """Muestra un diálogo de error."""
+    from tkinter import messagebox
+    messagebox.showerror(titulo, mensaje)
+
+
+def mostrar_exito(titulo, mensaje):
+    """Muestra un diálogo de éxito."""
+    from tkinter import messagebox
+    messagebox.showinfo(titulo, mensaje)
+
+
+def mostrar_advertencia(titulo, mensaje):
+    """Muestra un diálogo de advertencia."""
+    from tkinter import messagebox
+    messagebox.showwarning(titulo, mensaje)
+
+
+def mostrar_info(titulo, mensaje):
+    """Muestra un diálogo de información."""
+    from tkinter import messagebox
+    messagebox.showinfo(titulo, mensaje)

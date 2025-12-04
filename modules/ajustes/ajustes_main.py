@@ -18,7 +18,7 @@ try:
         ensure_templates_dir,
     )
 except ImportError as e:
-    print(f"⚠️ Error importando dependencias: {e}")
+    print(f"[ERROR] Error importando dependencias: {e}")
 
 class AjustesFrame(ctk.CTkFrame):
     """Módulo de Ajustes: preferencias de la aplicación (tema, etc.)."""

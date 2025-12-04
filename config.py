@@ -55,7 +55,7 @@ class Config:
         
         for directory in directories:
             directory.mkdir(exist_ok=True, parents=True)
-            print(f"✅ Directorio verificado: {directory}")
+            print(f"[OK] Directorio verificado: {directory}")
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -73,8 +73,8 @@ RUTA_BASE_DATOS = config.DB_PATH
 RUTA_ASSETS = config.ASSETS_DIR
 
 if __name__ == "__main__":
-    print("🧪 Probando configuración...")
+    print("[TEST] Probando configuración...")
     print(f"BASE_DIR: {config.BASE_DIR}")
     print(f"DB_PATH: {config.DB_PATH}")
     print(f"LOG_DIR: {config.LOG_DIR}")
-    print("✅ Configuración cargada correctamente")
+    print("[OK] Configuración cargada correctamente")
