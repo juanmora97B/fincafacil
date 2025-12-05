@@ -43,10 +43,16 @@ class BitacoraComentarios(ctk.CTkFrame):
         # Encabezado
         header = ctk.CTkFrame(container, fg_color=("#f5f5f5", "#2b2b2b"), corner_radius=10)
         header.pack(fill="x", padx=6, pady=(0, 8))
-        ctk.CTkLabel(header, text="📝 Bitácora de Comentarios", font=("Segoe UI", 18, "bold")).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 8), columnspan=4)
-        banner = ctk.CTkFrame(header, fg_color="#1976D2", corner_radius=6)
-        banner.grid(row=0, column=3, sticky="e", padx=(0,12), pady=(10,8))
-        ctk.CTkLabel(banner, text="Nueva UI v2", font=("Segoe UI", 12, "bold"), text_color="white").pack(padx=10, pady=4)
+        ctk.CTkLabel(header, text="📝 Bitácora de Comentarios", font=("Segoe UI", 18, "bold")).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 8), columnspan=2)
+        
+        # Búsqueda de Animal
+        search_frame = ctk.CTkFrame(header, fg_color="transparent")
+        search_frame.grid(row=0, column=2, columnspan=2, sticky="e", padx=12, pady=(10, 8))
+        ctk.CTkLabel(search_frame, text="🔍 Buscar Animal:", font=("Segoe UI", 11, "bold")).pack(side="left", padx=(0, 8))
+        self.combo_animal_search = ctk.CTkComboBox(search_frame, width=220, placeholder_text="Código o Nombre...")
+        self.combo_animal_search.pack(side="left", padx=(0, 8))
+        self.combo_animal_search.bind("<KeyRelease>", self._on_animal_search)
+        ctk.CTkButton(search_frame, text="Cargar", width=70, height=32, command=self._load_selected_animal).pack(side="left")
 
         self.header_vars = {k: ctk.StringVar(value="-") for k in ["codigo", "nombre", "finca", "potrero", "estado", "categoria"]}
         self._grid_kv(header, 1, "Código", self.header_vars['codigo'])
@@ -104,9 +110,7 @@ class BitacoraComentarios(ctk.CTkFrame):
         self.entry_adjunto.grid(row=4, column=1, sticky="w", padx=6, pady=4)
         ctk.CTkButton(form, text="📎 Seleccionar archivo", command=self._pick_file).grid(row=4, column=2, sticky="w", padx=6, pady=4)
 
-        # Marca visible de nueva UI
-        ctk.CTkLabel(form, text="Nueva UI Bitácora v2 activa", text_color="#1976D2", font=("Segoe UI", 12, "bold")).grid(row=5, column=0, sticky="w", padx=8, pady=(8,0))
-        ctk.CTkButton(form, text="💾 Guardar Comentario", fg_color="#1976D2", command=self._save_comment).grid(row=6, column=1, sticky="w", padx=6, pady=8)
+        ctk.CTkButton(form, text="💾 Guardar Comentario", fg_color="#1976D2", command=self._save_comment).grid(row=5, column=1, sticky="w", padx=6, pady=8)
 
         # Filtros
         filtros = ctk.CTkFrame(container, corner_radius=10)
@@ -224,6 +228,42 @@ class BitacoraComentarios(ctk.CTkFrame):
             self.header_vars[k].set("-")
         self._load_animal_header(); self._load_comments(); self._compute_indicators()
 
+    def _on_animal_search(self, event=None):
+        """Busca animales mientras se escribe en el combobox"""
+        search_text = (self.combo_animal_search.get() or "").strip().lower()
+        if not search_text or len(search_text) < 2:
+            return
+        
+        try:
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT codigo, nombre 
+                    FROM animal 
+                    WHERE codigo LIKE ? OR nombre LIKE ?
+                    ORDER BY codigo
+                    LIMIT 20
+                """, (f"%{search_text}%", f"%{search_text}%"))
+                
+                results = cur.fetchall()
+                if results:
+                    options = [f"{row['codigo']} - {row['nombre']}" if isinstance(row, sqlite3.Row) 
+                              else f"{row[0]} - {row[1]}" for row in results]
+                    self.combo_animal_search.configure(values=options)
+        except Exception as e:
+            print(f"Error en búsqueda: {e}")
+
+    def _load_selected_animal(self):
+        """Carga el animal seleccionado del combobox"""
+        selected = (self.combo_animal_search.get() or "").strip()
+        if not selected:
+            messagebox.showwarning("Búsqueda", "Selecciona un animal primero")
+            return
+        
+        # Extraer código del formato "CODIGO - NOMBRE"
+        codigo = selected.split(" - ")[0].strip()
+        self.set_animal_codigo(codigo)
+        
     def _load_animal_header(self):
         if not self.animal_codigo:
             return
