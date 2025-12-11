@@ -1,0 +1,71 @@
+ANTES DE INSTALAR FINCAFÁCIL
+
+Bienvenido a FincaFácil v2.0
+
+===== REQUISITOS DEL SISTEMA =====
+
+Mínimos:
+- Windows 10 o superior
+- 200 MB de espacio en disco
+- 4 GB de RAM
+- Procesador Intel/AMD 2 GHz o superior
+
+Recomendados:
+- Windows 11
+- 500 MB de espacio en disco disponible
+- 8 GB de RAM
+- Conexión a internet (solo para soporte)
+
+===== QUÉ NECESITAS SABER =====
+
+1. LICENCIA DE PRUEBA
+   - Período de prueba: 6 meses completamente gratuito
+   - Sin tarjeta de crédito requerida
+   - Acceso a todas las funciones
+
+2. BASE DE DATOS
+   - Los datos se almacenan localmente en tu computadora
+   - Se recomienda hacer copias de seguridad regularmente
+   - El archivo de base de datos es portable
+
+3. COMPATIBILIDAD
+   - Compatible con Windows 10/11 (64 bits)
+   - No requiere Python instalado (incluido en el ejecutable)
+   - Requiere permisos de administrador para la instalación
+
+4. ESPACIO EN DISCO
+   - Instalación: ~200-500 MB
+   - Base de datos: comienza con <1 MB
+   - Aumenta según datos (típicamente 10-100 MB)
+
+===== IMPORTANTE =====
+
+✓ Cierra todas las instancias de FincaFácil antes de actualizar
+✓ Asegúrate de tener permisos de administrador
+✓ Realiza una copia de seguridad de tus datos importantes
+✓ Lee la licencia antes de continuar
+
+===== DESPUÉS DE INSTALAR =====
+
+1. Ejecuta FincaFácil desde el Menú Inicio
+2. Crea tu cuenta (usuario y contraseña)
+3. Completa el tour interactivo (opcional)
+4. ¡Comienza a gestionar tu finca!
+
+===== SOPORTE =====
+
+Si encuentras problemas durante la instalación:
+
+Email: jfburitica97@gmail.com
+Teléfono: 3013869653
+Documentación: Incluida en el CD/descarga
+
+===== PRIVACIDAD =====
+
+- No vendemos tus datos
+- No recopilamos información de tus registros ganaderos
+- Tu información de contacto se usa solo para soporte
+
+¡Gracias por elegir FincaFácil!
+
+Para continuar, haz clic en "Siguiente"

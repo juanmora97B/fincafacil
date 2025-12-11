@@ -2,8 +2,14 @@
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python-envs.pythonProjects": [],
     "python.analysis.extraPaths": [
-        "./",
-        "./database",
-        "./modules"
-    ]
+        "${workspaceFolder}",
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/database"
+    ],
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/src"
+    ],
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.typeCheckingMode": "basic"
 }

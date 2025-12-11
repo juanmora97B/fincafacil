@@ -1,53 +1,66 @@
-# 🐄 FincaFácil - Sistema de Gestión Ganadera Profesional
+# FincaFácil v2.0 - Sistema de Gestión Ganadera
 
-> **v2.0.0** | *La fuerza del campo, la precisión del software*
+![FincaFácil](src/assets/Logo.png)
 
----
+**FincaFácil** es una aplicación profesional de gestión ganadera diseñada para facilitar el manejo integral de fincas ganaderas. Desde el control de animales hasta la gestión de ventas, FincaFácil centraliza todas tus operaciones en una interfaz intuitiva y fácil de usar.
 
-## 🚀 Inicio Rápido
+## 🚀 Características Principales
 
-### Para Usuarios
+- ✅ **Gestión integral de animales**: Registro, genealogía, fotos e historial
+- ✅ **Control de salud y reproducción**: Diagnósticos, vacunaciones, eventos reproductivos
+- ✅ **Producción de leche**: Registro diario de ordeño y calidad
+- ✅ **Gestión de potreros**: Control de terrenos y rotación de pasto
+- ✅ **Ventas y clientes**: Registro completo de transacciones comerciales
+- ✅ **Nómina de empleados**: Gestión de personal y salarios
+- ✅ **Herramientas e insumos**: Inventario con control de stock
+- ✅ **Reportes avanzados**: Exportación a PDF y Excel
+- ✅ **Período de prueba**: 6 meses gratuitos sin tarjeta de crédito
+- ✅ **Sistema de autenticación**: Login seguro con protección
+
+## 📋 Requisitos del Sistema
+
+### Mínimos
+- Windows 10 o superior (64 bits)
+- 200 MB de espacio en disco
+- 4 GB de RAM
+
+### Recomendados
+- Windows 11
+- 500 MB de espacio libre
+- 8 GB de RAM
+
+## 📦 Instalación
+
+### Opción 1: Instalador ejecutable (Recomendado)
+1. Descarga `FincaFacil_Installer_v2.0.exe`
+2. Ejecuta el instalador
+3. Sigue el asistente
+4. Disponible en Menú Inicio
+
+### Opción 2: Ejecutable standalone
+1. Descarga `FincaFacil.exe`
+2. Ejecuta sin instalación requerida
+3. No necesita Python instalado
+
+### Opción 3: Desde código fuente
 ```bash
-# Opción 1: Usar instalador ejecutable
-FincaFacil_Setup_v2.0.exe
-
-# Opción 2: Scripts batch
-.\scripts\setup\instalar_dependencias.bat
-.\scripts\setup\ejecutar.bat
+pip install -r src/utils/requirements.txt
+python src/main.py
 ```
 
-### Para Desarrolladores
-```bash
-# Instalar dependencias
-pip install -r requirements.txt
+## 🎯 Primeros Pasos
 
-# Ejecutar aplicación
-python main.py
-
-# Ejecutar tests
-pytest tests/
-```
-
----
+1. **Crear cuenta**: Usuario y contraseña
+2. **Período de prueba**: 6 meses completamente gratis
+3. **Tour interactivo**: Recorrido por la aplicación
+4. **Comenzar a usar**: Agregar animales, fincas, etc.
 
 ## 📚 Documentación
 
-### 📖 Guías de Usuario
-- [Inicio Rápido](docs/guias/INICIO_RAPIDO_INSTALADOR.md) - Cómo empezar
-- [Guía de Cliente](docs/guias/GUIA_RAPIDA_CLIENTE.md) - Manual del usuario
-- [Instrucciones de Instalación](docs/guias/INSTRUCCIONES_INSTALACION_CLIENTE.md) - Pasos detallados
-
-### 🔧 Documentación Técnica
-- [Plan de Reorganización v2.0.0](docs/tecnico/PLAN_REORGANIZACION_COMPLETO.md) - Cambios de estructura
-- [Arquitectura del Proyecto](docs/tecnico/ARQUITECTURA_FINCA_COMPLETADA.md) - Estructura interna
-
-### 📊 Reportes
-- [Reporte Final](docs/reportes/REPORTE_FINAL_REORGANIZACION.md) - Resumen ejecutivo
-- [Estructura Final](ESTRUCTURA_FINAL.md) - Organización de carpetas
-
----
-
-## 🏗️ Estructura del Proyecto
+- **Manual completo**: [docs/Manual_FincaFacil_v2.pdf](docs/Manual_FincaFacil_v2.pdf)
+- **Licencia de uso**: [docs/LICENCIA.txt](docs/LICENCIA.txt)
+- **Antes de instalar**: [docs/ANTES_DE_INSTALAR.txt](docs/ANTES_DE_INSTALAR.txt)
+- **Después de instalar**: [docs/DESPUES_DE_INSTALAR.txt](docs/DESPUES_DE_INSTALAR.txt)
 
 ```
 FincaFacil/
@@ -214,6 +227,10 @@ Para más información consulta:
 - 🔧 [Documentación técnica](docs/tecnico/)
 - 📊 [Reportes](docs/reportes/)
 - 📋 [Ver estructura completa](ESTRUCTURA_FINAL.md)
+
+**Contacto:**
+- 📧 Email: jfburitica97@gmail.com
+- 📱 Teléfono: 3013869653
 
 ---
 

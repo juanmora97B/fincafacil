@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Caja de insumos/Bodega -->
+  <rect x="15" y="30" width="70" height="55" fill="none" stroke="currentColor" stroke-width="2"/>
+  <!-- Tapa -->
+  <path d="M 15 30 L 50 15 L 85 30" fill="currentColor" opacity="0.3" stroke="currentColor" stroke-width="2"/>
+  <!-- Línea divisoria -->
+  <line x1="15" y1="45" x2="85" y2="45" stroke="currentColor" stroke-width="1"/>
+  <!-- Items dentro -->
+  <rect x="25" y="50" width="12" height="15" fill="currentColor" opacity="0.5"/>
+  <rect x="44" y="50" width="12" height="15" fill="currentColor" opacity="0.5"/>
+  <rect x="63" y="50" width="12" height="15" fill="currentColor" opacity="0.5"/>
+</svg>

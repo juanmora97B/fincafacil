@@ -1,0 +1,33 @@
+
+REORGANIZACIÓN DE PROYECTO FINCAFÁCIL
+=====================================
+
+Nueva estructura (src/):
+C:\Users\lenovo\Desktop\FincaFacil\src
+├── config/          (configuración)
+├── database/        (BD y esquemas)
+├── modules/         (módulos funcionales)
+├── assets/          (recursos, imágenes, ícono)
+├── utils/           (utilidades compartidas)
+├── styles/          (estilos CSS/tema)
+├── main.py          (punto de entrada)
+└── requirements.txt (dependencias)
+
+Pasos completados:
+✓ Estructura de directorios creada
+✓ Carpetas principales movidas a src/
+✓ Archivos de utilidad copiados a src/utils/
+✓ main.py copiado a src/
+✓ Cache (__pycache__, .pyc) eliminado
+✓ Archivos __init__.py creados
+✓ Launchers (Python y BAT) creados
+
+Proximos pasos:
+1. Eliminar antiguas carpetas en raíz (una vez verificado que todo funciona)
+2. Actualizar referencias de rutas en el código
+3. Generar ejecutable con PyInstaller desde src/
+
+Para ejecutar:
+- Windows: FincaFacil.bat
+- Python: python launcher.py
+- Directo: python -m src.main

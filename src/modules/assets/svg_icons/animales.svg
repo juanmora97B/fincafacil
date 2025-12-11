@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Vaca estilizada -->
+  <ellipse cx="50" cy="50" rx="30" ry="35" fill="currentColor"/>
+  <!-- Cabeza -->
+  <circle cx="50" cy="25" r="15" fill="currentColor"/>
+  <!-- Orejas -->
+  <ellipse cx="40" cy="12" rx="5" ry="8" fill="currentColor"/>
+  <ellipse cx="60" cy="12" rx="5" ry="8" fill="currentColor"/>
+  <!-- Cuernos -->
+  <path d="M 38 10 Q 30 5 28 0" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 62 10 Q 70 5 72 0" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>

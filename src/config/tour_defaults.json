@@ -1,0 +1,52 @@
+{
+  "dashboard": [
+    {"title": "Panel principal", "description": "KPIs y resumen general de la finca."},
+    {"title": "Filtros de fecha", "description": "Ajusta rango de fechas para refrescar métricas."},
+    {"title": "Gráficos", "description": "Visualiza tendencias de producción, ventas y eventos."}
+  ],
+  "animales": [
+    {"title": "Inventario", "description": "Lista de animales con filtros por finca y estado."},
+    {"title": "Registro", "description": "Crear/editar animales con validaciones integradas."},
+    {"title": "Bitácoras", "description": "Historial de movimientos, reubicaciones y eventos."}
+  ],
+  "reproduccion": [
+    {"title": "Servicios", "description": "Gestiona servicios y monta, registra hembras y toros."},
+    {"title": "Gestantes", "description": "Seguimiento de gestación y fechas probables de parto."},
+    {"title": "Partos", "description": "Registra partos y crea crías desde el modal."}
+  ],
+  "salud": [
+    {"title": "Tratamientos", "description": "Registro de tratamientos y medicamentos aplicados."},
+    {"title": "Alertas", "description": "Alertas sanitarias y filtros por finca."},
+    {"title": "Historial", "description": "Consulta tratamientos previos por animal."}
+  ],
+  "leche": [
+    {"title": "Pesajes", "description": "Captura diaria de litros y control por finca/lote."},
+    {"title": "Gráficos", "description": "Tendencias de producción y comparativos."},
+    {"title": "Exportación", "description": "Exporta reportes de leche a Excel/PDF."}
+  ],
+  "ventas": [
+    {"title": "Listado de ventas", "description": "Filtra por finca, estado y fechas."},
+    {"title": "Detalle", "description": "Registro/edición de venta con validación de datos."},
+    {"title": "Historial", "description": "Consulta y exporta ventas históricas."}
+  ],
+  "reportes": [
+    {"title": "Reportes estándar", "description": "Reportes generales del sistema."},
+    {"title": "Reportes profesional", "description": "Vista profesional con métricas avanzadas."},
+    {"title": "Exportación", "description": "Exporta a PDF/Excel según selección."}
+  ],
+  "insumos": [
+    {"title": "Inventario de insumos", "description": "Stock por bodega y alertas de mínimo."},
+    {"title": "Movimientos", "description": "Entradas/salidas y ajustes de inventario."},
+    {"title": "Proveedores", "description": "Administra proveedores y costos."}
+  ],
+  "configuracion": [
+    {"title": "Catálogos", "description": "Razas, calidades, condiciones corporales y parámetros."},
+    {"title": "Fincas", "description": "Alta de fincas y gestión de identificadores."},
+    {"title": "Preferencias", "description": "Unidades, colores y opciones globales."}
+  ],
+  "ajustes": [
+    {"title": "Backups", "description": "Crea y restaura copias de la base de datos."},
+    {"title": "Reinicio", "description": "Reinicia la aplicación después de restaurar."},
+    {"title": "Manual y tours", "description": "Acceso al PDF y tours interactivos."}
+  ]
+}

@@ -25,20 +25,19 @@ def verificar_demo_interactivo():
     else:
         print(f"   ⚠️  No existe (se mostrará en próxima ejecución)")
     
-    # 2. Verificar módulo tour_interactivo.py
-    tour_file = Path("utils/tour_interactivo.py")
+    # 2. Verificar módulo tour_manager.py (nuevo sistema de tours)
+    tour_file = Path("modules/utils/tour_manager.py")
     print(f"\n2. Módulo del tour interactivo:")
     print(f"   Ruta: {tour_file}")
     
     if tour_file.exists():
         print(f"   ✅ Existe")
-        # Contar pasos del tour
         with open(tour_file, 'r', encoding='utf-8') as f:
             content = f.read()
-            if 'class TourInteractivo' in content:
-                print(f"   ✅ Clase TourInteractivo encontrada")
-            if 'def iniciar_tour' in content:
-                print(f"   ✅ Método iniciar_tour encontrado")
+            if 'class TourManager' in content:
+                print(f"   ✅ Clase TourManager encontrada")
+            if 'def start_tour' in content:
+                print(f"   ✅ Método start_tour encontrado")
     else:
         print(f"   ❌ No existe")
     
@@ -68,7 +67,7 @@ def verificar_manual_pdf():
     print("=" * 60)
     
     # 1. Verificar generador de PDF
-    generador_file = Path("utils/pdf_manual_generator.py")
+    generador_file = Path("modules/utils/pdf_manual_generator.py")
     print(f"\n1. Generador de PDF:")
     print(f"   Ruta: {generador_file}")
     
@@ -96,7 +95,7 @@ def verificar_manual_pdf():
         print(f"   ⚠️  No existe (se generará automáticamente)")
     
     # 3. Verificar módulo pdf_generator.py
-    pdf_gen_file = Path("utils/pdf_generator.py")
+    pdf_gen_file = Path("modules/utils/pdf_generator.py")
     print(f"\n3. Módulo pdf_generator.py:")
     
     if pdf_gen_file.exists():

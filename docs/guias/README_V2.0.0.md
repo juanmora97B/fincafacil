@@ -247,7 +247,8 @@ Licencia Propietaria - Ver [LICENSE.txt](LICENSE.txt)
 
 ## 📞 Soporte
 
-- 📧 Email: soporte@fincafacil.com
+- 📧 Email: jfburitica97@gmail.com
+- 📱 Teléfono: 3013869653
 - 💬 Issues: [GitHub Issues](https://github.com/juanmora97B/fincafacil/issues)
 - 📖 Docs: [Documentación Completa](docs/)
 

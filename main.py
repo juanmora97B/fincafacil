@@ -11,7 +11,7 @@ from pathlib import Path
 if getattr(sys, 'frozen', False):
     # Ejecutándose como ejecutable empaquetado
     current_dir = Path(sys.executable).parent
-    base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else current_dir
+    base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else current_dir  # type: ignore
 else:
     # Ejecutándose como script Python
     current_dir = Path(__file__).parent
@@ -61,6 +61,7 @@ except ImportError as e:
 
 import customtkinter as ctk
 from tkinter import messagebox
+from modules.utils.login_ui import mostrar_login
 
 class FincaFacilApp(ctk.CTk):
     def __init__(self):
@@ -139,6 +140,10 @@ class FincaFacilApp(ctk.CTk):
 
         # Guarda el módulo activo actual
         self.current_module = None
+        
+        # Control de animaciones en botones
+        self.animated_buttons = {}  # {button_key: (frames, current_frame_idx, after_id)}
+        self.animation_enabled = True
 
         # ----------- MENÚ LATERAL -----------
         self.create_sidebar()
@@ -167,7 +172,7 @@ class FincaFacilApp(ctk.CTk):
                 
                 # Importar en background para no bloquear
                 try:
-                    from utils.pdf_manual_generator import generar_manual_pdf
+                    from modules.utils.pdf_manual_generator import generar_manual_pdf
                     generar_manual_pdf()
                     if self.logger:
                         self.logger.info("Manual PDF generado correctamente")
@@ -179,16 +184,24 @@ class FincaFacilApp(ctk.CTk):
                 self.logger.warning(f"Error verificando manual PDF: {e}")
     
     def verificar_primer_uso(self):
-        """Verifica si es la primera vez que se usa el sistema y muestra el tour"""
+        """Verifica si es la primera vez usando el sistema e inicia el tour global"""
         try:
-            from modules.utils.tour_interactivo import TourInteractivo
+            from modules.utils.global_tour import GlobalTour
             
-            tour = TourInteractivo(self)
-            if tour.debe_mostrar_tour():
-                tour.iniciar_tour()
+            # Crear gestor del tour global
+            global_tour = GlobalTour(self)
+            
+            # Si es primer uso, iniciar tour automáticamente
+            if global_tour.should_start_tour():
+                if self.logger:
+                    self.logger.info("Primer uso detectado - iniciando tour global")
+                self.after(500, global_tour.start_tour)
+            else:
+                if self.logger:
+                    self.logger.info("Sistema ya fue usado antes - tour no necesario")
         except Exception as e:
             if self.logger:
-                self.logger.warning(f"No se pudo verificar/iniciar tour: {e}")
+                self.logger.warning(f"No se pudo iniciar tour global: {e}")
 
     def create_sidebar(self):
         # Header con fondo claro para resaltar el logo
@@ -240,42 +253,133 @@ class FincaFacilApp(ctk.CTk):
         )
         section_label.pack(pady=(5, 10), padx=15, anchor="w")
 
-        # Botones con colores temáticos e iconos grandes
-        buttons_config = [
-            ("📊 Dashboard", "dashboard", "#1976D2", "#2196F3"),
-            ("🐄 Animales", "animales", "#2E7D32", "#4CAF50"),
-            ("🤰 Reproducción", "reproduccion", "#E91E63", "#F06292"),
-            ("🏥 Salud", "salud", "#C62828", "#EF5350"),
-            ("🌿 Potreros", "potreros", "#388E3C", "#66BB6A"),
-            ("💊 Tratamientos", "tratamientos", "#7B1FA2", "#AB47BC"),
-            ("💰 Ventas", "ventas", "#F57C00", "#FF9800"),
-            ("📦 Insumos", "insumos", "#0288D1", "#03A9F4"),
-            ("🔧 Herramientas", "herramientas", "#616161", "#9E9E9E"),
-            ("📋 Reportes", "reportes", "#5E35B1", "#7E57C2"),
-            ("👥 Nómina", "nomina", "#00796B", "#26A69A"),
-            ("👨‍💼 Empleados", "empleados", "#0097A7", "#00BCD4"),
-            ("⚙️ Configuración", "configuracion", "#455A64", "#78909C"),
-            ("🎨 Ajustes", "ajustes", "#37474F", "#607D8B")
-        ]
-
-        self.active_button = None
-        self.buttons = {}
+        # Botones con iconos PNG grandes y colores mejorados
+        try:
+            from modules.utils.icons import COLORS, ICON_SYMBOLS
+            from PIL import Image
+            
+            buttons_config = [
+                ("dashboard", "Dashboard"),
+                ("animales", "Animales"),
+                ("reproduccion", "Reproducción"),
+                ("salud", "Salud"),
+                ("potreros", "Potreros"),
+                ("leche", "Pesaje de Leche"),
+                ("ventas", "Ventas"),
+                ("insumos", "Insumos"),
+                ("herramientas", "Herramientas"),
+                ("reportes", "Reportes"),
+                ("nomina", "Nómina"),
+                ("configuracion", "Config."),
+                ("ajustes", "Ajustes")
+            ]
+            
+            self.active_button = None
+            self.buttons = {}
+            self.button_images = {}  # Para mantener referencias de las imágenes
+            
+            for screen, label in buttons_config:
+                color_bg, color_hover = COLORS.get(screen, ("#1976D2", "#2196F3"))
+                
+                # Intentar cargar icono PNG del módulo
+                icon_image = None
+                icon_ctk = None
+                try:
+                    icon_path = Path(__file__).parent / "assets" / f"{screen}.png"
+                    if not icon_path.exists():
+                        # Intentar con nombres alternativos (singular)
+                        if screen == "animales":
+                            icon_path = Path(__file__).parent / "assets" / "animal.png"
+                        elif screen == "ajustes":
+                            icon_path = Path(__file__).parent / "assets" / "ajuste.png"
+                        elif screen == "potreros":
+                            icon_path = Path(__file__).parent / "assets" / "potrero.png"
+                    
+                    if icon_path.exists():
+                        icon_image = Image.open(icon_path)
+                        # Redimensionar icono a 36x36 para los botones
+                        icon_image = icon_image.resize((36, 36), Image.Resampling.LANCZOS)
+                        icon_ctk = ctk.CTkImage(light_image=icon_image, size=(36, 36))
+                        self.button_images[screen] = icon_ctk  # Mantener referencia
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"No se pudo cargar icono para {screen}: {e}")
+                
+                # Crear botón con icono y etiqueta
+                btn = ctk.CTkButton(
+                    self.sidebar,
+                    text=label,
+                    image=icon_ctk,
+                    width=180,
+                    height=65,
+                    font=("Segoe UI", 12, "bold"),
+                    fg_color=color_bg,
+                    hover_color=color_hover,
+                    corner_radius=15,
+                    border_width=0,
+                    compound="top",  # Icono encima del texto
+                    command=lambda s=screen, b=label: self.show_screen_animated(s, b)
+                )
+                
+                btn.pack(pady=8, padx=10)
+                self.buttons[label] = btn
         
-        for text, screen, color, hover_color in buttons_config:
-            btn = ctk.CTkButton(
-                self.sidebar,
-                text=text,
-                width=190,
-                height=45,
-                font=("Segoe UI", 13, "bold"),
-                fg_color=color,
-                hover_color=hover_color,
-                corner_radius=12,
-                border_width=0,
-                command=lambda s=screen, b=text: self.show_screen_animated(s, b)
-            )
-            btn.pack(pady=4, padx=10)
-            self.buttons[text] = btn
+        except ImportError:
+            # Fallback si hay error importando módulo de iconos
+            buttons_config_fallback = [
+                ("Dashboard", "dashboard", "#1976D2", "#2196F3"),
+                ("Animales", "animales", "#2E7D32", "#4CAF50"),
+                ("Reproducción", "reproduccion", "#E91E63", "#F06292"),
+                ("Salud", "salud", "#C62828", "#EF5350"),
+                ("Potreros", "potreros", "#388E3C", "#66BB6A"),
+                ("Leche", "leche", "#F57F17", "#FBC02D"),
+                ("Ventas", "ventas", "#F57C00", "#FF9800"),
+                ("Insumos", "insumos", "#0288D1", "#03A9F4"),
+                ("Herramientas", "herramientas", "#616161", "#9E9E9E"),
+                ("Reportes", "reportes", "#5E35B1", "#7E57C2"),
+                ("Nómina", "nomina", "#00796B", "#26A69A"),
+                ("Config.", "configuracion", "#455A64", "#78909C"),
+                ("Ajustes", "ajustes", "#37474F", "#607D8B")
+            ]
+            
+            self.active_button = None
+            self.buttons = {}
+            
+            # Cargar emojis como fallback si no hay PNG
+            emoji_fallback = {
+                "dashboard": "📊",
+                "animales": "🐄",
+                "reproduccion": "🤰",
+                "salud": "🏥",
+                "potreros": "🌿",
+                "leche": "🥛",
+                "ventas": "💰",
+                "insumos": "📦",
+                "herramientas": "🔧",
+                "reportes": "📋",
+                "nomina": "👥",
+                "configuracion": "⚙️",
+                "ajustes": "🎨"
+            }
+            
+            for text, screen, color, hover_color in buttons_config_fallback:
+                emoji = emoji_fallback.get(screen, "")
+                btn_text = f"{emoji}\n{text}" if emoji else text
+                
+                btn = ctk.CTkButton(
+                    self.sidebar,
+                    text=btn_text,
+                    width=180,
+                    height=65,
+                    font=("Segoe UI", 11, "bold"),
+                    fg_color=color,
+                    hover_color=hover_color,
+                    corner_radius=15,
+                    border_width=0,
+                    command=lambda s=screen, b=text: self.show_screen_animated(s, b)
+                )
+                btn.pack(pady=8, padx=10)
+                self.buttons[text] = btn
 
     def change_appearance_mode(self, mode):
         # Permite cambiar entre modo claro y oscuro
@@ -286,18 +390,35 @@ class FincaFacilApp(ctk.CTk):
 
     def show_screen_animated(self, name, button_text):
         """Cambia de pantalla con efecto visual en el botón activo"""
-        # Resetear botón anterior
+        # Resetear botón anterior - detener animación
         if self.active_button and self.active_button in self.buttons:
             old_btn = self.buttons[self.active_button]
             old_btn.configure(border_width=0)
+            # Cancelar animación previa si existe
+            if self.active_button in self.animated_buttons:
+                after_id = self.animated_buttons[self.active_button].get('after_id')
+                if after_id:
+                    try:
+                        self.after_cancel(after_id)
+                    except:
+                        pass
         
         # Destacar botón activo
         if button_text in self.buttons:
-            self.buttons[button_text].configure(border_width=3, border_color=("#FFFFFF", "#000000"))
+            self.buttons[button_text].configure(border_width=4, border_color=("#FFFFFF", "#FFD700"))
             self.active_button = button_text
-        
-        # Llamar al método original
+            
+            # Iniciar animación si existe para este módulo
+            self._iniciar_animacion_boton(name, button_text)
         self.show_screen(name)
+    
+    def _iniciar_animacion_boton(self, module_name, button_key):
+        """Inicia animación del icono en un botón - deshabilitada (solo emojis)"""
+        pass
+    
+    def _animar_boton(self, button_key):
+        """Loop de animación para un botón específico - deshabilitada"""
+        pass
 
     def show_screen(self, name):
         """
@@ -347,15 +468,16 @@ class FincaFacilApp(ctk.CTk):
                 from modules.potreros.potreros_main import PotrerosModule
                 self.current_module = PotrerosModule(self.main_frame)
             elif name == "tratamientos":
-                from modules.tratamientos.tratamientos_main import TratamientosModule
-                self.current_module = TratamientosModule(self.main_frame)
+                # NOTA: Tratamientos ahora está integrado en el módulo de Salud
+                from modules.salud.salud_main import SaludModule
+                self.current_module = SaludModule(self.main_frame)
             elif name == "nomina":
                 from modules.nomina.nomina_main import NominaModule
                 self.current_module = NominaModule(self.main_frame)
             elif name == "empleados":
-                # Carga directa del frame de empleados sin pasar por menú de configuración
-                from modules.configuracion.empleados import EmpleadosFrame
-                self.current_module = EmpleadosFrame(self.main_frame)
+                # NOTA: Empleados ahora está integrado en el módulo de Nómina
+                from modules.nomina.nomina_main import NominaModule
+                self.current_module = NominaModule(self.main_frame)
             elif name == "reportes":
                 from modules.reportes.reportes_main import ReportesModule
                 self.current_module = ReportesModule(self.main_frame)
@@ -368,6 +490,9 @@ class FincaFacilApp(ctk.CTk):
             elif name == "insumos":
                 from modules.insumos.insumos_main import InsumosModule
                 self.current_module = InsumosModule(self.main_frame)
+            elif name == "leche":
+                from modules.leche.pesaje_leche import PesajeLecheFrame
+                self.current_module = PesajeLecheFrame(self.main_frame)
 
             else:
                 self.current_module = self.create_placeholder_module(
@@ -392,7 +517,9 @@ class FincaFacilApp(ctk.CTk):
                     # Solo quitar padding en contenedores grandes típicos
                     if isinstance(child, ctk.CTkFrame):
                         # Si el frame no es barra de estado (altura muy pequeña) ni sidebar
-                        child.pack_configure(padx=max(child.pack_info().get('padx', 0) - 3, 0))
+                        padx = child.pack_info().get('padx', 0)
+                        if isinstance(padx, int):
+                            child.pack_configure(padx=max(padx - 3, 0))
             except Exception:
                 pass
 
@@ -634,6 +761,16 @@ def main():
         mostrar_banner(logger)
         logger.info("Sistema listo. Cargando interfaz principal...")
         
+        # Mostrar login (ANTES de iniciar la app principal)
+        logger.info("Mostrando pantalla de login...")
+        usuario_logueado = mostrar_login()
+        
+        if not usuario_logueado:
+            logger.info("El usuario canceló el login")
+            sys.exit(0)
+        
+        logger.info(f"Usuario '{usuario_logueado}' ha iniciado sesión")
+        
         # Ejecutar aplicación
         app = FincaFacilApp()
         app.protocol("WM_DELETE_WINDOW", app.on_closing)
@@ -647,7 +784,8 @@ def main():
         
     except Exception as e:
         if logger:
-            logger.critical(f"Error crítico en la aplicación: {e}", exc_info=True)
+            logger.critical(f"Error crítico en la aplicación: {e}")
+            logger.critical(traceback.format_exc())
         else:
             print(f"❌ Error crítico: {e}\n{traceback.format_exc()}")
 

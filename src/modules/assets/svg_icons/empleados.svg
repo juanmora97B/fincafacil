@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Usuario/Perfil -->
+  <circle cx="50" cy="30" r="12" fill="currentColor"/>
+  <!-- Cuerpo/Uniforme -->
+  <path d="M 38 45 Q 38 50 50 50 Q 62 50 62 45" fill="currentColor"/>
+  <!-- Brazos -->
+  <line x1="38" y1="47" x2="20" y2="55" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <line x1="62" y1="47" x2="80" y2="55" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <!-- Piernas -->
+  <line x1="43" y1="50" x2="40" y2="75" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <line x1="57" y1="50" x2="60" y2="75" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>

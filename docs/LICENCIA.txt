@@ -1,0 +1,85 @@
+LICENCIA DE USO - FINCAFÁCIL v2.0
+
+ACUERDO DE LICENCIA DE SOFTWARE
+
+1. TÉRMINOS Y CONDICIONES
+
+FincaFácil (en adelante "el Software") se proporciona bajo una licencia de prueba gratuita de 6 meses sin necesidad de tarjeta de crédito.
+
+2. PERÍODO DE PRUEBA
+
+- Acceso gratuito: 6 meses desde la instalación
+- Funcionalidad completa durante el período de prueba
+- Sin límites de datos
+- Sin costos ocultos
+
+3. DESPUÉS DE LA PRUEBA
+
+Una vez finalizado el período de 6 meses, deberás activar una licencia permanente usando un código de activación para continuar usando el Software.
+
+4. DERECHOS Y RESTRICCIONES
+
+Derecho de Uso:
+- El Software se licencia, no se vende.
+- Tienes derecho a instalar y usar el Software en una computadora.
+
+Restricciones:
+- No puedes modificar, decodificar, descompilar o crear derivados del Software.
+- No puedes distribuir, vender, alquilar o prestar el Software.
+- No puedes usar el Software para crear un producto competidor.
+
+5. PROPIEDAD INTELECTUAL
+
+Todos los derechos de autor, marcas registradas y derechos de propiedad intelectual del Software pertenecen a FincaFácil Development.
+
+6. DESCARGO DE RESPONSABILIDAD
+
+El Software se proporciona "TAL CUAL" sin garantías. FincaFácil no es responsable por:
+- Pérdida de datos
+- Interrupciones del servicio
+- Daños indirectos o incidentales
+
+7. LIMITACIÓN DE RESPONSABILIDAD
+
+En ningún caso FincaFácil será responsable por daños que excedan el monto pagado por la licencia (si aplica).
+
+8. ACTUALIZACIONES Y MEJORAS
+
+FincaFácil puede proporcionar actualizaciones y mejoras a su discreción. El uso continuado del Software después de una actualización constituye aceptación de los cambios.
+
+9. RESCISIÓN
+
+Esta licencia es válida hasta que:
+- El período de prueba expire
+- La licencia sea revocada por incumplimiento de términos
+- El usuario cancele voluntariamente el uso
+
+10. DATOS Y PRIVACIDAD
+
+- Los datos se almacenan localmente en tu computadora
+- FincaFácil no recopila información personal sin consentimiento
+- Para activar la licencia, se requiere información de contacto básica
+
+11. SOPORTE TÉCNICO
+
+El soporte técnico está disponible en:
+- Email: jfburitica97@gmail.com
+- Teléfono: 3013869653
+
+12. LEY APLICABLE
+
+Esta licencia se regirá por las leyes aplicables en el país de residencia del usuario.
+
+13. CAMBIOS A LOS TÉRMINOS
+
+FincaFácil se reserva el derecho de modificar estos términos. Los cambios entrarán en vigor con la siguiente versión de actualización.
+
+ACEPTACIÓN
+
+Al instalar y usar FincaFácil, aceptas completamente estos términos y condiciones.
+
+Para más información, visita: docs/licencia.html
+
+---
+FincaFácil Development
+Última actualización: 2025

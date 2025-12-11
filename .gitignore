@@ -1,79 +1,33 @@
-# ========================================
-#   FincaFácil - Archivo .gitignore
-# ========================================
-
-# ---- ARCHIVOS DEL SISTEMA ----
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# ---- PYTHON ----
+# Python artifacts
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-*.pdb
-*.egg-info/
-*.egg
-*.log
 
-# ---- ENTORNO VIRTUAL ----
-venv/
-env/
-ENV/
+# Virtual environments
 .venv/
+.env
+.env.*
+*.env
 
-# ---- CONFIGURACIÓN DE EDITORES ----
-.vscode/
-.idea/
-
-# ---- BASE DE DATOS ----
-# La base de datos local NO debe subirse al repositorio
-database/fincafacil.db
-*.db
-
-# ---- BACKUPS ----
-backup/
-*.bak
-*.old
-
-# ---- LOGS ----
+# Logs
 logs/
 *.log
 
-# ---- ARCHIVOS TEMPORALES ----
-temp/
-tmp/
-*.tmp
-*.cache
-.cache/
-__temp__/
+# Databases and caches
+*.db
+*.sqlite
+*.sqlite3
+
+# Build/output
 build/
 dist/
+*.exe
+*.msi
 
-# ---- ARCHIVOS DE INTERFACE TKINTER PERSONALIZADOS ----
-*.tcl
-*.tk
+# Uploads and generated media
+uploads/
 
-# ---- ARCHIVOS DE CONFIGURACIÓN SENSIBLES ----
-.env
-*.env
-
-# ---- ARCHIVOS DE COMPILACIÓN PYINSTALLER ----
-*.spec
-
-# ---- ARCHIVOS DE WINDOWS Y PYTHON TEMPORALES ----
-*.pyproj
-*.suo
-*.dll
-*.manifest
-*.obj
-
-# ---- IMÁGENES GRANDES NO NECESARIAS ----
-assets/raw/
-assets/capturas-originales/
-
-# ---- EXPORTACIONES ----
-export/
-reports/
-output/
+# IDE/editor
+.vscode/
+.idea/

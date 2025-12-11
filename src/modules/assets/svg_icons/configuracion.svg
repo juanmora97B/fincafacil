@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Engranaje -->
+  <circle cx="50" cy="50" r="15" fill="none" stroke="currentColor" stroke-width="2"/>
+  <circle cx="50" cy="50" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+  <!-- Dientes -->
+  <rect x="48" y="30" width="4" height="5" fill="currentColor"/>
+  <rect x="48" y="65" width="4" height="5" fill="currentColor"/>
+  <rect x="65" y="48" width="5" height="4" fill="currentColor"/>
+  <rect x="30" y="48" width="5" height="4" fill="currentColor"/>
+  <rect x="62" y="38" width="4" height="4" fill="currentColor" transform="rotate(45 64 40)"/>
+  <rect x="30" y="58" width="4" height="4" fill="currentColor" transform="rotate(45 32 60)"/>
+</svg>

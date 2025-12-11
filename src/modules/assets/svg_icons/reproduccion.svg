@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Vaca preñada con ternero -->
+  <ellipse cx="50" cy="55" rx="35" ry="28" fill="currentColor"/>
+  <!-- Barriga hinchada -->
+  <ellipse cx="50" cy="60" rx="32" ry="25" fill="currentColor" opacity="0.7"/>
+  <!-- Cabeza madre -->
+  <circle cx="50" cy="25" r="12" fill="currentColor"/>
+  <!-- Patas -->
+  <rect x="35" y="75" width="5" height="20" fill="currentColor"/>
+  <rect x="60" y="75" width="5" height="20" fill="currentColor"/>
+  <!-- Pequeño ternero interno (representación) -->
+  <circle cx="50" cy="58" r="8" fill="white" opacity="0.3"/>
+</svg>

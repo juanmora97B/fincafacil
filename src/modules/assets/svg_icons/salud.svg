@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Jeringa/Medicamento -->
+  <rect x="15" y="35" width="70" height="12" rx="6" fill="currentColor"/>
+  <!-- Aguja -->
+  <polygon points="80,35 85,40 80,45" fill="currentColor"/>
+  <!-- Marcas de dosis -->
+  <line x1="25" y1="28" x2="25" y2="32" stroke="currentColor" stroke-width="2"/>
+  <line x1="40" y1="28" x2="40" y2="32" stroke="currentColor" stroke-width="2"/>
+  <line x1="55" y1="28" x2="55" y2="32" stroke="currentColor" stroke-width="2"/>
+  <line x1="70" y1="28" x2="70" y2="32" stroke="currentColor" stroke-width="2"/>
+  <!-- Émbolo -->
+  <circle cx="20" cy="41" r="5" fill="currentColor"/>
+</svg>

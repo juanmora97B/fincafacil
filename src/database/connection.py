@@ -1,266 +1,318 @@
 """
-Sistema de conexión unificado a base de datos
-Consolidación de database/database.py con un enfoque moderno
+Sistema moderno de conexión a base de datos para FincaFácil
+
+Este módulo proporciona:
+- get_connection(): Context manager para conexiones
+- DatabaseManager: Clase para operaciones comunes
+- db: Instancia global del DatabaseManager
 """
 
+from __future__ import annotations
 import sqlite3
-from pathlib import Path
-from contextlib import contextmanager
-from typing import Optional, List, Dict, Any, Tuple
 import logging
-from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional, List, Dict, Any, Iterator
+from contextlib import contextmanager
+
+# Importar las funciones existentes del sistema legacy
+from .database import get_db_connection, DB_PATH
 
 logger = logging.getLogger(__name__)
 
-# ============================================
-# CONFIGURACIÓN
-# ============================================
-
-BASE_DIR = Path(__file__).parent.parent.parent
-DB_PATH = BASE_DIR / "database" / "fincafacil.db"
-DB_TIMEOUT = 30
-DB_JOURNAL_MODE = "WAL"
-DB_PRAGMA_FOREIGN_KEYS = True
-
-
-# ============================================
-# CONTEXT MANAGER
-# ============================================
 
 @contextmanager
-def get_connection(db_path: Optional[str] = None):
+def get_connection(db_path: Optional[str] = None) -> Iterator[sqlite3.Connection]:
     """
-    Context manager para obtener conexión a la base de datos
+    Context manager moderno para obtener conexión a BD.
     
     Uso:
+        from database import get_connection
+        
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT ...")
+            cursor.execute("SELECT * FROM animal")
     
     Args:
-        db_path: Ruta opcional a la BD (default: fincafacil.db)
+        db_path: Ruta opcional a la base de datos
         
     Yields:
-        sqlite3.Connection: Conexión configurada
-        
-    Raises:
-        sqlite3.Error: Si hay error en la conexión
+        sqlite3.Connection: Conexión configurada a la BD
     """
-    path = db_path or DB_PATH
-    conn = None
-    try:
-        # Asegurar que existe el directorio
-        Path(path).parent.mkdir(exist_ok=True, parents=True)
-        
-        # Conectar con configuración optimizada
-        conn = sqlite3.connect(str(path), timeout=DB_TIMEOUT)
-        conn.row_factory = sqlite3.Row  # Acceso por columna
-        conn.execute(f"PRAGMA foreign_keys = {'ON' if DB_PRAGMA_FOREIGN_KEYS else 'OFF'}")
-        conn.execute(f"PRAGMA journal_mode = {DB_JOURNAL_MODE}")
-        
-        logger.debug(f"Conexión establecida a {path}")
+    # Delegar al sistema existente
+    with get_db_connection(db_path or DB_PATH) as conn:
         yield conn
-        conn.commit()
-        
-    except sqlite3.Error as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Error de base de datos: {e}")
-        raise
-    finally:
-        if conn:
-            try:
-                conn.close()
-                logger.debug("Conexión cerrada")
-            except Exception:
-                pass
 
-
-# ============================================
-# CLASE MANAGER
-# ============================================
 
 class DatabaseManager:
-    """Manager de base de datos para operaciones comunes"""
+    """
+    Manager centralizado para operaciones comunes en la base de datos.
+    
+    Proporciona métodos de alto nivel para:
+    - Consultas SELECT
+    - Inserciones, actualizaciones, eliminaciones
+    - Transacciones
+    - Verificaciones de tabla
+    
+    Ejemplo:
+        db = DatabaseManager()
+        animales = db.execute_query("SELECT * FROM animal WHERE finca_id = ?", (1,))
+    """
     
     def __init__(self, db_path: Optional[str] = None):
         """
-        Inicializa el manager
+        Inicializa el DatabaseManager.
         
         Args:
-            db_path: Ruta opcional a la BD
+            db_path: Ruta opcional a la base de datos
         """
         self.db_path = db_path or DB_PATH
+        self.logger = logging.getLogger(f"{__name__}.DatabaseManager")
     
-    # ======== QUERY EXECUTION ========
-    
-    def execute_query(self, query: str, params: tuple = ()) -> List[Dict]:
+    @contextmanager
+    def get_connection(self) -> Iterator[sqlite3.Connection]:
         """
-        Ejecuta una query SELECT y retorna resultados
+        Obtiene una conexión a la base de datos (context manager público).
+        
+        Yields:
+            sqlite3.Connection: Conexión a la BD
+        """
+        with get_connection(self.db_path) as conn:
+            yield conn
+    
+    @contextmanager
+    def _get_conn(self) -> Iterator[sqlite3.Connection]:
+        """Context manager interno para conexiones."""
+        with self.get_connection() as conn:
+            yield conn
+    
+    def execute_query(
+        self,
+        query: str,
+        params: tuple = None,
+        fetch_one: bool = False,
+        fetch_all: bool = True
+    ) -> Any:
+        """
+        Ejecuta una consulta SELECT.
         
         Args:
-            query: Query SQL
-            params: Parámetros para la query
+            query: Consulta SQL
+            params: Parámetros para la consulta
+            fetch_one: Si True, retorna un registro
+            fetch_all: Si True, retorna todos los registros (default)
             
         Returns:
-            List[Dict]: Lista de resultados como diccionarios
+            Registros como diccionarios o None
         """
-        with get_connection(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params or ())
+                
+                if fetch_one:
+                    row = cursor.fetchone()
+                    return dict(row) if row else None
+                elif fetch_all:
+                    return [dict(row) for row in cursor.fetchall()]
+                else:
+                    return cursor.fetchall()
+        except sqlite3.Error as e:
+            self.logger.error(f"Error ejecutando query: {query} - {e}")
+            raise
     
-    def execute_one(self, query: str, params: tuple = ()) -> Optional[Dict]:
-        """Ejecuta una query y retorna un solo resultado"""
-        with get_connection(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            row = cursor.fetchone()
-            return dict(row) if row else None
-    
-    def execute_update(self, query: str, params: tuple = ()) -> int:
+    def execute_one(
+        self,
+        query: str,
+        params: tuple = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Ejecuta INSERT/UPDATE/DELETE
-        
-        Returns:
-            int: Número de filas afectadas
-        """
-        with get_connection(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.rowcount
-    
-    def execute_many(self, query: str, params_list: List[tuple]) -> int:
-        """
-        Ejecuta múltiples inserts/updates
+        Ejecuta una consulta que retorna un solo registro.
         
         Args:
-            query: Query SQL
+            query: Consulta SQL
+            params: Parámetros
+            
+        Returns:
+            Registro como diccionario o None
+        """
+        return self.execute_query(query, params, fetch_one=True, fetch_all=False)
+    
+    def execute_update(
+        self,
+        query: str,
+        params: tuple = None
+    ) -> int:
+        """
+        Ejecuta una operación INSERT, UPDATE o DELETE.
+        
+        Args:
+            query: Consulta SQL
+            params: Parámetros
+            
+        Returns:
+            Número de filas afectadas
+        """
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params or ())
+                conn.commit()
+                return cursor.rowcount
+        except sqlite3.Error as e:
+            self.logger.error(f"Error ejecutando update: {query} - {e}")
+            raise
+    
+    def execute_many(
+        self,
+        query: str,
+        params_list: List[tuple]
+    ) -> int:
+        """
+        Ejecuta múltiples operaciones INSERT/UPDATE/DELETE.
+        
+        Args:
+            query: Consulta SQL
             params_list: Lista de tuplas de parámetros
             
         Returns:
-            int: Número total de filas afectadas
+            Número total de filas afectadas
         """
-        with get_connection(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.executemany(query, params_list)
-            return cursor.rowcount
-    
-    # ======== TABLE OPERATIONS ========
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.executemany(query, params_list)
+                conn.commit()
+                return cursor.rowcount
+        except sqlite3.Error as e:
+            self.logger.error(f"Error ejecutando many: {query} - {e}")
+            raise
     
     def table_exists(self, table_name: str) -> bool:
-        """Verifica si existe una tabla"""
-        query = "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
-        return self.execute_one(query, (table_name,)) is not None
-    
-    def get_tables(self) -> List[str]:
-        """Obtiene lista de todas las tablas"""
-        query = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        rows = self.execute_query(query)
-        return [row['name'] for row in rows]
-    
-    def get_table_info(self, table_name: str) -> List[Dict]:
-        """Obtiene información de columnas de una tabla"""
-        query = f"PRAGMA table_info({table_name})"
-        return self.execute_query(query)
-    
-    def get_table_count(self, table_name: str) -> int:
-        """Cuenta registros en una tabla"""
-        query = f"SELECT COUNT(*) as count FROM {table_name}"
-        result = self.execute_one(query)
-        return result['count'] if result else 0
-    
-    # ======== BACKUP/RESTORE ========
-    
-    def backup(self, backup_path: Optional[str] = None) -> bool:
         """
-        Crea backup de la BD
+        Verifica si una tabla existe en la BD.
         
         Args:
-            backup_path: Ruta de destino (default: database/backup_TIMESTAMP.db)
+            table_name: Nombre de la tabla
             
         Returns:
-            bool: True si fue exitoso
+            True si la tabla existe
         """
         try:
-            if backup_path is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = self.db_path.parent / f"backup_{timestamp}.db"
-            
-            with get_connection(self.db_path) as source_conn:
-                with get_connection(backup_path) as dest_conn:
-                    source_conn.backup(dest_conn)
-            
-            logger.info(f"Backup creado: {backup_path}")
-            return True
-        except Exception as e:
-            logger.error(f"Error creando backup: {e}")
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,)
+                )
+                return cursor.fetchone() is not None
+        except sqlite3.Error as e:
+            self.logger.error(f"Error verificando tabla {table_name}: {e}")
             return False
     
-    # ======== VACUUM/OPTIMIZE ========
+    def get_table_info(self, table_name: str) -> List[Dict[str, Any]]:
+        """
+        Obtiene información sobre las columnas de una tabla.
+        
+        Args:
+            table_name: Nombre de la tabla
+            
+        Returns:
+            Lista de diccionarios con info de columnas
+        """
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"PRAGMA table_info({table_name})")
+                columns = cursor.fetchall()
+                return [
+                    {
+                        'cid': col[0],
+                        'name': col[1],
+                        'type': col[2],
+                        'notnull': col[3],
+                        'dflt_value': col[4],
+                        'pk': col[5]
+                    }
+                    for col in columns
+                ]
+        except sqlite3.Error as e:
+            self.logger.error(f"Error obteniendo info de {table_name}: {e}")
+            return []
+    
+    def backup(self, backup_path: str) -> bool:
+        """
+        Realiza un backup de la base de datos.
+        
+        Args:
+            backup_path: Ruta donde guardar el backup
+            
+        Returns:
+            True si fue exitoso
+        """
+        try:
+            with self._get_conn() as conn:
+                backup_conn = sqlite3.connect(backup_path)
+                conn.backup(backup_conn)
+                backup_conn.close()
+                self.logger.info(f"Backup realizado en: {backup_path}")
+                return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Error realizando backup: {e}")
+            return False
     
     def vacuum(self) -> bool:
-        """Optimiza la BD (VACUUM)"""
+        """
+        Optimiza la base de datos (libera espacio).
+        
+        Returns:
+            True si fue exitoso
+        """
         try:
-            with get_connection(self.db_path) as conn:
+            with self._get_conn() as conn:
                 conn.execute("VACUUM")
-            logger.info("BD optimizada")
-            return True
-        except Exception as e:
-            logger.error(f"Error optimizando BD: {e}")
+                self.logger.info("Base de datos optimizada")
+                return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Error en VACUUM: {e}")
             return False
-    
-    # ======== TRANSACTION ========
     
     @contextmanager
     def transaction(self):
         """
-        Context manager para transacciones
+        Context manager para transacciones.
         
         Uso:
-            with db.transaction() as conn:
-                cursor = conn.cursor()
-                cursor.execute(...)
+            with db.transaction():
+                db.execute_update("UPDATE animal SET peso = ?", (100,))
+                db.execute_update("INSERT INTO log VALUES (...)")
+        
+        Yields:
+            None (usa execute_update dentro del contexto)
         """
-        with get_connection(self.db_path) as conn:
-            try:
-                yield conn
-                conn.commit()
-            except Exception:
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute("PRAGMA journal_mode = WAL")
+            yield conn
+            conn.commit()
+        except Exception as e:
+            if conn:
                 conn.rollback()
-                raise
+            self.logger.error(f"Error en transacción: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
 
 
-# ============================================
-# INSTANCIA GLOBAL
-# ============================================
-
+# Instancia global
 db = DatabaseManager()
 
 
-# ============================================
-# FUNCIONES DE UTILIDAD
-# ============================================
-
-def check_database_exists(path: Optional[str] = None) -> bool:
-    """Verifica si existe el archivo de BD"""
-    db_path = Path(path or DB_PATH)
-    return db_path.exists() and db_path.is_file()
-
-
-def get_database_size(path: Optional[str] = None) -> int:
-    """Obtiene tamaño de la BD en bytes"""
-    db_path = Path(path or DB_PATH)
-    if db_path.exists():
-        return db_path.stat().st_size
-    return 0
-
-
-def get_database_modified_time(path: Optional[str] = None) -> Optional[datetime]:
-    """Obtiene fecha de última modificación"""
-    db_path = Path(path or DB_PATH)
-    if db_path.exists():
-        mtime = db_path.stat().st_mtime
-        return datetime.fromtimestamp(mtime)
-    return None
+__all__ = [
+    "get_connection",
+    "DatabaseManager",
+    "db",
+]

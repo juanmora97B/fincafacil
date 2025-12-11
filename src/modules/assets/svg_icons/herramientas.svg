@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Llave inglesa -->
+  <rect x="10" y="35" width="50" height="10" rx="5" fill="currentColor"/>
+  <!-- Cabezal móvil -->
+  <circle cx="65" cy="40" r="12" fill="none" stroke="currentColor" stroke-width="2"/>
+  <circle cx="65" cy="40" r="8" fill="currentColor" opacity="0.3"/>
+  <!-- Tornillo central -->
+  <circle cx="40" cy="40" r="3" fill="currentColor"/>
+  <!-- Destornillador superpuesto -->
+  <path d="M 45 20 L 50 65" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 48 18 L 52 22" stroke="currentColor" stroke-width="2"/>
+</svg>
