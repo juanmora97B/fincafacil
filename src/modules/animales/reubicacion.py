@@ -414,9 +414,10 @@ class ReubicacionFrame(ctk.CTkFrame):
             pass
 
     def _ocultar_tooltip_id(self, _event=None):
-        if getattr(self, "_tooltip", None):
+        tooltip = getattr(self, "_tooltip", None)
+        if tooltip:
             try:
-                self._tooltip.destroy()
+                tooltip.destroy()
             except Exception:
                 pass
             self._tooltip = None

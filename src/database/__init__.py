@@ -10,62 +10,39 @@ API pública:
 from __future__ import annotations
 import logging
 from typing import List
-from contextlib import contextmanager
+from pathlib import Path
 
-# Importar desde los módulos correctos
-try:
-    # Nuevo sistema de conexión (módulo connection.py)
-    from .connection import get_connection, db, DatabaseManager
-    
-    # Importar también desde database.py (ya existente) para compatibilidad
-    from .database import (
-        get_db_connection,
-        verificar_base_datos,
-        inicializar_base_datos,
-        ejecutar_consulta,
-        obtener_tablas,
-        asegurar_esquema_minimo,
-        asegurar_esquema_completo,
-        DB_PATH
-    )
-    
-    # Alias para compatibilidad
-    check_database_exists = verificar_base_datos
-    init_database = inicializar_base_datos
-    get_table_info = obtener_tablas
-    
-    log = logging.getLogger("FincaFacil.database")
-    log.info("Database module cargado correctamente")
-    
-except ImportError as exc:
-    # Fallback mínimo si el módulo no está disponible
-    log.error("No se pudo importar database.database: %s", exc)
+# Importar desde los módulos correctos (modernos)
+from .connection import get_connection, db, DatabaseManager
 
-    def get_db_connection():
-        raise RuntimeError("database.database no disponible")
+# Importar también desde database.py (compatibilidad ampliada)
+from .database import (
+    get_db_connection,
+    verificar_base_datos,
+    inicializar_base_datos,
+    ejecutar_consulta,
+    obtener_tablas,
+    asegurar_esquema_minimo,
+    asegurar_esquema_completo,
+    get_db_path_safe,
+)
 
-    def verificar_base_datos() -> bool:
-        return False
+# Lazy DB_PATH for backwards compatibility
+DB_PATH: Path | None = None
 
-    def inicializar_base_datos() -> bool:
-        return False
+def _lazy_db_path() -> Path:
+    global DB_PATH
+    if DB_PATH is None:
+        DB_PATH = get_db_path_safe()
+    return DB_PATH
 
-    def ejecutar_consulta(query: str, parametros: tuple = None, fetch: bool = False):
-        raise RuntimeError("database.database no disponible")
+# Alias para compatibilidad
+check_database_exists = verificar_base_datos
+init_database = inicializar_base_datos
+get_table_info = obtener_tablas
 
-    def obtener_tablas() -> List[str]:
-        return []
-
-    # Aliases
-    check_database_exists = verificar_base_datos
-    init_database = inicializar_base_datos
-    get_table_info = obtener_tablas
-    
-    class DatabaseManager:
-        def __init__(self):
-            raise RuntimeError("database.database no disponible")
-    
-    db = None
+log = logging.getLogger("FincaFacil.database")
+log.info("Database module cargado correctamente")
 
 # API pública exportada
 __all__ = [

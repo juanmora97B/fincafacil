@@ -6,7 +6,9 @@ from tkinter import messagebox, filedialog
 import sys
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date, time, timedelta
+from decimal import Decimal
+from typing import Any, Optional, cast
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from database import db
@@ -33,6 +35,33 @@ def importar_animales_desde_excel():
             "O ejecute: python crear_plantilla_excel.py"
         )
         return
+
+    def _coerce_text(value: Any) -> str:
+        return "" if value is None else str(value).strip()
+
+    def _coerce_date(value: Any) -> Optional[str]:
+        """Normaliza valores de fecha a YYYY-MM-DD si es posible."""
+        if value is None:
+            return None
+        if isinstance(value, (datetime, date)):
+            return value.strftime("%Y-%m-%d")
+        if isinstance(value, time):
+            return value.strftime("%H:%M:%S")
+        try:
+            # Algunos valores numéricos de Excel representan fechas; se deja tal cual como texto
+            return str(value).strip()
+        except Exception:
+            return None
+
+    def _coerce_float(value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return None
+        try:
+            return float(value)
+        except Exception:
+            return None
     
     # Seleccionar archivo
     archivo = filedialog.askopenfilename(
@@ -46,10 +75,13 @@ def importar_animales_desde_excel():
     try:
         # Leer Excel
         wb = openpyxl.load_workbook(archivo)
-        ws = wb.active
+        if wb is None or wb.active is None:
+            messagebox.showerror("Error", "No se pudo abrir la hoja activa del Excel")
+            return
+        ws = cast(Any, wb.active)
         
         # Leer encabezados
-        headers = [cell.value for cell in ws[1]]
+        headers = [cell.value for cell in ws[1]] if ws else []
         
         # Mapeo de columnas
         col_map = {}
@@ -154,19 +186,19 @@ def importar_animales_desde_excel():
                     if not codigo:
                         continue  # Fila vacía
                     
-                    nombre = str(ws.cell(row=row_num, column=col_map.get('nombre', 0)).value or "").strip() or None
+                    nombre = _coerce_text(ws.cell(row=row_num, column=col_map.get('nombre', 0)).value) or None
                     # Normalización de tipo_ingreso y sexo
-                    tipo_ingreso_raw = str(ws.cell(row=row_num, column=col_map['tipo_ingreso']).value or "").strip().lower()
+                    tipo_ingreso_raw = _coerce_text(ws.cell(row=row_num, column=col_map['tipo_ingreso']).value).lower()
                     mapping_tipo = {
                         'nacimiento': 'Nacimiento', 'nac': 'Nacimiento', 'nacido': 'Nacimiento',
                         'compra': 'Compra', 'comprado': 'Compra', 'comp': 'Compra'
                     }
                     tipo_ingreso = mapping_tipo.get(tipo_ingreso_raw)
-                    sexo_raw = str(ws.cell(row=row_num, column=col_map['sexo']).value or "").strip().lower()
+                    sexo_raw = _coerce_text(ws.cell(row=row_num, column=col_map['sexo']).value).lower()
                     mapping_sexo = {'macho': 'Macho', 'hembra': 'Hembra', 'm': 'Macho', 'h': 'Hembra'}
                     sexo = mapping_sexo.get(sexo_raw)
                     from modules.utils.database_helpers import normalizar_texto
-                    finca_nombre = normalizar_texto(ws.cell(row=row_num, column=col_map['finca']).value)
+                    finca_nombre = normalizar_texto(_coerce_text(ws.cell(row=row_num, column=col_map['finca']).value))
                     
                     # Validaciones básicas
                     if not tipo_ingreso:
@@ -187,60 +219,52 @@ def importar_animales_desde_excel():
                     fecha_nacimiento = None
                     if 'fecha_nacimiento' in col_map:
                         fecha_val = ws.cell(row=row_num, column=col_map['fecha_nacimiento']).value
-                        if fecha_val:
-                            if hasattr(fecha_val, 'strftime'):
-                                fecha_nacimiento = fecha_val.strftime("%Y-%m-%d")
-                            else:
-                                fecha_nacimiento = str(fecha_val).strip()
+                        fecha_nacimiento = _coerce_date(fecha_val)
                     
                     fecha_compra = None
                     if 'fecha_compra' in col_map:
                         fecha_val = ws.cell(row=row_num, column=col_map['fecha_compra']).value
-                        if fecha_val:
-                            if hasattr(fecha_val, 'strftime'):
-                                fecha_compra = fecha_val.strftime("%Y-%m-%d")
-                            else:
-                                fecha_compra = str(fecha_val).strip()
+                        fecha_compra = _coerce_date(fecha_val)
                     
                     # Raza: ahora normalizado a raza_id. Tomar nombre y mapear a id.
                     raza_id = None
                     if 'raza' in col_map:
-                        raza_nombre_tmp = str(ws.cell(row=row_num, column=col_map['raza']).value or "").strip().lower() or None
+                        raza_nombre_tmp = _coerce_text(ws.cell(row=row_num, column=col_map['raza']).value).lower() or None
                         if raza_nombre_tmp:
                             raza_id = razas_dict.get(raza_nombre_tmp)
                     
                     # Potrero
                     id_potrero = None
                     if 'potrero' in col_map:
-                        potrero_nombre = str(ws.cell(row=row_num, column=col_map['potrero']).value or "").strip().lower()
+                        potrero_nombre = _coerce_text(ws.cell(row=row_num, column=col_map['potrero']).value).lower()
                         if potrero_nombre and potrero_nombre in potreros_dict:
                             id_potrero = potreros_dict[potrero_nombre]
                     
                     # Lote
                     lote_id = None
                     if 'lote' in col_map:
-                        lote_nombre = str(ws.cell(row=row_num, column=col_map['lote']).value or "").strip().lower()
+                        lote_nombre = _coerce_text(ws.cell(row=row_num, column=col_map['lote']).value).lower()
                         if lote_nombre and lote_nombre in lotes_dict:
                             lote_id = lotes_dict[lote_nombre]
                     
                     # Sector
                     id_sector = None
                     if 'sector' in col_map:
-                        sector_nombre = str(ws.cell(row=row_num, column=col_map['sector']).value or "").strip().lower()
+                        sector_nombre = _coerce_text(ws.cell(row=row_num, column=col_map['sector']).value).lower()
                         if sector_nombre and sector_nombre in sectores_dict:
                             id_sector = sectores_dict[sector_nombre]
                     
                     # Grupo
                     grupo_compra = None
                     if 'grupo' in col_map:
-                        grupo_val = str(ws.cell(row=row_num, column=col_map['grupo']).value or "").strip()
+                        grupo_val = _coerce_text(ws.cell(row=row_num, column=col_map['grupo']).value)
                         if grupo_val and grupo_val in ["Toros", "Vacas", "Terneros", "Novillos"]:
                             grupo_compra = grupo_val
                     
                     # Condición Corporal
                     condicion_corporal = None
                     if 'condicion_corporal' in col_map:
-                        condicion_val = str(ws.cell(row=row_num, column=col_map['condicion_corporal']).value or "").strip()
+                        condicion_val = _coerce_text(ws.cell(row=row_num, column=col_map['condicion_corporal']).value)
                         if condicion_val:
                             condicion_corporal = condicion_val
                     
@@ -248,54 +272,42 @@ def importar_animales_desde_excel():
                     peso_nacimiento = None
                     if 'peso_nacimiento' in col_map:
                         peso_val = ws.cell(row=row_num, column=col_map['peso_nacimiento']).value
-                        if peso_val:
-                            try:
-                                peso_nacimiento = float(peso_val)
-                            except:
-                                pass
+                        peso_nacimiento = _coerce_float(peso_val)
                     
                     peso_compra = None
                     if 'peso_compra' in col_map:
                         peso_val = ws.cell(row=row_num, column=col_map['peso_compra']).value
-                        if peso_val:
-                            try:
-                                peso_compra = float(peso_val)
-                            except:
-                                pass
+                        peso_compra = _coerce_float(peso_val)
                     
                     # Precio
                     precio_compra = None
                     if 'precio_compra' in col_map:
                         precio_val = ws.cell(row=row_num, column=col_map['precio_compra']).value
-                        if precio_val:
-                            try:
-                                precio_compra = float(precio_val)
-                            except:
-                                pass
+                        precio_compra = _coerce_float(precio_val)
                     
                     # Salud
                     salud = "Sano"
                     if 'salud' in col_map:
-                        salud_val = str(ws.cell(row=row_num, column=col_map['salud']).value or "").strip()
+                        salud_val = _coerce_text(ws.cell(row=row_num, column=col_map['salud']).value)
                         if salud_val:
                             salud = salud_val
                     
                     # Otros campos
                     color = None
                     if 'color' in col_map:
-                        color_val = str(ws.cell(row=row_num, column=col_map['color']).value or "").strip()
+                        color_val = _coerce_text(ws.cell(row=row_num, column=col_map['color']).value)
                         if color_val:
                             color = color_val
                     
                     hierro = None
                     if 'hierro' in col_map:
-                        hierro_val = str(ws.cell(row=row_num, column=col_map['hierro']).value or "").strip()
+                        hierro_val = _coerce_text(ws.cell(row=row_num, column=col_map['hierro']).value)
                         if hierro_val:
                             hierro = hierro_val
                     
                     comentarios = None
                     if 'comentarios' in col_map:
-                        comentarios_val = str(ws.cell(row=row_num, column=col_map['comentarios']).value or "").strip()
+                        comentarios_val = _coerce_text(ws.cell(row=row_num, column=col_map['comentarios']).value)
                         if comentarios_val:
                             comentarios = comentarios_val
                     

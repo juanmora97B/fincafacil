@@ -1,21 +1,23 @@
 """
 Modal Reubicar Animal - Cambiar ubicación (finca, sector, lote, potrero)
+FASE 8.3: Migrado para usar AnimalService en lugar de acceso directo a BD
 """
 
 import customtkinter as ctk
 from tkinter import messagebox
 from typing import List, Tuple
+import sys
+import os
 
-try:
-    from database import get_db_connection
-except Exception:
-    from database.database import get_db_connection
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from infraestructura.animales.animal_service import AnimalService
 
 class ModalReubicarAnimal(ctk.CTkToplevel):
     def __init__(self, master, animal_data, on_saved=None):
         super().__init__(master)
         self.animal = animal_data
         self.on_saved = on_saved
+        self.animal_service = AnimalService()  # FASE 8.3: inyectar servicio
         self.title(f"Reubicar: {animal_data.get('codigo','')} - {animal_data.get('nombre','')}")
         self.geometry("700x420")
         self.resizable(False, False)
@@ -58,25 +60,14 @@ class ModalReubicarAnimal(ctk.CTkToplevel):
         ctk.CTkButton(actions, text="✓ Guardar", fg_color="#2d6a4f", width=160, command=self._guardar).pack(side="left", padx=6)
         ctk.CTkButton(actions, text="✗ Cancelar", fg_color="gray40", width=140, command=self.destroy).pack(side="left", padx=6)
 
-    def _col_finca(self, tabla: str) -> str:
-        try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(f"PRAGMA table_info({tabla})")
-                cols = [r[1] for r in cur.fetchall()]
-                return 'finca_id' if 'finca_id' in cols else 'id_finca'
-        except Exception:
-            return 'id_finca'
-
     def _load_fincas(self):
+        """Cargar fincas usando AnimalService (FASE 8.3)"""
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT id, nombre FROM finca ORDER BY nombre")
-                fincas = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
+            fincas_data = self.animal_service.cargar_fincas()
+            fincas = [f"{r['id']} - {r['nombre']}" for r in fincas_data]
             self.cmb_finca.configure(values=fincas)
             if fincas:
-                # intentar preselect actual
+                # Intentar preseleccionar finca actual
                 finca_nombre = self.animal.get('finca') or ''
                 preset = next((v for v in fincas if finca_nombre and finca_nombre in v), None)
                 self.cmb_finca.set(preset or fincas[0])
@@ -85,74 +76,69 @@ class ModalReubicarAnimal(ctk.CTkToplevel):
             messagebox.showerror("Error", f"No se pudieron cargar fincas:\n{e}")
 
     def _on_finca_change(self):
+        """Cargar sectores, lotes y potreros al cambiar finca (FASE 8.3)"""
         try:
             val = self.cmb_finca.get()
             if not val or '-' not in val:
                 return
             finca_id = int(val.split(' - ')[0])
-            # Sectores
-            col = self._col_finca('sector')
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(f"SELECT id, nombre FROM sector WHERE {col} = ? ORDER BY nombre", (finca_id,))
-                sectores = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
+            
+            # Cargar sectores usando AnimalService
+            sectores_data = self.animal_service.cargar_sectores_por_finca(finca_id)
+            sectores = [f"{r['id']} - {r['nombre']}" for r in sectores_data]
             self.cmb_sector.configure(values=["Ninguno"] + sectores)
             self.cmb_sector.set("Ninguno")
-            # Lotes
-            col = self._col_finca('lote')
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(f"SELECT id, nombre FROM lote WHERE {col} = ? ORDER BY nombre", (finca_id,))
-                lotes = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
+            
+            # Cargar lotes usando AnimalService
+            lotes_data = self.animal_service.cargar_lotes_por_finca(finca_id)
+            lotes = [f"{r['id']} - {r['nombre']}" for r in lotes_data]
             self.cmb_lote.configure(values=["Ninguno"] + lotes)
             self.cmb_lote.set("Ninguno")
-            # Potreros
-            col = self._col_finca('potrero')
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(f"SELECT id, nombre FROM potrero WHERE {col} = ? ORDER BY nombre", (finca_id,))
-                potreros = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
+            
+            # Cargar potreros usando AnimalService
+            potreros_data = self.animal_service.cargar_potreros_por_finca(finca_id)
+            potreros = [f"{r['id']} - {r['nombre']}" for r in potreros_data]
             self.cmb_potrero.configure(values=["Ninguno"] + potreros)
             self.cmb_potrero.set("Ninguno")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar dependientes:\n{e}")
 
     def _guardar(self):
+        """Guardar reubicación del animal usando AnimalService (FASE 8.3)"""
         try:
             finca_val = self.cmb_finca.get()
             if not finca_val or '-' not in finca_val:
                 messagebox.showerror("Error", "Seleccione una finca")
                 return
             finca_id = int(finca_val.split(' - ')[0])
+            
+            # Parsear sector_id
             sector_id = None
             if self.cmb_sector.get() and self.cmb_sector.get() != 'Ninguno' and '-' in self.cmb_sector.get():
                 sector_id = int(self.cmb_sector.get().split(' - ')[0])
+            
+            # Parsear lote_id
             lote_id = None
             if self.cmb_lote.get() and self.cmb_lote.get() != 'Ninguno' and '-' in self.cmb_lote.get():
                 lote_id = int(self.cmb_lote.get().split(' - ')[0])
+            
+            # Parsear potrero_id
             potrero_id = None
             if self.cmb_potrero.get() and self.cmb_potrero.get() != 'Ninguno' and '-' in self.cmb_potrero.get():
                 potrero_id = int(self.cmb_potrero.get().split(' - ')[0])
 
-            # Detectar columnas en animal
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("PRAGMA table_info(animal)")
-                cols = [r[1] for r in cur.fetchall()]
-                col_finca = 'finca_id' if 'finca_id' in cols else 'id_finca'
-                col_sector = 'sector_id' if 'sector_id' in cols else 'id_sector'
-                col_potrero = 'potrero_id' if 'potrero_id' in cols else 'id_potrero'
-
-                sql = f"""
-                    UPDATE animal SET
-                        {col_finca} = ?,
-                        {col_sector} = ?,
-                        lote_id = ?,
-                        {col_potrero} = ?
-                    WHERE id = ?
-                """
-                cur.execute(sql, (finca_id, sector_id, lote_id, potrero_id, self.animal['id']))
-                conn.commit()
+            # Actualizar animal usando AnimalService
+            cambios = {
+                'finca_id': finca_id,
+                'sector_id': sector_id,
+                'lote_id': lote_id,
+                'potrero_id': potrero_id,
+            }
+            # Filtrar None
+            cambios_limpios = {k: v for k, v in cambios.items() if v is not None}
+            
+            # Usar servicio para actualizar
+            self.animal_service.actualizar_animal(self.animal['id'], cambios_limpios)
 
             messagebox.showinfo("Éxito", "Animal reubicado correctamente")
             if self.on_saved:

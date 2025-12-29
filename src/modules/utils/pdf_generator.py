@@ -8,6 +8,7 @@ import subprocess
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.lib.colors import HexColor
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 import markdown
@@ -64,7 +65,10 @@ def abrir_manual_pdf():
     except Exception as e:
         return False, f"Error inesperado: {e}"
 
-def generar_manual_pdf(md_path: str = None, pdf_path: str = None):
+from typing import Optional, Tuple
+
+
+def generar_manual_pdf(md_path: Optional[str] = None, pdf_path: Optional[str] = None) -> Tuple[bool, str]:
     """Genera el manual de usuario en formato PDF.
 
     Args:
@@ -101,7 +105,7 @@ def generar_manual_pdf(md_path: str = None, pdf_path: str = None):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=24,
-            textColor='#1f538d',
+            textColor=HexColor('#1f538d'),
             spaceAfter=30,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -112,7 +116,7 @@ def generar_manual_pdf(md_path: str = None, pdf_path: str = None):
             'CustomSubtitle',
             parent=styles['Heading2'],
             fontSize=14,
-            textColor='#1f538d',
+            textColor=HexColor('#1f538d'),
             spaceAfter=12,
             fontName='Helvetica-Bold'
         )
@@ -122,7 +126,7 @@ def generar_manual_pdf(md_path: str = None, pdf_path: str = None):
             'CustomHeading',
             parent=styles['Heading3'],
             fontSize=12,
-            textColor='#2e7d32',
+            textColor=HexColor('#2e7d32'),
             spaceAfter=10,
             fontName='Helvetica-Bold'
         )

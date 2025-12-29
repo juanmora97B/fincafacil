@@ -1,14 +1,17 @@
 """
 Sistema de autenticación y gestión de usuarios.
 Incluye registro, login y cambio de contraseña.
+REFACTOR FASE 7.5: Usa inyección de PathService en lugar de acceso directo a BD paths.
 """
 import sqlite3
 import hashlib
 import json
-from pathlib import Path
 from typing import Optional, Tuple
 from datetime import datetime
 import logging
+
+from database.services import get_path_service
+from modules.utils.app_paths import get_config_file
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +19,9 @@ logger = logging.getLogger(__name__)
 class UsuarioManager:
     """Gestión de usuarios y autenticación"""
     
-    def __init__(self, db_path: str = "database/fincafacil.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str | None = None):
+        path_service = get_path_service()
+        self.db_path = str(db_path or path_service.get_db_path())
         self._asegurar_tabla_usuarios()
     
     def _asegurar_tabla_usuarios(self):
@@ -50,7 +54,7 @@ class UsuarioManager:
         """Hash seguro de contraseña usando SHA256"""
         return hashlib.sha256(contraseña.encode()).hexdigest()
     
-    def registrar_usuario(self, nombre: str, contraseña: str, email: str = None) -> Tuple[bool, str]:
+    def registrar_usuario(self, nombre: str, contraseña: str, email: str | None = None) -> Tuple[bool, str]:
         """
         Registra un nuevo usuario
         
@@ -182,7 +186,7 @@ class UsuarioManager:
     def obtener_usuario_actual(self) -> Optional[dict]:
         """Retorna el diccionario del usuario actualmente logueado (desde archivo de sesión)"""
         try:
-            session_file = Path("config/session.json")
+            session_file = get_config_file("session.json")
             if session_file.exists():
                 with open(session_file, 'r') as f:
                     data = json.load(f)
@@ -227,8 +231,7 @@ class UsuarioManager:
     def guardar_sesion(self, nombre: str):
         """Guarda la sesión del usuario actual"""
         try:
-            Path("config").mkdir(exist_ok=True)
-            session_file = Path("config/session.json")
+            session_file = get_config_file("session.json")
             with open(session_file, 'w') as f:
                 json.dump({'usuario': nombre, 'timestamp': datetime.now().isoformat()}, f)
             logger.info(f"Sesión guardada: {nombre}")
@@ -238,7 +241,7 @@ class UsuarioManager:
     def cerrar_sesion(self):
         """Cierra la sesión actual"""
         try:
-            session_file = Path("config/session.json")
+            session_file = get_config_file("session.json")
             if session_file.exists():
                 session_file.unlink()
             logger.info("Sesión cerrada")

@@ -113,7 +113,7 @@ class ConfiguracionModule(ctk.CTkFrame):
                                    hover_color=self._hover)
                 btn.pack(pady=2, padx=10)
                 # Guardar referencia para posible uso futuro
-                btn.modulo_id = modulo_id
+                btn.__dict__['modulo_id'] = modulo_id  # type: ignore[attr-defined]
                 add_tooltip(btn, f"Abrir {texto}")
             
             # Separador entre categorías

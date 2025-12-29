@@ -5,20 +5,27 @@ import os
 import sys
 from pathlib import Path
 
+def _user_data_dir() -> Path:
+    """Return a writable base dir for user data (AppData/Local)."""
+    base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
+    return Path(base) / "FincaFacil"
+
+
 class Config:
     # Detectar si está ejecutándose como ejecutable empaquetado
-    if getattr(sys, 'frozen', False):
-        # Ejecutándose como ejecutable empaquetado
-        BASE_DIR = Path(sys.executable).parent
+    if getattr(sys, "frozen", False):
+        INSTALL_DIR = Path(sys.executable).parent
+        DATA_DIR = _user_data_dir()
     else:
-        # Ejecutándose como script Python
-        BASE_DIR = Path(__file__).parent
+        INSTALL_DIR = Path(__file__).parent
+        DATA_DIR = INSTALL_DIR
+    BASE_DIR = INSTALL_DIR
     
     # Rutas
-    DB_PATH = BASE_DIR / "database" / "fincafacil.db"
-    BACKUP_DIR = BASE_DIR / "backup"
-    LOG_DIR = BASE_DIR / "logs"
-    ASSETS_DIR = BASE_DIR / "assets"
+    DB_PATH = DATA_DIR / "database" / "fincafacil.db"
+    BACKUP_DIR = DATA_DIR / "backup"
+    LOG_DIR = DATA_DIR / "logs"
+    ASSETS_DIR = INSTALL_DIR / "assets"
 
     # Configuración de la aplicación
     APP_NAME = "FincaFacil"
@@ -35,7 +42,7 @@ class Config:
     LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     # Archivo de preferencias de usuario
-    PREFERENCES_FILE = BASE_DIR / "config" / "user_preferences.json"
+    PREFERENCES_FILE = DATA_DIR / "config" / "user_preferences.json"
 
     def __init__(self):
         # Asegurar directorios al inicializar
@@ -44,15 +51,14 @@ class Config:
     def _ensure_directories(self):
         """Asegura que los directorios necesarios existan"""
         directories = [
-            self.BASE_DIR / "database",
-            self.BACKUP_DIR, 
-            self.LOG_DIR, 
-            self.ASSETS_DIR,
-            self.BASE_DIR / "exports",
-            self.BASE_DIR / "uploads",
-            self.BASE_DIR / "config"
+            self.DB_PATH.parent,
+            self.BACKUP_DIR,
+            self.LOG_DIR,
+            self.DATA_DIR / "exports",
+            self.DATA_DIR / "uploads",
+            self.DATA_DIR / "config",
         ]
-        
+
         for directory in directories:
             directory.mkdir(exist_ok=True, parents=True)
             print(f"[OK] Directorio verificado: {directory}")

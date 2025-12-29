@@ -2,6 +2,8 @@ import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 from typing import List, Any, Optional
+import sqlite3
+from matplotlib.figure import Figure
 
 try:
     from database import get_db_connection
@@ -147,9 +149,10 @@ class RealizarInventarioFrame(ctk.CTkFrame):
         sel = self.tree.focus()
         if not sel:
             return
-        vals = list(self.tree.item(sel, 'values'))
-        codigo = vals[0]
-        peso_ant = float(vals[2] or 0)
+        vals_tuple = self.tree.item(sel, 'values')
+        vals: List[Any] = list(vals_tuple) if vals_tuple else []
+        codigo = str(vals[0]) if vals else ""
+        peso_ant = float(vals[2] or 0) if len(vals) > 2 else 0.0
         top = ctk.CTkToplevel(self)
         top.title(f"Peso nuevo - {codigo}")
         ctk.CTkLabel(top, text=f"Peso anterior: {peso_ant} kg").pack(padx=8, pady=(10,4))
@@ -159,7 +162,7 @@ class RealizarInventarioFrame(ctk.CTkFrame):
             try:
                 peso_nuevo = float(entry.get())
                 dif = peso_nuevo - peso_ant
-                vals[3] = peso_nuevo
+                vals[3] = str(peso_nuevo)
                 vals[4] = f"{dif:+.2f}"
                 self.tree.item(sel, values=vals)
                 self.nuevos_pesos[codigo] = peso_nuevo
@@ -279,7 +282,7 @@ class RealizarInventarioFrame(ctk.CTkFrame):
             inv = inv or 0; noinv = noinv or 0
             top = ctk.CTkToplevel(self)
             top.title("Inventariados vs Faltantes")
-            fig = plt.Figure(figsize=(4,3))
+            fig = Figure(figsize=(4,3))
             ax = fig.add_subplot(111)
             ax.bar(["Inventariados","Faltantes"], [inv, noinv], color=['#4caf50','#f44336'])
             for i, v in enumerate([inv, noinv]):

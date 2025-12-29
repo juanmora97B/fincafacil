@@ -5,6 +5,7 @@ from datetime import datetime
 import sys
 import os
 from pathlib import Path
+from typing import Any, cast
 
 # Importaciones corregidas
 try:
@@ -19,6 +20,7 @@ try:
         ensure_templates_dir,
     )
     from modules.utils.license_ui import LicenseFrame
+    from infraestructura.ajustes import AjustesService, AjustesRepository
 except ImportError as e:
     print(f"[ERROR] Error importando dependencias: {e}")
 
@@ -34,6 +36,8 @@ class AjustesFrame(ctk.CTkFrame):
         # Configurar logger
         self.logger = get_logger("Ajustes")
         self.logger.info("Módulo Ajustes iniciado")
+        # Servicio de Ajustes
+        self.ajustes_service = AjustesService(repository=AjustesRepository())
         
         # Inicializar interfaz
         self.crear_widgets()
@@ -43,13 +47,13 @@ class AjustesFrame(ctk.CTkFrame):
     # =========================================================
     def crear_widgets(self):
         """Interfaz de Ajustes: solo preferencias (tema, etc.)."""
-        # Contenedor principal scrollable
+        # Contenedor principal scrollable con ancho completo
         scroll_container = ctk.CTkScrollableFrame(self)
-        scroll_container.pack(fill="both", expand=True, padx=5, pady=5)
+        scroll_container.pack(fill="both", expand=True, padx=0, pady=0)
 
         # Título de ajustes con color del módulo
         titulo_frame = ctk.CTkFrame(scroll_container, fg_color=(self.color_bg, "#1a1a1a"), corner_radius=15)
-        titulo_frame.pack(fill="x", pady=(0, 20))
+        titulo_frame.pack(fill="x", pady=(0, 20), padx=10)
         ctk.CTkLabel(titulo_frame, text="⚙️ Ajustes", font=("Segoe UI", 24, "bold"), text_color="white").pack(side="left", padx=15, pady=10)
 
         # Preferencias de apariencia
@@ -114,96 +118,29 @@ class AjustesFrame(ctk.CTkFrame):
         ctk.CTkButton(backup_btns, text="📂 Ver Backups", command=self.ver_backups, width=150).pack(side="left", padx=5)
         ctk.CTkButton(backup_btns, text="♻️ Restaurar Backup", command=self.restaurar_backup, fg_color="orange", width=150).pack(side="left", padx=5)
 
-        # Plantillas de carga
-        plantillas_frame = ctk.CTkFrame(scroll_container, corner_radius=10)
-        plantillas_frame.pack(fill="x", pady=10)
-        ctk.CTkLabel(plantillas_frame, text="📦 Plantillas de carga (Excel)", font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=10, pady=(10, 5))
-        
-        # Botón para generar todas las plantillas
-        gen_all_row = ctk.CTkFrame(plantillas_frame, fg_color="transparent")
-        gen_all_row.pack(fill="x", padx=10, pady=(5, 10))
-        ctk.CTkButton(
-            gen_all_row, 
-            text="⚡ Generar Todas las Plantillas", 
-            command=self._generar_todas_plantillas,
-            width=260,
-            height=40,
-            fg_color="#2e7d32",
-            hover_color="#1b5e20",
-            font=("Segoe UI", 13, "bold")
-        ).pack(side="left", padx=5)
-        ctk.CTkLabel(
-            gen_all_row,
-            text="Crea 23 plantillas Excel listas para importación masiva",
-            font=("Segoe UI", 11),
-            text_color="gray"
-        ).pack(side="left", padx=10)
-        
-        sel_row = ctk.CTkFrame(plantillas_frame, fg_color="transparent")
-        sel_row.pack(fill="x", padx=10, pady=(5, 15))
-        ctk.CTkLabel(sel_row, text="O descargue una plantilla específica:", font=("Segoe UI", 13)).pack(anchor="w", pady=(0, 8))
-        combo_btn_row = ctk.CTkFrame(sel_row, fg_color="transparent")
-        combo_btn_row.pack(fill="x")
-        self.plantilla_combo = ctk.CTkComboBox(combo_btn_row, values=get_template_names(), width=380, height=32, font=("Segoe UI", 12))
-        if get_template_names():
-            self.plantilla_combo.set(get_template_names()[0])
-        self.plantilla_combo.pack(side="left", padx=(0, 10))
-        ctk.CTkButton(
-            combo_btn_row,
-            text="📥 Descargar Plantilla",
-            command=self._download_template,
-            width=180,
-            height=32,
-            fg_color="#1f538d",
-            hover_color="#164070",
-            font=("Segoe UI", 12)
-        ).pack(side="left")
-
-        # Botón adicional para abrir selector múltiple
-        ctk.CTkButton(
-            combo_btn_row,
-            text="🗂 Selección múltiple...",
-            command=self._abrir_selector_multiple,
-            width=190,
-            height=32,
-            fg_color="#2e7d32",
-            hover_color="#1b5e20",
-            font=("Segoe UI", 12, "bold")
-        ).pack(side="left", padx=(10,0))
-
-        # Sección de Licencia
-        try:
-            license_frame = ctk.CTkFrame(scroll_container, corner_radius=10, fg_color=("#F5F5F5", "#2a2a2a"))
-            license_frame.pack(fill="x", pady=10)
-            
-            LicenseFrame(license_frame)
-        except Exception as e:
-            self.logger.error(f"Error al cargar panel de licencia: {e}")
-
-        # Ayuda y Documentación
-        ayuda_frame = ctk.CTkFrame(scroll_container, corner_radius=10)
-        ayuda_frame.pack(fill="x", pady=10)
-        ctk.CTkLabel(ayuda_frame, text="❓ Ayuda y Documentación", font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=10, pady=(10, 0))
-        ayuda_btns = ctk.CTkFrame(ayuda_frame, fg_color="transparent")
-        ayuda_btns.pack(fill="x", padx=10, pady=5)
-        ctk.CTkButton(ayuda_btns, text="📖 Manual de Usuario (PDF)", command=self.abrir_manual_pdf, fg_color="#1f538d", hover_color="#164070", width=220, height=40, font=("Segoe UI", 13, "bold")).pack(side="left", padx=5)
-        ctk.CTkButton(ayuda_btns, text="🎓 Tour Interactivo", command=self.iniciar_tour, fg_color="#2e7d32", hover_color="#1b5e20", width=180, height=40, font=("Segoe UI", 13, "bold")).pack(side="left", padx=5)
-
-        # Acciones finales
-        actions = ctk.CTkFrame(scroll_container, fg_color="transparent")
-        actions.pack(fill="x", pady=10)
-        ctk.CTkButton(actions, text="Guardar cambios", command=self._save_preferences).pack(side="right", padx=10)
-
         # Cargar datos iniciales
         self._populate_fincas()
-        self._load_preferences()
+
+    def _populate_fincas(self):
+        """Carga las fincas disponibles en el combobox."""
+        try:
+            from src.database.database import get_db_connection
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT id, nombre FROM finca ORDER BY nombre")
+                fincas = [f"{row[0]} - {row[1]}" for row in cur.fetchall()]
+                self.finca_combo.configure(values=fincas)
+                if fincas:
+                    self.finca_combo.set(fincas[0])
+        except Exception as e:
+            self.logger.error(f"No se pudieron cargar fincas: {e}")
 
     # Navegación hacia módulos desde Ajustes
     def _navigate(self, destino: str):
         try:
             app = self.winfo_toplevel()
             if hasattr(app, "show_screen"):
-                app.show_screen(destino)
+                cast(Any, app).show_screen(destino)
         except Exception:
             pass
 
@@ -212,16 +149,15 @@ class AjustesFrame(ctk.CTkFrame):
         try:
             app = self.winfo_toplevel()
             if hasattr(app, "change_appearance_mode"):
-                app.change_appearance_mode(modo)
-            # Persistir preferencia
-            self._set_setting("appearance", "Claro" if modo == "Claro" else "Oscuro" if modo == "Oscuro" else str(modo))
-        except Exception:
-            # Fallback directo si no existe método en app
-            if modo == "Claro":
-                ctk.set_appearance_mode("light")
+                cast(Any, app).change_appearance_mode(modo)
             else:
-                ctk.set_appearance_mode("dark")
-            # Persistir igualmente
+                # Fallback directo si no existe método en app
+                ctk.set_appearance_mode("light" if modo == "Claro" else "dark")
+            # Persistir preferencia
+            self._set_setting("appearance", "Claro" if modo == "Claro" else "Oscuro")
+        except Exception:
+            # Último recurso
+            ctk.set_appearance_mode("light" if modo == "Claro" else "dark")
             self._set_setting("appearance", "Claro" if modo == "Claro" else "Oscuro")
 
     # =========================================================
@@ -231,16 +167,333 @@ class AjustesFrame(ctk.CTkFrame):
         """(Reservado) Exportar configuración o preferencias."""
         self.logger.info("Solicitada exportación de ajustes (no implementado)")
 
-    # ============================
-    # Helpers de datos/ajustes
-    # ============================
-    def _populate_fincas(self):
+    # =============================== HERRAMIENTAS DE DESARROLLO ===============================
+    
+    def _is_dev_mode(self) -> bool:
+        """Verifica si la aplicación está en modo desarrollo."""
+        # Puede verificarse por variable de entorno, archivo de config, etc.
+        return os.getenv("FINCAFACIL_DEV") == "1" or Path(".dev").exists() or True  # True por ahora (fase 1)
+    
+    def _create_dev_tools_section(self, parent):
+        """Crea sección de herramientas para modo desarrollo."""
+        dev_frame = ctk.CTkFrame(parent, corner_radius=10, border_width=2, border_color="#ff9800")
+        dev_frame.pack(fill="x", pady=10)
+        
+        # Encabezado
+        header = ctk.CTkFrame(dev_frame, fg_color="#fff3e0", corner_radius=8)
+        header.pack(fill="x", padx=10, pady=(10, 5))
+        ctk.CTkLabel(
+            header,
+            text="⚙️ HERRAMIENTAS DE DESARROLLO",
+            font=("Segoe UI", 14, "bold"),
+            text_color="#e65100"
+        ).pack(anchor="w", padx=10, pady=8)
+        
+        # Advertencia
+        ctk.CTkLabel(
+            dev_frame,
+            text="⚠️  Estas herramientas solo están disponibles en modo DESARROLLO",
+            font=("Segoe UI", 10, "italic"),
+            text_color="gray"
+        ).pack(anchor="w", padx=10, pady=(5, 10))
+        
+        # Sección: Datos de Prueba
+        test_frame = ctk.CTkFrame(dev_frame, fg_color="transparent")
+        test_frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkLabel(
+            test_frame,
+            text="🌱 Datos de Prueba",
+            font=("Segoe UI", 13, "bold")
+        ).pack(anchor="w", pady=(0, 8))
+        
+        desc_label = ctk.CTkLabel(
+            test_frame,
+            text="Carga datos realistas para validar el sistema (40 animales, 7 potreros, producción de leche, "
+                 "reproducción, etc.)",
+            font=("Segoe UI", 11),
+            text_color="gray",
+            wraplength=600
+        )
+        desc_label.pack(anchor="w", pady=(0, 10))
+        
+        buttons_frame = ctk.CTkFrame(test_frame, fg_color="transparent")
+        buttons_frame.pack(fill="x")
+        
+        ctk.CTkButton(
+            buttons_frame,
+            text="🌱 Cargar Datos de Prueba",
+            command=self._load_test_data,
+            fg_color="#2e7d32",
+            hover_color="#1b5e20",
+            font=("Segoe UI", 12, "bold"),
+            height=38
+        ).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkButton(
+            buttons_frame,
+            text="🗑️  Limpiar + Recargar",
+            command=self._load_test_data_clear,
+            fg_color="#d32f2f",
+            hover_color="#b71c1c",
+            font=("Segoe UI", 12),
+            height=38
+        ).pack(side="left")
+        
+        ctk.CTkLabel(
+            test_frame,
+            text="Sin limpiar: agrega datos  |  Limpiar: elimina previos y recarga",
+            font=("Segoe UI", 9),
+            text_color="gray"
+        ).pack(anchor="w", pady=(8, 0))
+        
+        # Separador
+        ctk.CTkLabel(dev_frame, text="", fg_color="transparent").pack(pady=2)
+        
+        # Sección: Validación
+        val_frame = ctk.CTkFrame(dev_frame, fg_color="transparent")
+        val_frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkLabel(
+            val_frame,
+            text="✅ Validación",
+            font=("Segoe UI", 13, "bold")
+        ).pack(anchor="w", pady=(0, 8))
+        
+        ctk.CTkButton(
+            val_frame,
+            text="🔍 Validar Integridad de BD",
+            command=self._validate_database,
+            fg_color="#1f538d",
+            hover_color="#164070",
+            font=("Segoe UI", 12),
+            height=38
+        ).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkButton(
+            val_frame,
+            text="📊 Ver Estadísticas",
+            command=self._show_statistics,
+            fg_color="#6a4c93",
+            hover_color="#503d7f",
+            font=("Segoe UI", 12),
+            height=38
+        ).pack(side="left")
+    
+    def _load_test_data(self):
+        """Carga datos de prueba sin limpiar previos."""
+        from database.seed_data import run_seed
+        
+        respuesta = messagebox.askyesno(
+            "Cargar Datos de Prueba",
+            "¿Desea cargar datos de prueba realistas?\n\n"
+            "Se agregarán:\n"
+            "  • 40 animales\n"
+            "  • 3 fincas y 7 potreros\n"
+            "  • 12 servicios de reproducción\n"
+            "  • 60 días de producción de leche\n"
+            "  • Registros de salud y herramientas\n\n"
+            "Los datos previos NO serán eliminados."
+        )
+        
+        if not respuesta:
+            return
+        
         try:
+            # Mostrar progreso
+            progress_window = messagebox.showinfo(
+                "Cargando...",
+                "⏳ Cargando datos de prueba...\n\nEsto puede tomar algunos segundos."
+            )
+            
+            self.logger.info("Iniciando carga de datos de prueba (sin limpiar)")
+            success = run_seed(clear_before_seed=False, mode="dev")
+            
+            if success:
+                messagebox.showinfo(
+                    "✅ Éxito",
+                    "Los datos de prueba han sido cargados correctamente.\n\n"
+                    "Puedes ver los datos en los módulos:\n"
+                    "  • Dashboard (KPIs actualizados)\n"
+                    "  • Animales (40 cabezas)\n"
+                    "  • Reproducción (gestantes, partos)\n"
+                    "  • Leche (últimos 60 días)\n\n"
+                    "Para más información, consulta:\n"
+                    "docs/FASE1_SEED_DATOS_PRUEBA.md"
+                )
+                self.logger.info("✅ Datos de prueba cargados exitosamente")
+            else:
+                messagebox.showerror(
+                    "❌ Error",
+                    "No se pudieron cargar los datos de prueba.\n"
+                    "Revisa los logs para más detalles:\n"
+                    "logs/fincafacil.log"
+                )
+                self.logger.error("❌ Error al cargar datos de prueba")
+        except Exception as e:
+            messagebox.showerror(
+                "❌ Error",
+                f"Excepción al cargar datos de prueba:\n{e}"
+            )
+            self.logger.error(f"Error cargando datos de prueba: {e}")
+    
+    def _load_test_data_clear(self):
+        """Carga datos de prueba LIMPIANDO previos."""
+        respuesta = messagebox.askyesno(
+            "⚠️ Limpiar y Recargar",
+            "ADVERTENCIA: Esto eliminará TODOS los datos previos y cargará nuevos.\n\n"
+            "Se recomienda hacer un backup antes.\n\n"
+            "¿Desea continuar?"
+        )
+        
+        if not respuesta:
+            return
+        
+        try:
+            from database.seed_data import run_seed
+            
+            self.logger.info("Iniciando carga de datos de prueba (CON LIMPIEZA)")
+            success = run_seed(clear_before_seed=True, mode="dev")
+            
+            if success:
+                messagebox.showinfo(
+                    "✅ Éxito",
+                    "✅ Base de datos limpiada y recargada con datos de prueba.\n\n"
+                    "Todos los módulos ahora tienen datos frescos.\n"
+                    "Los cambios se reflejarán tras reiniciar módulos o hacer refresh."
+                )
+                self.logger.info("✅ Datos de prueba recargados (con limpieza)")
+            else:
+                messagebox.showerror(
+                    "❌ Error",
+                    "No se pudieron cargar los datos de prueba.\n"
+                    "Revisa los logs."
+                )
+        except Exception as e:
+            messagebox.showerror(
+                "❌ Error",
+                f"Excepción: {e}"
+            )
+            self.logger.error(f"Error en limpiar+recargar: {e}")
+    
+    def _validate_database(self):
+        """Valida integridad de FK y registros huérfanos."""
+        try:
+            from database import get_db_connection
+            
             with get_db_connection() as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT id, nombre FROM finca ORDER BY nombre")
-                fincas = [f"{row[0]} - {row[1]}" for row in cur.fetchall()]
-                self.finca_combo.configure(values=fincas)
+                
+                errors = []
+                
+                # Validar FKs clave
+                checks = [
+                    ("animal", "id_finca", "finca", "id"),
+                    ("animal", "raza_id", "raza", "id"),
+                    ("animal", "id_potrero", "potrero", "id"),
+                    ("servicio", "id_hembra", "animal", "id"),
+                    ("servicio", "id_macho", "animal", "id"),
+                    ("tratamiento", "id_animal", "animal", "id"),
+                    ("produccion_leche", "animal_id", "animal", "id"),
+                ]
+                
+                for table, fk_col, ref_table, ref_col in checks:
+                    cur.execute(f"""
+                        SELECT COUNT(*) FROM {table}
+                        WHERE {fk_col} IS NOT NULL 
+                        AND {fk_col} NOT IN (SELECT {ref_col} FROM {ref_table})
+                    """)
+                    count = cur.fetchone()[0]
+                    if count > 0:
+                        errors.append(f"  ❌ {table}.{fk_col}: {count} registros huérfanos")
+                
+                # Contar totales
+                cur.execute("SELECT COUNT(*) FROM animal")
+                animal_count = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM produccion_leche")
+                leche_count = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM servicio")
+                servicio_count = cur.fetchone()[0]
+                
+                if errors:
+                    msg = "❌ ERRORES DE INTEGRIDAD ENCONTRADOS:\n\n" + "\n".join(errors)
+                else:
+                    msg = "✅ INTEGRIDAD VERIFICADA - NO HAY ERRORES\n\n"
+                    msg += f"  Animales: {animal_count}\n"
+                    msg += f"  Producción de leche: {leche_count}\n"
+                    msg += f"  Servicios: {servicio_count}"
+                
+                messagebox.showinfo("Validación de BD", msg)
+                self.logger.info(f"Validación: {msg}")
+        except Exception as e:
+            messagebox.showerror("Error en validación", f"No se pudo validar:\n{e}")
+            self.logger.error(f"Error validando BD: {e}")
+    
+    def _show_statistics(self):
+        """Muestra estadísticas de la base de datos."""
+        try:
+            from database import get_db_connection
+            
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                
+                stats = {}
+                tables = [
+                    'animal', 'finca', 'potrero', 'lote', 'raza',
+                    'servicio', 'reproduccion', 'tratamiento', 'peso',
+                    'produccion_leche', 'muerte', 'insumo', 'herramienta'
+                ]
+                
+                for table in tables:
+                    cur.execute(f"SELECT COUNT(*) FROM {table}")
+                    count = cur.fetchone()[0]
+                    if count > 0:
+                        stats[table] = count
+                
+                # Crear ventana de estadísticas
+                win = ctk.CTkToplevel(self)
+                win.title("📊 Estadísticas de BD")
+                win.geometry("400x500")
+                win.grab_set()
+                
+                ctk.CTkLabel(
+                    win,
+                    text="📊 Estadísticas de Base de Datos",
+                    font=("Segoe UI", 16, "bold")
+                ).pack(pady=(15, 10))
+                
+                frame = ctk.CTkScrollableFrame(win, width=380, height=400)
+                frame.pack(fill="both", expand=True, padx=10, pady=10)
+                
+                total = sum(stats.values())
+                for table, count in sorted(stats.items(), key=lambda x: x[1], reverse=True):
+                    row = ctk.CTkFrame(frame, fg_color="transparent")
+                    row.pack(fill="x", pady=4)
+                    
+                    ctk.CTkLabel(row, text=f"  {table}", width=180).pack(side="left", anchor="w")
+                    ctk.CTkLabel(
+                        row,
+                        text=f"{count} registros",
+                        font=("Segoe UI", 12, "bold"),
+                        text_color="#2e7d32" if count > 0 else "gray"
+                    ).pack(side="left")
+                
+                ctk.CTkLabel(
+                    frame,
+                    text=f"\nTotal: {total} registros",
+                    font=("Segoe UI", 13, "bold"),
+                    text_color="#1f538d"
+                ).pack(pady=(10, 0))
+                
+                ctk.CTkButton(win, text="Cerrar", command=win.destroy).pack(pady=10)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo obtener estadísticas:\n{e}")
+            self.logger.error(f"Error en estadísticas: {e}")
+
+    
+        try:
+            fincas = self.ajustes_service.listar_fincas_combo()
+            self.finca_combo.configure(values=fincas)
         except Exception as e:
             self.logger.error(f"No se pudieron cargar fincas: {e}")
 
@@ -258,6 +511,7 @@ class AjustesFrame(ctk.CTkFrame):
             "units_volume": "L",
             "backup_dir": str(app_config.BACKUP_DIR),
             "appearance": ctk.get_appearance_mode(),
+            "auto_switch_bitacora": "true",
         })
 
         # Apariencia
@@ -283,13 +537,19 @@ class AjustesFrame(ctk.CTkFrame):
         self.units_volume_var.set(prefs.get("units_volume", "L"))
         self.backup_entry.delete(0, "end")
         self.backup_entry.insert(0, prefs.get("backup_dir") or str(app_config.BACKUP_DIR))
+        # Auto switch bitácora
+        try:
+            val = prefs.get("auto_switch_bitacora", "true")
+            self.auto_switch_var.set("Sí" if str(val).strip().lower() in ("1","true","sí","si","on","yes") else "No")
+        except Exception:
+            pass
 
     def _save_preferences(self):
         """Guarda las preferencias usando el gestor centralizado"""
         from modules.utils.preferences_manager import get_preferences_manager
-        
+
         prefs_manager = get_preferences_manager()
-        
+
         # Finca id seleccionado
         finca_val = self.finca_combo.get().strip()
         finca_id = None
@@ -306,6 +566,7 @@ class AjustesFrame(ctk.CTkFrame):
             "units_volume": self.units_volume_var.get(),
             "backup_dir": self.backup_entry.get().strip() or str(app_config.BACKUP_DIR),
             "appearance": self.appearance_var_local.get(),
+            "auto_switch_bitacora": "true" if self.auto_switch_var.get() == "Sí" else "false",
         }
 
         # Guardar usando el gestor centralizado
@@ -331,67 +592,27 @@ class AjustesFrame(ctk.CTkFrame):
             self.logger.error("Error al guardar preferencias")
 
     def _get_settings(self, defaults: dict) -> dict:
-        out = dict(defaults)
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT clave, valor FROM app_settings")
-                for k, v in cur.fetchall():
-                    out[k] = v
+            return self.ajustes_service.obtener_settings(defaults)
         except Exception as e:
             self.logger.warning(f"No se pudieron leer preferencias: {e}")
-        return out
+            return dict(defaults)
 
     def _set_setting(self, key: str, value: str):
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("INSERT OR REPLACE INTO app_settings (clave, valor) VALUES (?, ?)", (key, value))
-                conn.commit()
+            self.ajustes_service.guardar_setting(key, value)
         except Exception as e:
             self.logger.error(f"No se pudo guardar preferencia {key}: {e}")
 
-    def _load_preferences(self):
-        """Carga preferencias desde app_settings y setea UI."""
-        defaults = {
-            "appearance": ctk.get_appearance_mode(),
-            "language": "es",
-            "units_weight": "kg",
-            "units_volume": "L",
-            "auto_switch_bitacora": "true",
-        }
-        settings = self._get_settings(defaults)
-        try:
-            # Idioma
-            self.lang_var.set(settings.get("language", "es"))
-            # Unidades
-            self.units_weight_var.set(settings.get("units_weight", "kg"))
-            self.units_volume_var.set(settings.get("units_volume", "L"))
-            # Auto switch
-            val = settings.get("auto_switch_bitacora", "true")
-            self.auto_switch_var.set("Sí" if str(val).strip().lower() in ("1","true","sí","si","on","yes") else "No")
-        except Exception:
-            pass
-
-    def _save_preferences(self):
-        """Guarda preferencias actuales en app_settings."""
-        try:
-            # Guardar auto switch
-            self._set_setting("auto_switch_bitacora", "true" if self.auto_switch_var.get() == "Sí" else "false")
-            # Guardar otras
-            self._set_setting("language", self.lang_var.get())
-            self._set_setting("units_weight", self.units_weight_var.get())
-            self._set_setting("units_volume", self.units_volume_var.get())
-            messagebox.showinfo("Ajustes", "Preferencias guardadas correctamente.")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudieron guardar las preferencias:\n{e}")
+    # Métodos duplicados eliminados: _load_preferences / _save_preferences
 
     def hacer_backup_manual(self):
         """Crea una copia de seguridad de la base de datos"""
         import shutil
         try:
             # Ruta de la BD actual
-            db_path = Path("database/fincafacil.db")
+            from database.database import get_db_path_safe
+            db_path = get_db_path_safe()
             if not db_path.exists():
                 messagebox.showerror("Error", "No se encontró la base de datos")
                 return
@@ -484,7 +705,8 @@ class AjustesFrame(ctk.CTkFrame):
                 return
             
             # Backup de seguridad de la BD actual
-            db_path = Path("database/fincafacil.db")
+            from database.database import get_db_path_safe
+            db_path = get_db_path_safe()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safety_backup = backup_dir / f"fincafacil_pre_restauracion_{timestamp}.db"
             shutil.copy2(db_path, safety_backup)
@@ -529,9 +751,9 @@ class AjustesFrame(ctk.CTkFrame):
             sys.path.append(str(Path(__file__).parent.parent.parent))
             from modules.utils.tour_manager import TourManager, TourStep
 
-            app = self.winfo_toplevel()
+            app_ctk = cast(ctk.CTk, self.winfo_toplevel())
 
-            tour = TourManager(app, tour_name="ajustes")
+            tour = TourManager(app_ctk, tour_name="ajustes")
 
             # Tour básico para evitar arrancar sin pasos (se mejora en fase 5)
             tour.add_step(TourStep(

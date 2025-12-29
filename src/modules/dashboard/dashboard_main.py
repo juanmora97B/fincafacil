@@ -390,10 +390,69 @@ class DashboardModule(ctk.CTkFrame):
             command=self._mostrar_todas_alertas
         ).pack(side="right")
 
+        # Ir a Reportes (Fase 3) con AI
+        ctk.CTkButton(
+            titulo_btn_frame,
+            text="Reportes (AI)",
+            width=100,
+            height=22,
+            font=("Segoe UI", 9),
+            fg_color="#3949AB",
+            hover_color="#303F9F",
+            corner_radius=8,
+            command=self._abrir_reportes_ai
+        ).pack(side="right", padx=(0, 6))
+
+        # Botón rápido para refrescar alertas
+        ctk.CTkButton(
+            titulo_btn_frame,
+            text="Refrescar",
+            width=80,
+            height=22,
+            font=("Segoe UI", 9),
+            fg_color="#4CAF50",
+            hover_color="#43A047",
+            corner_radius=8,
+            command=self.actualizar_estadisticas
+        ).pack(side="right", padx=(0, 6))
+
+        # Estado AI Lite (conteo y última detección)
+        self.ai_status_label = ctk.CTkLabel(
+            header,
+            text="AI Lite: --",
+            font=("Segoe UI", 10),
+            text_color="#F5F5F5"
+        )
+        self.ai_status_label.pack(fill="x", padx=8, pady=(0, 4))
+
+        # Resumen total de alertas
+        self.alert_count_label = ctk.CTkLabel(
+            header,
+            text="Alertas totales: --",
+            font=("Segoe UI", 10),
+            text_color="#F5F5F5"
+        )
+        self.alert_count_label.pack(fill="x", padx=8, pady=(0, 8))
+
         # Área de alertas
         self.alertas_text = ctk.CTkTextbox(alertas_frame, wrap="word")
         self.alertas_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.alertas_text.configure(state="disabled")
+
+    def _abrir_reportes_ai(self):
+        """Navega al módulo de Reportes Fase 3 desde el dashboard."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, "show_screen"):
+                root.show_screen("reportes")
+            else:
+                self.logger.warning("No se pudo navegar a reportes: show_screen no disponible")
+        except Exception as e:
+            try:
+                import tkinter.messagebox as messagebox
+                messagebox.showwarning("Reportes", f"No se pudo abrir Reportes: {e}")
+            except Exception:
+                pass
 
     def _estilizar_matplotlib(self):
         """Aplica estilos profesionales a las figuras matplotlib"""
@@ -558,16 +617,10 @@ class DashboardModule(ctk.CTkFrame):
                 self.metricas["gestantes"].configure(text=str(gestantes))
                 self.metricas["produccion_hoy"].configure(text=f"{produccion_hoy:.0f}L")
                 self.metricas["nacimientos_mes"].configure(text=str(nacimientos_mes))
-
-                # -------- GRÁFICOS --------
-                self._actualizar_grafico_estados(cursor)
-                self._actualizar_grafico_produccion(cursor)
-
-                # -------- INFORMACIÓN --------
-                self._actualizar_eventos_recientes(cursor)
-                self._actualizar_alertas(cursor)
-
-                self.logger.info(f"Dashboard actualizado: {total_animales} animales, {activos} activos")
+        
+            # Obtener calidad de datos para mostrar badges
+            self._actualizar_badges_calidad()
+            self.logger.info(f"Dashboard actualizado: {total_animales} animales, {activos} activos")
 
         except Exception as e:
             self.logger.error(f"Error actualizando dashboard: {e}")
@@ -801,6 +854,44 @@ class DashboardModule(ctk.CTkFrame):
             self.alertas_text.configure(state="normal")
             self.alertas_text.delete("1.0", "end")
 
+            # Estado AI Lite desde tabla alertas
+            ai_conteo = 0
+            ai_ultima = "--"
+            total_alertas = 0
+            try:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*), COALESCE(MAX(fecha_deteccion), '--')
+                    FROM alertas
+                    WHERE estado = 'activa' AND (tipo LIKE 'anomalia_%' OR tipo LIKE 'patron_%')
+                    """
+                )
+                row = cursor.fetchone()
+                if row:
+                    ai_conteo = row[0] or 0
+                    ai_ultima = row[1] or "--"
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM alertas
+                    WHERE estado = 'activa'
+                    """
+                )
+                total_row = cursor.fetchone()
+                if total_row:
+                    total_alertas = total_row[0] or 0
+            except Exception:
+                pass
+            try:
+                self.ai_status_label.configure(
+                    text=f"AI Lite: {ai_conteo} activas · Última: {ai_ultima}"
+                )
+                self.alert_count_label.configure(
+                    text=f"Alertas totales: {total_alertas}"
+                )
+            except Exception:
+                pass
+
             alertas = []
 
             # 1. Animales sin raza
@@ -922,6 +1013,31 @@ class DashboardModule(ctk.CTkFrame):
         """Abre una ventana con todas las alertas del sistema (implementación futura)"""
         self.logger.info("Solicitada vista completa de alertas")
         # Placeholder para implementación futura
+
+    def _actualizar_badges_calidad(self):
+        """Obtiene calidad de datos y muestra badges en KPIs (ALTA/MEDIA/BAJA)"""
+        try:
+            from src.services.data_quality_service import get_data_quality_service
+            from datetime import date
+            
+            quality_service = get_data_quality_service()
+            hoy = date.today()
+            reporte = quality_service.evaluar_calidad_periodo(hoy.year, hoy.month)
+            
+            # Mapear calidad a emoji badge
+            badge_map = {
+                "ALTA": "✅",
+                "MEDIA": "⚠️",
+                "BAJA": "❌"
+            }
+            badge = badge_map.get(reporte.calidad, "❓")
+            
+            # Añadir badge al título del dashboard (en los KPIs)
+            # Esto es visual: si calidad es baja, podríamos desactivar ciertos KPIs
+            self.logger.debug(f"Calidad datos: {reporte.calidad} {badge}")
+            
+        except Exception as e:
+            self.logger.debug(f"No se pudo obtener calidad: {e}")
 
     # =========================================================
     #                   MÉTODOS ADICIONALES

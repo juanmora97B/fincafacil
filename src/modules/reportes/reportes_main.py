@@ -489,7 +489,7 @@ class ReportesModule(ctk.CTkFrame):
             self.logger.error(f"Error en inventario: {e}")
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-        tabla.configure(yscroll=scrollbar.set)
+        tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
     def generar_ventas(self):
@@ -580,7 +580,7 @@ class ReportesModule(ctk.CTkFrame):
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-        tabla.configure(yscroll=scrollbar.set)
+        tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
     def generar_tratamientos(self):
@@ -670,7 +670,7 @@ class ReportesModule(ctk.CTkFrame):
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-        tabla.configure(yscroll=scrollbar.set)
+        tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
     def generar_potreros(self):
@@ -745,7 +745,7 @@ class ReportesModule(ctk.CTkFrame):
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-        tabla.configure(yscroll=scrollbar.set)
+        tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
     def generar_actividad(self):
@@ -885,7 +885,7 @@ class ReportesModule(ctk.CTkFrame):
 
         tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-        tabla.configure(yscroll=scrollbar.set)
+        tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
     def generar_lotes(self):
@@ -1043,8 +1043,13 @@ Características próximas:
                     cursor = conn.cursor()
                     where_parts = []
                     params = []
-                    if self._pot_finca: where_parts.append("f.nombre = ?") or params.append(self._pot_finca)
-                    if self._pot_estado: where_parts.append("p.estado = ?") or params.append(self._pot_estado)
+                    
+                    if self._pot_finca:
+                        where_parts.append("f.nombre = ?")
+                        params.append(self._pot_finca)
+                    if self._pot_estado:
+                        where_parts.append("p.estado = ?")
+                        params.append(self._pot_estado)
                     where_clause = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
                     query = f"""
                         SELECT p.nombre, f.nombre, p.sector, p.area_hectareas, p.capacidad_maxima, p.tipo_pasto, p.estado, p.id
@@ -1171,10 +1176,11 @@ Características próximas:
                 
                 labels = list(razas_top.keys())
                 valores = list(razas_top.values())
-                colores_pie = plt.cm.Set3(range(len(labels)))
+                colores_pie = plt.get_cmap('Set3')(range(len(labels)))
                 
-                wedges, texts, autotexts = ax_raza.pie(valores, labels=labels, autopct='%1.1f%%', 
-                                                         colors=colores_pie, startangle=90, textprops={'fontsize': 9})
+                pie_result = ax_raza.pie(valores, labels=labels, autopct='%1.1f%%', 
+                                                         colors=colores_pie, startangle=90, textprops={'fontsize': 9})  # type: ignore[arg-type]
+                autotexts = pie_result[2] if len(pie_result) > 2 else []
                 ax_raza.set_title("Distribución por Raza", fontsize=12, fontweight='bold')
                 
                 # Mejorar legibilidad de porcentajes

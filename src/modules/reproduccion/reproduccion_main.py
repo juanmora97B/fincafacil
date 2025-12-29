@@ -10,7 +10,7 @@ import os
 import csv
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database.connection import get_db_connection
+from infraestructura.reproduccion import ReproduccionService
 from modules.utils.date_picker import attach_date_picker
 from modules.utils.colores import obtener_colores
 
@@ -19,12 +19,13 @@ from modules.utils.colores import obtener_colores
 class ModalRegistroParto(ctk.CTkToplevel):
     """Modal para registrar parto y opcionalmente crear la cría."""
 
-    def __init__(self, parent, servicio_id, hembra_id, codigo, nombre, on_success=None):
+    def __init__(self, parent, servicio_id, hembra_id, codigo, nombre, reproduccion_service, on_success=None):
         super().__init__(parent)
         self.servicio_id = servicio_id
         self.hembra_id = hembra_id
         self.codigo = codigo
         self.nombre = nombre or ""
+        self.reproduccion_service = reproduccion_service
         self.on_success = on_success
 
         self.title(f"Registrar Parto - {codigo}")
@@ -135,53 +136,28 @@ class ModalRegistroParto(ctk.CTkToplevel):
         registrar_cria = bool(self.chk_registrar_cria.get()) and estado_cria == "Vivo" and tipo_parto != "Aborto"
 
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
+            self.reproduccion_service.registrar_parto(
+                servicio_id=self.servicio_id,
+                hembra_id=self.hembra_id,
+                fecha_parto=fecha_parto,
+                tipo_parto=tipo_parto,
+                sexo_cria=sexo_cria,
+                peso_cria=peso_val,
+                estado_cria=estado_cria,
+                registrar_cria=registrar_cria,
+                observaciones=obs
+            )
 
-                cur.execute(
-                    "UPDATE servicio SET estado=?, fecha_parto_real=?, observaciones=? WHERE id=?",
-                    ("Parida" if estado_cria == "Vivo" else "Aborto", fecha_parto, obs, self.servicio_id),
-                )
-
-                cur.execute(
-                    """
-                    INSERT INTO comentario (id_animal, fecha, tipo, nota, autor)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        self.hembra_id,
-                        fecha_parto,
-                        "Parto",
-                        f"Parto {tipo_parto.lower()} - Cría {sexo_cria} - {estado_cria}" + (f" - Peso: {peso_val}kg" if peso_val else ""),
-                        os.getenv("USERNAME", "Sistema"),
-                    ),
-                )
-
-                if registrar_cria:
-                    cur.execute("SELECT MAX(CAST(SUBSTR(codigo, 2) AS INTEGER)) FROM animal WHERE codigo LIKE 'A%'")
-                    max_num = cur.fetchone()[0] or 0
-                    nuevo_codigo = f"A{max_num + 1:04d}"
-
-                    cur.execute("SELECT id_finca FROM animal WHERE id=?", (self.hembra_id,))
-                    finca_id = cur.fetchone()[0]
-
-                    cur.execute(
-                        """
-                        INSERT INTO animal (codigo, nombre, sexo, fecha_nacimiento, tipo_ingreso, id_madre,
-                                            estado, id_finca, peso_nacimiento)
-                        VALUES (?, ?, ?, ?, 'NACIMIENTO', ?, 'Activo', ?, ?)
-                        """,
-                        (nuevo_codigo, f"Cría de {self.nombre or self.codigo}", sexo_cria, fecha_parto, self.hembra_id, finca_id, peso_val),
-                    )
-                    messagebox.showinfo("Éxito", f"✅ Parto registrado\n✅ Cría creada: {nuevo_codigo}")
-                else:
-                    messagebox.showinfo("Éxito", "✅ Parto registrado")
-
-                conn.commit()
+            if registrar_cria:
+                messagebox.showinfo("Éxito", "✅ Parto registrado\n✅ Cría creada automáticamente")
+            else:
+                messagebox.showinfo("Éxito", "✅ Parto registrado")
 
             if self.on_success:
                 self.on_success()
             self.destroy()
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo registrar el parto:\n{e}")
 
@@ -192,6 +168,7 @@ class ReproduccionModule(ctk.CTkFrame):
         super().__init__(master)
         self.on_animal_selected = on_animal_selected
         self._fincas_cache = []
+        self.reproduccion_service = ReproduccionService()
         self.pack(fill="both", expand=True)
         # Colores del módulo
         self.color_bg, self.color_hover = obtener_colores('reproduccion')
@@ -238,27 +215,16 @@ class ReproduccionModule(ctk.CTkFrame):
         val = ctk.CTkLabel(info, text=valor, font=("Segoe UI", 14, "bold"))
         val.pack(anchor="w")
         ctk.CTkLabel(info, text=texto, font=("Segoe UI", 9), text_color="gray").pack(anchor="w")
-        frame.valor_label = val
+        frame.__dict__['valor_label'] = val  # type: ignore[attr-defined]
         return frame
 
     def _actualizar_badges(self):
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT COUNT(*) FROM servicio WHERE estado='Gestante'")
-                self.badge_gestantes.valor_label.configure(text=str(cur.fetchone()[0]))
-                cur.execute(
-                    """
-                    SELECT COUNT(*) FROM servicio
-                    WHERE estado='Gestante'
-                    AND DATE(fecha_servicio, '+280 days') BETWEEN DATE('now') AND DATE('now', '+7 days')
-                    """
-                )
-                self.badge_partos.valor_label.configure(text=str(cur.fetchone()[0]))
-                cur.execute("SELECT COUNT(*) FROM servicio WHERE tipo_servicio LIKE '%Inseminación%' AND DATE(fecha_servicio)>=DATE('now','-365 days')")
-                self.badge_ia.valor_label.configure(text=str(cur.fetchone()[0]))
-                cur.execute("SELECT COUNT(*) FROM servicio WHERE tipo_servicio='Monta Natural' AND DATE(fecha_servicio)>=DATE('now','-365 days')")
-                self.badge_montas.valor_label.configure(text=str(cur.fetchone()[0]))
+            stats = self.reproduccion_service.obtener_estadisticas_badges()
+            self.badge_gestantes.__dict__['valor_label'].configure(text=str(stats.get('gestantes', 0)))  # type: ignore[index]
+            self.badge_partos.__dict__['valor_label'].configure(text=str(stats.get('proximos_7_dias', 0)))  # type: ignore[index]
+            self.badge_ia.__dict__['valor_label'].configure(text=str(stats.get('inseminaciones', 0)))  # type: ignore[index]
+            self.badge_montas.__dict__['valor_label'].configure(text=str(stats.get('montas', 0)))  # type: ignore[index]
         except Exception as e:
             print(f"Error actualizando badges: {e}")
 
@@ -547,18 +513,16 @@ class ReproduccionModule(ctk.CTkFrame):
 
     def cargar_fincas(self):
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT id, nombre FROM finca WHERE estado='Activo' ORDER BY nombre")
-                self._fincas_cache = cur.fetchall()
-                fincas = [f"{r[0]} - {r[1]}" for r in self._fincas_cache]
-                if fincas:
-                    self.cb_finca_serv.configure(values=fincas)
-                    self.cb_finca_gest.configure(values=["Todas las fincas"] + fincas)
-                    self.cb_finca_partos.configure(values=["Todas las fincas"] + fincas)
-                    self.cb_finca_serv.set(fincas[0])
-                    self.cb_finca_gest.set("Todas las fincas")
-                    self.cb_finca_partos.set("Todas las fincas")
+            fincas_data = self.reproduccion_service.cargar_fincas()
+            self._fincas_cache = [(f['id'], f['nombre']) for f in fincas_data]
+            fincas = [f"{f['id']} - {f['nombre']}" for f in fincas_data]
+            if fincas:
+                self.cb_finca_serv.configure(values=fincas)
+                self.cb_finca_gest.configure(values=["Todas las fincas"] + fincas)
+                self.cb_finca_partos.configure(values=["Todas las fincas"] + fincas)
+                self.cb_finca_serv.set(fincas[0])
+                self.cb_finca_gest.set("Todas las fincas")
+                self.cb_finca_partos.set("Todas las fincas")
         except Exception as e:
             print(f"Error cargando fincas: {e}")
 
@@ -582,52 +546,24 @@ class ReproduccionModule(ctk.CTkFrame):
     def cargar_hembras(self):
         try:
             finca_id = self._parse_combo_id(self.cb_finca_serv.get())
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                if finca_id:
-                    cur.execute("""
-                        SELECT id, codigo, COALESCE(nombre,'') FROM animal
-                        WHERE sexo='Hembra' AND estado='Activo' AND (id_finca=? OR ? IS NULL)
-                        ORDER BY codigo
-                    """, (finca_id, finca_id))
-                else:
-                    cur.execute("""
-                        SELECT id, codigo, COALESCE(nombre,'') FROM animal
-                        WHERE sexo='Hembra' AND estado='Activo'
-                        ORDER BY codigo
-                    """)
-                hembras = [f"{r[0]}-{r[1]} {r[2]}".strip() for r in cur.fetchall()]
-                if hembras:
-                    self.cb_animal.configure(values=hembras)
-                    self.cb_animal.set(hembras[0])
-                self.cb_receptora.configure(values=hembras or ["(Sin datos)"])
+            hembras_data = self.reproduccion_service.cargar_hembras(finca_id)
+            hembras = [f"{h['id']}-{h['codigo']} {h['nombre']}".strip() for h in hembras_data]
+            if hembras:
+                self.cb_animal.configure(values=hembras)
+                self.cb_animal.set(hembras[0])
+            self.cb_receptora.configure(values=hembras or ["(Sin datos)"])
         except Exception as e:
             print(f"Error cargando hembras: {e}")
 
     def _cargar_toros(self):
         try:
             finca_id = self._parse_combo_id(self.cb_finca_serv.get())
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                if finca_id:
-                    # Filtrar toros por la finca seleccionada
-                    cur.execute("""
-                        SELECT id, codigo, COALESCE(nombre,'') FROM animal
-                        WHERE sexo='Macho' AND estado='Activo' AND id_finca=?
-                        ORDER BY codigo
-                    """, (finca_id,))
-                else:
-                    # Si no hay finca seleccionada, mostrar todos los toros
-                    cur.execute("""
-                        SELECT id, codigo, COALESCE(nombre,'') FROM animal
-                        WHERE sexo='Macho' AND estado='Activo'
-                        ORDER BY codigo
-                    """)
-                toros = [f"{r[0]}-{r[1]} {r[2]}".strip() for r in cur.fetchall()]
-                if toros:
-                    self.cb_toro.configure(values=toros)
-                    self.cb_toro.set(toros[0])
-                self.cb_donadora.configure(values=toros or ["(Sin datos)"])
+            machos_data = self.reproduccion_service.cargar_machos(finca_id)
+            toros = [f"{m['id']}-{m['codigo']} {m['nombre']}".strip() for m in machos_data]
+            if toros:
+                self.cb_toro.configure(values=toros)
+                self.cb_toro.set(toros[0])
+            self.cb_donadora.configure(values=toros or ["(Sin datos)"])
         except Exception as e:
             print(f"Error cargando toros: {e}")
 
@@ -692,46 +628,24 @@ class ReproduccionModule(ctk.CTkFrame):
                 return
 
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
+            obs = self.t_obs.get("1.0", "end-1c").strip()
+            obs_full = " | ".join(filter(None, [obs, extra_obs])) or None
 
-                cur.execute("SELECT COUNT(*) FROM servicio WHERE id_hembra=? AND estado='Gestante'", (hembra_id,))
-                if cur.fetchone()[0] > 0:
-                    messagebox.showerror("Error", "La hembra ya está gestante")
-                    return
-
-                cur.execute("SELECT COUNT(*) FROM servicio WHERE id_hembra=? AND fecha_servicio=?", (hembra_id, fecha_serv))
-                if cur.fetchone()[0] > 0:
-                    messagebox.showerror("Error", "Ya existe un servicio para esa hembra en la misma fecha")
-                    return
-
-                fecha_parto_est = (datetime.strptime(fecha_serv, "%Y-%m-%d") + timedelta(days=280)).strftime("%Y-%m-%d")
-                obs = self.t_obs.get("1.0", "end-1c").strip()
-                obs_full = " | ".join(filter(None, [obs, extra_obs])) or None
-
-                cur.execute(
-                    """
-                    INSERT INTO servicio (id_hembra, id_macho, fecha_servicio, tipo_servicio, estado, fecha_parto_estimada, observaciones)
-                    VALUES (?, ?, ?, ?, 'Gestante', ?, ?)
-                    """,
-                    (hembra_id, id_macho, fecha_serv, tipo, fecha_parto_est, obs_full),
-                )
-
-                cur.execute(
-                    """
-                    INSERT INTO comentario (id_animal, fecha, tipo, nota, autor)
-                    VALUES (?, ?, 'Servicio', ?, ?)
-                    """,
-                    (hembra_id, fecha_serv, f"Servicio {tipo} - {extra_obs}", os.getenv("USERNAME", "Sistema")),
-                )
-
-                conn.commit()
+            self.reproduccion_service.registrar_servicio(
+                hembra_id=hembra_id,
+                macho_id=id_macho,
+                fecha_servicio=fecha_serv,
+                tipo_servicio=tipo,
+                observaciones=obs_full
+            )
 
             messagebox.showinfo("Éxito", "✅ Servicio registrado")
             self._limpiar_formulario_servicio()
             self.cargar_gestantes()
             self.cargar_proximos()
             self._actualizar_badges()
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar:\n{e}")
 
@@ -758,48 +672,23 @@ class ReproduccionModule(ctk.CTkFrame):
         for iid in self.tabla_gest.get_children():
             self.tabla_gest.delete(iid)
 
-        finca_id = self._parse_combo_id(self.cb_finca_gest.get())
         estado_filtro = self.cb_estado_gest.get()
-        desde = self.e_desde_gest.get().strip()
-        hasta = self.e_hasta_gest.get().strip()
         buscar = self.e_buscar_gest.get().strip().upper()
 
-        condiciones = ["s.estado='Gestante'"]
-        params = []
-        if finca_id:
-            condiciones.append("a.id_finca=?")
-            params.append(finca_id)
-        if self._valid_date(desde):
-            condiciones.append("s.fecha_servicio>=?")
-            params.append(desde)
-        if self._valid_date(hasta):
-            condiciones.append("s.fecha_servicio<=?")
-            params.append(hasta)
-        if buscar:
-            condiciones.append("(a.codigo LIKE ? OR UPPER(COALESCE(a.nombre,'')) LIKE ?)")
-            params.extend([f"%{buscar}%", f"%{buscar}%"])
-
-        where_clause = " AND ".join(condiciones)
-        sql = f"""
-            SELECT s.id, a.id, a.codigo, COALESCE(a.nombre,''), s.fecha_servicio, s.tipo_servicio,
-                   COALESCE(a_m.codigo || ' ' || a_m.nombre, s.observaciones),
-                   CAST((JULIANDAY('now') - JULIANDAY(s.fecha_servicio)) AS INTEGER) as dias_gest,
-                   DATE(s.fecha_servicio, '+280 days') as parto_est
-            FROM servicio s
-            JOIN animal a ON a.id = s.id_hembra
-            LEFT JOIN animal a_m ON a_m.id = s.id_macho
-            WHERE {where_clause}
-            ORDER BY s.fecha_servicio DESC
-        """
-
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(sql, params)
-                rows = cur.fetchall()
-                total = 0
-                for row in rows:
-                    servicio_id, hembra_id, codigo, nombre, fecha_serv, tipo, toro_s, dias, parto_est = row
+            gestantes = self.reproduccion_service.listar_gestantes()
+            total = 0
+            for row in gestantes:
+                try:
+                    servicio_id = row['servicio_id']
+                    codigo = row['codigo']
+                    nombre = row['nombre']
+                    fecha_serv = row['fecha_servicio']
+                    tipo = row['tipo_servicio']
+                    toro_s = row['toro_semen']
+                    dias = row.get('dias_gestacion', 0)  # Usar .get() con default
+                    parto_est = row['fecha_parto_estimada']
+
                     estado_tag = 'normal'
                     estado_txt = 'Normal'
                     if dias > 280:
@@ -814,11 +703,20 @@ class ReproduccionModule(ctk.CTkFrame):
                     if estado_filtro == "Normal" and estado_tag != 'normal':
                         continue
 
+                    if buscar and buscar not in codigo.upper() and buscar not in nombre.upper():
+                        continue
+
                     self.tabla_gest.insert("", "end", iid=str(servicio_id), values=(servicio_id, codigo, nombre, fecha_serv, tipo, toro_s, dias, parto_est, estado_txt), tags=(estado_tag,))
                     total += 1
-                self.label_count_gest.configure(text=f"Total: {total}")
+                except KeyError as ke:
+                    print(f"[ERROR] KeyError en gestante: {ke}, row keys: {list(row.keys())}")
+                    continue
+                    
+            self.label_count_gest.configure(text=f"Total: {total}")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudieron cargar gestantes:\n{e}")
+            import traceback
+            print(f"[ERROR] Traceback completo: {traceback.format_exc()}")
+            messagebox.showerror("Error", f"No se pudieron cargar gestantes:\n{type(e).__name__}: {str(e)}")
 
     def _limpiar_filtros_partos(self):
         self.cb_finca_partos.set("Todas las fincas")
@@ -837,7 +735,6 @@ class ReproduccionModule(ctk.CTkFrame):
         for iid in self.tabla_partos.get_children():
             self.tabla_partos.delete(iid)
 
-        finca_id = self._parse_combo_id(self.cb_finca_partos.get())
         dias_sel = self.cb_dias_partos.get()
         buscar = self.e_buscar_partos.get().strip().upper()
 
@@ -848,51 +745,37 @@ class ReproduccionModule(ctk.CTkFrame):
             except Exception:
                 limite = 30
 
-        condiciones = ["s.estado='Gestante'"]
-        params = []
-        if finca_id:
-            condiciones.append("a.id_finca=?")
-            params.append(finca_id)
-        if buscar:
-            condiciones.append("(a.codigo LIKE ? OR UPPER(COALESCE(a.nombre,'')) LIKE ?)")
-            params.extend([f"%{buscar}%", f"%{buscar}%"])
-
-        where_clause = " AND ".join(condiciones)
-        sql = f"""
-            SELECT s.id, a.id, a.codigo, COALESCE(a.nombre,''), s.fecha_servicio, s.tipo_servicio,
-                   COALESCE(a_m.codigo || ' ' || a_m.nombre, s.observaciones)
-            FROM servicio s
-            JOIN animal a ON a.id = s.id_hembra
-            LEFT JOIN animal a_m ON a_m.id = s.id_macho
-            WHERE {where_clause}
-            ORDER BY DATE(s.fecha_servicio, '+280 days') ASC
-        """
-
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(sql, params)
-                rows = cur.fetchall()
-                total = 0
-                for row in rows:
-                    servicio_id, hembra_id, codigo, nombre, fecha_serv, tipo, toro_s = row
-                    dias_gest = (datetime.now().date() - datetime.strptime(fecha_serv, "%Y-%m-%d").date()).days
-                    dias_falta = 280 - dias_gest
-                    if limite is not None and dias_falta > limite:
-                        continue
-                    parto_est = (datetime.strptime(fecha_serv, "%Y-%m-%d") + timedelta(days=280)).strftime("%Y-%m-%d")
+            proximos = self.reproduccion_service.listar_proximos_partos(dias=limite or 999)
+            total = 0
+            for row in proximos:
+                servicio_id = row['servicio_id']
+                codigo = row['codigo']
+                nombre = row['nombre']
+                fecha_serv = row['fecha_servicio']
+                tipo = row['tipo_servicio']
+                toro_s = row['toro_semen']
+                dias_gest = row['dias_gestacion']
+                parto_est = row['fecha_parto_estimada']
+                dias_falta = row['dias_para_parto']
 
-                    tag = 'normal'
-                    if dias_falta < 0:
-                        tag = 'atrasado'
-                    elif dias_falta == 0:
-                        tag = 'hoy'
-                    elif dias_falta <= 7:
-                        tag = 'proximo'
+                if limite is not None and dias_falta > limite:
+                    continue
 
-                    self.tabla_partos.insert("", "end", iid=str(servicio_id), values=(servicio_id, codigo, nombre, fecha_serv, dias_gest, parto_est, dias_falta, tipo, toro_s), tags=(tag,))
-                    total += 1
-                self.label_count_partos.configure(text=f"Total: {total}")
+                if buscar and buscar not in codigo.upper() and buscar not in nombre.upper():
+                    continue
+
+                tag = 'normal'
+                if dias_falta < 0:
+                    tag = 'atrasado'
+                elif dias_falta == 0:
+                    tag = 'hoy'
+                elif dias_falta <= 7:
+                    tag = 'proximo'
+
+                self.tabla_partos.insert("", "end", iid=str(servicio_id), values=(servicio_id, codigo, nombre, fecha_serv, dias_gest, parto_est, dias_falta, tipo, toro_s), tags=(tag,))
+                total += 1
+            self.label_count_partos.configure(text=f"Total: {total}")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar próximos partos:\n{e}")
 
@@ -935,11 +818,11 @@ class ReproduccionModule(ctk.CTkFrame):
         codigo = values[1]
         nombre = values[2] if len(values) > 2 else ""
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT id_hembra FROM servicio WHERE id=?", (servicio_id,))
-                hembra_id = cur.fetchone()[0]
-            modal = ModalRegistroParto(self, servicio_id, hembra_id, codigo, nombre, on_success=self._refrescar_todo)
+            hembra_id = self.reproduccion_service.obtener_hembra_de_servicio(servicio_id)
+            if not hembra_id:
+                messagebox.showerror("Error", "No se pudo obtener la hembra del servicio")
+                return
+            modal = ModalRegistroParto(self, servicio_id, hembra_id, codigo, nombre, self.reproduccion_service, on_success=self._refrescar_todo)
             modal.focus_set()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el registro de parto:\n{e}")
@@ -953,10 +836,7 @@ class ReproduccionModule(ctk.CTkFrame):
         if not messagebox.askyesno("Confirmar", f"¿Anular servicio y marcar {codigo} como vacía?"):
             return
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("UPDATE servicio SET estado='Vacía' WHERE id=?", (servicio_id,))
-                conn.commit()
+            self.reproduccion_service.marcar_servicio_vacio(servicio_id)
             messagebox.showinfo("Éxito", "Servicio anulado")
             self._refrescar_todo()
         except Exception as e:

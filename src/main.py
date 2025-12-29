@@ -3,26 +3,71 @@ Sistema Principal FincaFacil
 Módulo unificado para la gestión integral de fincas ganaderas
 """
 
+import os
 import sys
 import traceback
+import importlib.util
 from pathlib import Path
 
 # Detectar si está ejecutándose como ejecutable empaquetado
 if getattr(sys, 'frozen', False):
-    # Ejecutándose como ejecutable empaquetado
+    # Ejecutándose como ejecutable empaquetado (_MEIPASS es raíz con src/ extraído allí)
     current_dir = Path(sys.executable).parent
-    base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else current_dir
+    base_path = Path(getattr(sys, '_MEIPASS', current_dir))
 else:
-    # Ejecutándose como script Python (en src/ o desde raíz)
-    current_dir = Path(__file__).parent
-    base_path = current_dir
+    # Ejecutándose como script Python desde src/main.py
+    current_dir = Path(__file__).parent  # src/
+    base_path = current_dir.parent  # raíz del proyecto
 
-# Agregar el directorio actual al path para imports
+
+def _write_startup_log(msg: str) -> None:
+    """Escribe mensajes tempranos en un log para depurar arranques fallidos."""
+    try:
+        base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
+        log_dir = Path(base) / "FincaFacil" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with open(log_dir / "startup.log", "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
+
+
+def _bootstrap_config():
+    """Carga config.py y lo inyecta en sys.modules para evitar conflictos con paquetes 'config'."""
+    if 'config' in sys.modules:
+        return sys.modules['config']
+
+    if getattr(sys, 'frozen', False):
+        config_path = Path(getattr(sys, '_MEIPASS', current_dir)) / 'config.py'
+    else:
+        config_path = Path(__file__).parent.parent / 'config.py'
+
+    spec = importlib.util.spec_from_file_location('config', config_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"No se pudo cargar config desde {config_path}")
+    config_module = importlib.util.module_from_spec(spec)
+    # loader garantizado por validación previa
+    spec.loader.exec_module(config_module)
+
+    # Registrar explícitamente en sys.modules para que otros imports lo reutilicen
+    sys.modules['config'] = config_module
+    return config_module
+
+# Agregar el directorio al path para imports absolutos
+# Cuando frozen: base_path = _MEIPASS (contiene src/, modules/, database/, etc.)
+# Cuando no: base_path = raíz del proyecto
+sys.path.insert(0, str(base_path))
 sys.path.insert(0, str(current_dir))
 
 # Importaciones de módulos
 try:
     print("DEBUG: sys.path[0:3] = " + str(sys.path[0:3]))
+
+    # Cargar config antes de cualquier otro import que lo necesite
+    print("DEBUG: Bootstrapping config...")
+    config_module = _bootstrap_config()
+    config = config_module.config
+    print("DEBUG: OK - Config (pre)")
     
     print("DEBUG: Importando DashboardModule...")
     from modules.dashboard.dashboard_main import DashboardModule
@@ -44,16 +89,13 @@ try:
     from database import inicializar_base_datos, verificar_base_datos, asegurar_esquema_minimo, asegurar_esquema_completo
     print("DEBUG: OK - Database")
     
-    # Configuración global
-    print("DEBUG: Importando config...")
-    from config import config
-    print("DEBUG: OK - Config")
-    
 except ImportError as e:
-    # Logger aun no disponible, usar print como ultima opcion
-    import traceback
-    print("ERROR CRITICO: No se pueden importar modulos necesarios: " + str(e))
+    # Logger aun no disponible, registrar en archivo de arranque
+    msg = f"ERROR CRITICO: No se pueden importar modulos necesarios: {e}"
+    print(msg)
     traceback.print_exc()
+    _write_startup_log(msg)
+    _write_startup_log(traceback.format_exc())
     sys.exit(1)
 
 import customtkinter as ctk
@@ -169,7 +211,7 @@ class FincaFacilApp(ctk.CTk):
                 
                 # Importar en background para no bloquear
                 try:
-                    from utils.pdf_manual_generator import generar_manual_pdf
+                    from modules.utils.pdf_generator import generar_manual_pdf
                     generar_manual_pdf()
                     if self.logger:
                         self.logger.info("Manual PDF generado correctamente")
@@ -183,6 +225,7 @@ class FincaFacilApp(ctk.CTk):
     def verificar_primer_uso(self):
         """Verifica si es la primera vez usando el sistema e inicia el tour global"""
         try:
+            print("[MAIN] Verificando primer uso...")
             from modules.utils.global_tour import GlobalTour
             
             # Crear gestor del tour global
@@ -190,13 +233,18 @@ class FincaFacilApp(ctk.CTk):
             
             # Si es primer uso, iniciar tour automáticamente
             if global_tour.should_start_tour():
-                self.logger.info("Primer uso detectado - iniciando tour global")
+                print("[MAIN] ✅ Primer uso detectado - iniciando tour global")
+                if self.logger:
+                    self.logger.info("Primer uso detectado - iniciando tour global")
                 self.after(500, global_tour.start_tour)
             else:
-                self.logger.info("Sistema ya fue usado antes - tour no necesario")
+                print("[MAIN] ℹ️ Sistema ya fue usado antes - tour no necesario")
+                if self.logger:
+                    self.logger.info("Sistema ya fue usado antes - tour no necesario")
         except Exception as e:
+            print(f"[MAIN] ❌ Error en verificar_primer_uso: {e}")
             if self.logger:
-                self.logger.warning(f"No se pudo iniciar tour global: {e}")
+                self.logger.error(f"No se pudo iniciar tour global: {e}", exc_info=True)
 
     def create_sidebar(self):
         # Header con fondo claro para resaltar el logo
@@ -512,7 +560,10 @@ class FincaFacilApp(ctk.CTk):
                     # Solo quitar padding en contenedores grandes típicos
                     if isinstance(child, ctk.CTkFrame):
                         # Si el frame no es barra de estado (altura muy pequeña) ni sidebar
-                        child.pack_configure(padx=max(child.pack_info().get('padx', 0) - 3, 0))
+                        _padx = child.pack_info().get('padx', 0)
+                        # Normalizar tuple/int para Pylance y runtime
+                        _padx_int = _padx[0] if isinstance(_padx, tuple) else int(_padx)
+                        child.pack_configure(padx=max(_padx_int - 3, 0))
             except Exception:
                 pass
 
@@ -598,7 +649,7 @@ class FincaFacilApp(ctk.CTk):
             from pathlib import Path
             from datetime import datetime, timedelta
             
-            backup_dir = Path("backup")
+            backup_dir = config.BACKUP_DIR
             if not backup_dir.exists():
                 return True  # Si no hay carpeta de backup, crear uno
             
@@ -627,12 +678,13 @@ class FincaFacilApp(ctk.CTk):
             from datetime import datetime
             
             # Rutas
-            db_path = Path("database/fincafacil.db")
+            from database.database import get_db_path_safe
+            db_path = get_db_path_safe()
             if not db_path.exists():
                 return
             
-            backup_dir = Path("backup")
-            backup_dir.mkdir(exist_ok=True)
+            backup_dir = config.BACKUP_DIR
+            backup_dir.mkdir(exist_ok=True, parents=True)
             
             # Nombre del backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -801,4 +853,11 @@ def main():
 
 if __name__ == "__main__":
     # Usar flujo principal que verifica/migra BD antes de abrir UI
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"EXCEPTION AT TOP LEVEL: {e}")
+        traceback.print_exc()
+        _write_startup_log(f"EXCEPTION AT TOP LEVEL: {e}")
+        _write_startup_log(traceback.format_exc())
+        sys.exit(1)

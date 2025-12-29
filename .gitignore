@@ -31,3 +31,4 @@ uploads/
 # IDE/editor
 .vscode/
 .idea/
+node_modules

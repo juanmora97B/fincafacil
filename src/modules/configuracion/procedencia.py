@@ -1,11 +1,10 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog
-import sqlite3
 import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import db
+from infraestructura.configuracion import ConfiguracionService, ConfiguracionRepository
 from modules.utils.importador_excel import parse_excel_to_dicts
 
 
@@ -13,6 +12,8 @@ class ProcedenciaFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        self.configuracion_service = ConfiguracionService(repository=ConfiguracionRepository())
+        self.editando_codigo = None
         self.crear_widgets()
         self.cargar_procedencias()
 
@@ -96,7 +97,7 @@ class ProcedenciaFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -118,40 +119,29 @@ class ProcedenciaFrame(ctk.CTkFrame):
             return
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                if self.entry_codigo.cget("state") == "disabled":
-                    cursor.execute("""
-                        UPDATE procedencia 
-                        SET descripcion = ?, tipo_procedencia = ?, ubicacion = ?, comentario = ?
-                        WHERE codigo = ?
-                    """, (
-                        descripcion,
-                        self.combo_tipo.get(),
-                        self.entry_ubicacion.get().strip(),
-                        self.text_comentario.get("1.0", "end-1c").strip(),
-                        codigo
-                    ))
-                else:
-                    cursor.execute("""
-                        INSERT INTO procedencia (codigo, descripcion, tipo_procedencia, ubicacion, comentario, estado)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (
-                        codigo,
-                        descripcion,
-                        self.combo_tipo.get(),
-                        self.entry_ubicacion.get().strip(),
-                        self.text_comentario.get("1.0", "end-1c").strip(),
-                        "Activo"
-                    ))
-                conn.commit()
-
-            messagebox.showinfo("Éxito", "Procedencia guardada correctamente." if self.entry_codigo.cget("state") != "disabled" else "Procedencia actualizada correctamente.")
+            if self.editando_codigo:
+                self.configuracion_service.actualizar_procedencia(
+                    codigo=codigo,
+                    descripcion=descripcion,
+                    tipo_procedencia=self.combo_tipo.get(),
+                    ubicacion=self.entry_ubicacion.get().strip(),
+                    comentario=self.text_comentario.get("1.0", "end-1c").strip(),
+                )
+                messagebox.showinfo("Éxito", "Procedencia actualizada correctamente.")
+            else:
+                self.configuracion_service.crear_procedencia(
+                    codigo=codigo,
+                    descripcion=descripcion,
+                    tipo_procedencia=self.combo_tipo.get(),
+                    ubicacion=self.entry_ubicacion.get().strip(),
+                    comentario=self.text_comentario.get("1.0", "end-1c").strip(),
+                    estado="Activo",
+                )
+                messagebox.showinfo("Éxito", "Procedencia guardada correctamente.")
             self.limpiar_formulario()
             self.cargar_procedencias()
-            
-        except sqlite3.IntegrityError:
-            messagebox.showerror("Error", "Ya existe una procedencia con ese código.")
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar la procedencia:\n{e}")
 
@@ -161,14 +151,15 @@ class ProcedenciaFrame(ctk.CTkFrame):
             self.tabla.delete(fila)
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT codigo, descripcion, tipo_procedencia, ubicacion, comentario FROM procedencia WHERE estado = 'Activo'")
-                
-                for fila in cursor.fetchall():
-                    valores = tuple(str(v) if v is not None else "" for v in fila)
-                    self.tabla.insert("", "end", values=valores)
-                    
+            filas = self.configuracion_service.listar_procedencias()
+            for fila in filas:
+                self.tabla.insert("", "end", values=(
+                    fila.get('codigo',''),
+                    fila.get('descripcion',''),
+                    fila.get('tipo_procedencia',''),
+                    fila.get('ubicacion',''),
+                    fila.get('comentario','')
+                ))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las procedencias:\n{e}")
 
@@ -179,25 +170,24 @@ class ProcedenciaFrame(ctk.CTkFrame):
             return
         codigo = self.tabla.item(seleccionado[0])["values"][0]
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT codigo, descripcion, tipo_procedencia, ubicacion, comentario FROM procedencia WHERE codigo = ?", (codigo,))
-                row = cursor.fetchone()
-                if not row:
-                    messagebox.showerror("Error", "No se encontró la procedencia")
-                    return
-                self.entry_codigo.delete(0, "end")
-                self.entry_codigo.insert(0, str(row[0]))
-                self.entry_codigo.configure(state="disabled")
-                self.entry_descripcion.delete(0, "end")
-                self.entry_descripcion.insert(0, str(row[1]))
-                if row[2]:
-                    self.combo_tipo.set(str(row[2]))
-                self.entry_ubicacion.delete(0, "end")
-                self.entry_ubicacion.insert(0, str(row[3] or ""))
-                self.text_comentario.delete("1.0", "end")
-                if row[4]:
-                    self.text_comentario.insert("1.0", str(row[4]))
+            proc = self.configuracion_service.obtener_procedencia(codigo)
+            if not proc:
+                messagebox.showerror("Error", "No se encontró la procedencia")
+                return
+            self.editando_codigo = codigo
+            self.entry_codigo.delete(0, "end")
+            self.entry_codigo.insert(0, proc.get('codigo', ''))
+            self.entry_codigo.configure(state="disabled")
+            self.entry_descripcion.delete(0, "end")
+            self.entry_descripcion.insert(0, proc.get('descripcion', ''))
+            tipo_proc = proc.get('tipo_procedencia')
+            if tipo_proc:
+                self.combo_tipo.set(tipo_proc)  # type: ignore[arg-type]
+            self.entry_ubicacion.delete(0, "end")
+            self.entry_ubicacion.insert(0, proc.get('ubicacion', ''))
+            self.text_comentario.delete("1.0", "end")
+            if proc.get('comentario'):
+                self.text_comentario.insert("1.0", proc.get('comentario'))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar la procedencia:\n{e}")
 
@@ -208,18 +198,18 @@ class ProcedenciaFrame(ctk.CTkFrame):
             return
         
         codigo = self.tabla.item(seleccionado[0])["values"][0]
-        if messagebox.askyesno("Confirmar", f"¿Eliminar la procedencia '{codigo}'?\n\nEsta acción no se puede deshacer."):
+        if messagebox.askyesno("Confirmar", f"¿Eliminar la procedencia '{codigo}'?"):
             try:
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM procedencia WHERE codigo = ?", (codigo,))
-                    conn.commit()
+                self.configuracion_service.cambiar_estado_procedencia(codigo, "Inactivo")
                 messagebox.showinfo("Éxito", "Procedencia eliminada.")
                 self.cargar_procedencias()
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
 
     def limpiar_formulario(self):
+        self.editando_codigo = None
         self.entry_codigo.configure(state="normal")
         self.entry_codigo.delete(0, "end")
         self.entry_descripcion.delete(0, "end")
@@ -254,43 +244,37 @@ class ProcedenciaFrame(ctk.CTkFrame):
         errores = []
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
+            registros = []
+            for fila in filas:
+                registros.append({
+                    'codigo': str(fila.get('codigo') or '').strip(),
+                    'descripcion': str(fila.get('descripcion') or '').strip(),
+                    'tipo_procedencia': str(fila.get('tipo_procedencia') or 'Granja').strip(),
+                    'ubicacion': str(fila.get('ubicacion') or '').strip(),
+                    'comentario': str(fila.get('comentario') or '').strip(),
+                    'estado': str(fila.get('estado') or 'Activo').strip(),
+                })
 
-                for idx, fila in enumerate(filas, start=2):
-                    codigo = str(fila.get('codigo') or "").strip()
-                    descripcion = str(fila.get('descripcion') or "").strip()
+            importados = 0
+            errores = []
+            for idx, r in enumerate(registros, start=2):
+                try:
+                    if not r['codigo'] or not r['descripcion']:
+                        raise ValueError("faltan campos requeridos (código y descripción)")
 
-                    if not codigo or not descripcion:
-                        errores.append(f"Fila {idx}: faltan campos requeridos (código y descripción)")
-                        continue
-
-                    try:
-                        # Verificar si la procedencia ya existe
-                        cursor.execute("SELECT COUNT(*) FROM procedencia WHERE codigo = ?", (codigo,))
-                        if cursor.fetchone()[0] > 0:
-                            errores.append(f"Fila {idx}: la procedencia con código '{codigo}' ya existe")
-                            continue
-
-                        # Insertar nueva procedencia
-                        cursor.execute("""
-                            INSERT INTO procedencia (codigo, descripcion, tipo_procedencia, ubicacion, comentario, estado)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (
-                            codigo,
-                            descripcion,
-                            str(fila.get('tipo_procedencia') or "Granja").strip(),
-                            str(fila.get('ubicacion') or "").strip() or None,
-                            str(fila.get('comentario') or "").strip() or None,
-                            str(fila.get('estado') or "Activo").strip()
-                        ))
-                        importados += 1
-                    except sqlite3.IntegrityError:
-                        errores.append(f"Fila {idx}: procedencia duplicada")
-                    except Exception as e:
-                        errores.append(f"Fila {idx}: {str(e)}")
-
-                conn.commit()
+                    self.configuracion_service.crear_procedencia(
+                        codigo=r['codigo'],
+                        descripcion=r['descripcion'],
+                        tipo_procedencia=r['tipo_procedencia'],
+                        ubicacion=r['ubicacion'],
+                        comentario=r['comentario'],
+                        estado=r['estado'] or 'Activo',
+                    )
+                    importados += 1
+                except ValueError as e:
+                    errores.append(f"Fila {idx}: {str(e)}")
+                except Exception as e:
+                    errores.append(f"Fila {idx}: {str(e)}")
 
             mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
             if errores:

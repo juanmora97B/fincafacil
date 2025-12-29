@@ -108,10 +108,13 @@ def parse_excel_to_dicts(file_path: str) -> Tuple[List[Dict], List[str]]:
         # Cargar workbook
         workbook = openpyxl.load_workbook(file_path, data_only=True)
         sheet = workbook.active
+        if sheet is None:
+            errores.append("El archivo Excel no tiene hojas válidas")
+            return registros, errores
         
         # Leer encabezados
         headers = []
-        for cell in sheet[1]:
+        for cell in sheet[1]:  # type: ignore[index]
             if cell.value:
                 header = normalizar_nombre_columna(str(cell.value).strip())
                 headers.append(header)
@@ -124,7 +127,7 @@ def parse_excel_to_dicts(file_path: str) -> Tuple[List[Dict], List[str]]:
             return registros, errores
         
         # Procesar filas
-        for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):  # type: ignore[attr-defined]
             try:
                 # Saltar filas vacías
                 if all(cell is None or str(cell).strip() == '' for cell in row):

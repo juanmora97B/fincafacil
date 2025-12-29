@@ -1,6 +1,7 @@
 """
 Modal Editar Animal - Formulario completo con preview de foto
 Versión mejorada con filtrado dinámico y tipo de ingreso
+FASE 8.3: Migrado para usar AnimalService en lugar de acceso directo a BD
 """
 
 import customtkinter as ctk
@@ -10,12 +11,14 @@ from PIL import Image
 from pathlib import Path
 import shutil
 from datetime import datetime
-from modules.utils.date_picker import attach_date_picker
+from typing import Any
+import sys
+import os
 
-try:
-    from database import get_db_connection
-except Exception:
-    from database.database import get_db_connection
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from infraestructura.animales.animal_service import AnimalService
+from modules.utils.date_picker import attach_date_picker
+# FASE 8.3.2: No se importa get_db_connection, solo AnimalService
 
 
 class ModalEditarAnimal(ctk.CTkToplevel):
@@ -27,6 +30,7 @@ class ModalEditarAnimal(ctk.CTkToplevel):
         self.animal = animal_data
         self.callback = callback
         self.new_photo_path = None
+        self.animal_service = AnimalService()  # FASE 8.3: inyectar servicio
         
         # Variables para campos condicionales
         self.campos_compra = []
@@ -268,6 +272,13 @@ class ModalEditarAnimal(ctk.CTkToplevel):
         # Campos de reproducción
         self.cmb_madre = self._add_combo_grid(grid, "Madre *", ["Cargando..."], 0, 0)
         self.cmb_padre = self._add_combo_grid(grid, "Padre", ["Cargando..."], 0, 1)
+        self.cmb_tipo_reproduccion = self._add_combo_grid(
+            grid,
+            "Tipo de reproducción",
+            ["Natural", "Inseminación"],
+            1,
+            0
+        )
         
         # Inseminación: usar solo esta casilla para simplificar
         self.chk_inseminacion = ctk.CTkCheckBox(
@@ -420,7 +431,7 @@ class ModalEditarAnimal(ctk.CTkToplevel):
             self._cargar_opciones_reproduccion()
     
     def _on_finca_change(self, value=None):
-        """Filtrar potreros, sectores y lotes por finca seleccionada"""
+        """Filtrar potreros, sectores y lotes por finca seleccionada (FASE 8.3.2: usa AnimalService)"""
         finca_val = self.cmb_finca.get()
         if not finca_val or '-' not in finca_val:
             return
@@ -428,82 +439,34 @@ class ModalEditarAnimal(ctk.CTkToplevel):
         try:
             finca_id = int(finca_val.split(' - ')[0])
             
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                
-                # Detectar nombres de columnas
-                cur.execute("PRAGMA table_info(potrero)")
-                potrero_cols = [r[1] for r in cur.fetchall()]
-                finca_col_potrero = 'finca_id' if 'finca_id' in potrero_cols else 'id_finca'
-                
-                cur.execute("PRAGMA table_info(sector)")
-                sector_cols = [r[1] for r in cur.fetchall()]
-                finca_col_sector = 'finca_id' if 'finca_id' in sector_cols else 'id_finca'
-                
-                cur.execute("PRAGMA table_info(lote)")
-                lote_cols = [r[1] for r in cur.fetchall()]
-                finca_col_lote = 'finca_id' if 'finca_id' in lote_cols else 'id_finca'
-                
-                # Potreros de la finca
-                cur.execute(f"SELECT id, nombre FROM potrero WHERE {finca_col_potrero} = ? ORDER BY nombre", 
-                           (finca_id,))
-                potreros = cur.fetchall()
-                potrero_values = ["Ninguno"] + [f"{p[0]} - {p[1]}" for p in potreros]
-                self.cmb_potrero.configure(values=potrero_values)
-                self.cmb_potrero.set("Ninguno")
-                
-                # Sectores de la finca
-                cur.execute(f"SELECT id, nombre FROM sector WHERE {finca_col_sector} = ? ORDER BY nombre", 
-                           (finca_id,))
-                sectores = cur.fetchall()
-                sector_values = ["Ninguno"] + [f"{s[0]} - {s[1]}" for s in sectores]
-                self.cmb_sector.configure(values=sector_values)
-                self.cmb_sector.set("Ninguno")
-                
-                # Lotes de la finca
-                cur.execute(f"SELECT id, nombre FROM lote WHERE {finca_col_lote} = ? ORDER BY nombre", 
-                           (finca_id,))
-                lotes = cur.fetchall()
-                lote_values = ["Ninguno"] + [f"{l[0]} - {l[1]}" for l in lotes]
-                self.cmb_lote.configure(values=lote_values)
-                self.cmb_lote.set("Ninguno")
+            # Potreros de la finca
+            potreros_data = self.animal_service.cargar_potreros_por_finca(finca_id)
+            potrero_values = ["Ninguno"] + [f"{p['id']} - {p['nombre']}" for p in potreros_data]
+            self.cmb_potrero.configure(values=potrero_values)
+            self.cmb_potrero.set("Ninguno")
+            
+            # Sectores de la finca
+            sectores_data = self.animal_service.cargar_sectores_por_finca(finca_id)
+            sector_values = ["Ninguno"] + [f"{s['id']} - {s['nombre']}" for s in sectores_data]
+            self.cmb_sector.configure(values=sector_values)
+            self.cmb_sector.set("Ninguno")
+            
+            # Lotes de la finca
+            lotes_data = self.animal_service.cargar_lotes_por_finca(finca_id)
+            lote_values = ["Ninguno"] + [f"{l['id']} - {l['nombre']}" for l in lotes_data]
+            self.cmb_lote.configure(values=lote_values)
+            self.cmb_lote.set("Ninguno")
 
-                # Procedencias: preferir catálogo global y complementar con datos de la finca
-                try:
-                    # 1) Catálogo desde tabla 'procedencia'
-                    cat_vals = []
-                    try:
-                        cur.execute("SELECT descripcion FROM procedencia WHERE estado = 'Activo' ORDER BY descripcion")
-                        cat_vals = [row[0] for row in cur.fetchall() if row[0]]
-                    except Exception:
-                        cat_vals = []
-
-                    # 2) Complemento desde animales de la finca
-                    try:
-                        cur.execute("PRAGMA table_info(animal)")
-                        animal_cols = [r[1] for r in cur.fetchall()]
-                        finca_col_animal = 'finca_id' if 'finca_id' in animal_cols else 'id_finca'
-                        cur.execute(
-                            f"SELECT DISTINCT procedencia FROM animal WHERE {finca_col_animal} = ? AND procedencia IS NOT NULL AND TRIM(procedencia) <> '' ORDER BY procedencia",
-                            (finca_id,)
-                        )
-                        finca_vals = [row[0] for row in cur.fetchall() if row[0]]
-                    except Exception:
-                        finca_vals = []
-
-                    # Mezclar manteniendo orden: catálogo primero
-                    merged = []
-                    seen = set()
-                    for v in cat_vals + finca_vals:
-                        if v not in seen:
-                            seen.add(v)
-                            merged.append(v)
-                    if not merged:
-                        merged = [""]
-                    self.cmb_procedencia.configure(values=merged)
-                    self.cmb_procedencia.set(merged[0])
-                except Exception:
-                    pass
+            # Procedencias desde servicio
+            try:
+                procedencias_data = self.animal_service.cargar_procedencias(finca_id)
+                procedencias = [p.get('descripcion', '') for p in procedencias_data if p.get('descripcion')]
+                if not procedencias:
+                    procedencias = [""]
+                self.cmb_procedencia.configure(values=procedencias)
+                self.cmb_procedencia.set(procedencias[0])
+            except Exception:
+                pass
                 
         except Exception as e:
             print(f"Error filtrando por finca: {e}")
@@ -518,7 +481,7 @@ class ModalEditarAnimal(ctk.CTkToplevel):
             self._cargar_opciones_reproduccion()
     
     def _cargar_opciones_reproduccion(self):
-        """Cargar animales disponibles como padres/madres"""
+        """Cargar animales disponibles como padres/madres (FASE 8.3.2: usa AnimalService)"""
         try:
             finca_val = self.cmb_finca.get()
             if not finca_val or '-' not in finca_val:
@@ -526,131 +489,86 @@ class ModalEditarAnimal(ctk.CTkToplevel):
             
             finca_id = int(finca_val.split(' - ')[0])
             
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                
-                # Detectar columna de finca
-                cur.execute("PRAGMA table_info(animal)")
-                cols = [r[1] for r in cur.fetchall()]
-                finca_col = 'finca_id' if 'finca_id' in cols else 'id_finca'
-                
-                # Madres (hembras de la finca)
-                cur.execute(f"""
-                    SELECT id, codigo, nombre 
-                    FROM animal 
-                    WHERE {finca_col} = ? AND sexo = 'Hembra'
-                    ORDER BY codigo
-                """, (finca_id,))
-                madres = cur.fetchall()
-                madre_values = [f"{m[0]} - {m[1]} ({m[2] or 'Sin nombre'})" for m in madres]
-                if madre_values:
-                    self.cmb_madre.configure(values=madre_values)
-                    self.cmb_madre.set(madre_values[0])
-                else:
-                    self.cmb_madre.configure(values=["No hay hembras en esta finca"])
-                    self.cmb_madre.set("No hay hembras en esta finca")
-                
-                # Padres (machos de la finca)
-                cur.execute(f"""
-                    SELECT id, codigo, nombre 
-                    FROM animal 
-                    WHERE {finca_col} = ? AND sexo = 'Macho'
-                    ORDER BY codigo
-                """, (finca_id,))
-                padres = cur.fetchall()
-                padre_values = ["Ninguno"] + [f"{p[0]} - {p[1]} ({p[2] or 'Sin nombre'})" for p in padres]
-                if padre_values:
-                    self.cmb_padre.configure(values=padre_values)
-                    self.cmb_padre.set("Ninguno")
+            # Madres (hembras de la finca)
+            madres_data = self.animal_service.cargar_madres_por_finca(finca_id)
+            madre_values = [f"{m['id']} - {m['codigo']} ({m.get('nombre') or 'Sin nombre'})" for m in madres_data]
+            if madre_values:
+                self.cmb_madre.configure(values=madre_values)
+                self.cmb_madre.set(madre_values[0])
+            else:
+                self.cmb_madre.configure(values=["No hay hembras en esta finca"])
+                self.cmb_madre.set("No hay hembras en esta finca")
+            
+            # Padres (machos de la finca) si aplica
+            if not self.chk_inseminacion.get():
+                padres_data = self.animal_service.cargar_padres_por_finca(finca_id)
+                padre_values = ["Ninguno"] + [f"{p['id']} - {p['codigo']} ({p.get('nombre') or 'Sin nombre'})" for p in padres_data]
+                self.cmb_padre.configure(values=padre_values)
+                self.cmb_padre.set("Ninguno")
                 
         except Exception as e:
             print(f"Error cargando opciones reproducción: {e}")
 
     def _cargar_catalogos(self):
-        """Carga catálogos desde tablas de configuración cuando existan.
-        - raza: tabla 'raza' (columna nombre)
-        - condicion_corporal: tabla 'condicion_corporal' (columna descripcion)
-        - calidad: tabla 'calidad_animal' (columna descripcion)
-        - salud/estado: mantenerse desde valores en 'animal' por ahora
+        """Carga catálogos desde servicio (FASE 8.3.2: usa AnimalService)
+        - raza: desde cargar_razas()
+        - condicion_corporal: desde cargar_condiciones_corporales()
+        - calidad: desde cargar_calidades()
+        - salud/estado: desde cargar_estados_salud() y cargar_estados()
         """
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
+            # Raza
+            try:
+                razas_data = self.animal_service.cargar_razas()
+                vals = [r['nombre'] for r in razas_data if r.get('nombre')]
+                if not vals:
+                    vals = ["-"]
+                self.cmb_raza.configure(values=vals)
+                self.cmb_raza.set(vals[0])
+            except Exception:
+                pass
 
-                # Raza
-                try:
-                    cur.execute("SELECT nombre FROM raza WHERE COALESCE(LOWER(estado),'activa') IN ('activa','activo') OR estado IS NULL ORDER BY nombre")
-                    vals = [row[0] for row in cur.fetchall() if row[0]]
-                    if not vals:
-                        raise Exception("Catálogo raza vacío")
-                    self.cmb_raza.configure(values=vals)
-                    self.cmb_raza.set(vals[0])
-                except Exception:
-                    # Fallback a DISTINCT desde animal
-                    try:
-                        cur.execute("SELECT DISTINCT raza FROM animal WHERE raza IS NOT NULL AND TRIM(raza) <> '' ORDER BY raza")
-                        vals = [row[0] for row in cur.fetchall()]
-                        if not vals:
-                            vals = ["-"]
-                        self.cmb_raza.configure(values=vals)
-                        self.cmb_raza.set(vals[0])
-                    except Exception:
-                        pass
+            # Condición corporal
+            try:
+                condiciones_data = self.animal_service.cargar_condiciones_corporales()
+                vals = [c['descripcion'] for c in condiciones_data if c.get('descripcion')]
+                if not vals:
+                    vals = ["-"]
+                self.cmb_condicion.configure(values=vals)
+                self.cmb_condicion.set(vals[0])
+            except Exception:
+                pass
 
-                # Condición corporal
-                try:
-                    cur.execute("SELECT descripcion FROM condicion_corporal WHERE COALESCE(estado,'Activo') = 'Activo' ORDER BY descripcion")
-                    vals = [row[0] for row in cur.fetchall() if row[0]]
-                    if vals:
-                        self.cmb_condicion.configure(values=vals)
-                        self.cmb_condicion.set(vals[0])
-                    else:
-                        raise Exception("Catálogo condición vacío")
-                except Exception:
-                    try:
-                        cur.execute("SELECT DISTINCT condicion_corporal FROM animal WHERE condicion_corporal IS NOT NULL AND TRIM(condicion_corporal) <> '' ORDER BY condicion_corporal")
-                        vals = [row[0] for row in cur.fetchall()]
-                        if not vals:
-                            vals = ["-"]
-                        self.cmb_condicion.configure(values=vals)
-                        self.cmb_condicion.set(vals[0])
-                    except Exception:
-                        pass
+            # Calidad
+            try:
+                calidades_data = self.animal_service.cargar_calidades()
+                vals = [cal['descripcion'] for cal in calidades_data if cal.get('descripcion')]
+                if not vals:
+                    vals = ["-"]
+                self.cmb_calidad.configure(values=vals)
+                self.cmb_calidad.set(vals[0])
+            except Exception:
+                pass
 
-                # Calidad
-                try:
-                    cur.execute("SELECT descripcion FROM calidad_animal ORDER BY descripcion")
-                    vals = [row[0] for row in cur.fetchall() if row[0]]
-                    if vals:
-                        self.cmb_calidad.configure(values=vals)
-                        self.cmb_calidad.set(vals[0])
-                    else:
-                        raise Exception("Catálogo calidad vacío")
-                except Exception:
-                    try:
-                        cur.execute("SELECT DISTINCT calidad FROM animal WHERE calidad IS NOT NULL AND TRIM(calidad) <> '' ORDER BY calidad")
-                        vals = [row[0] for row in cur.fetchall()]
-                        if not vals:
-                            vals = ["-"]
-                        self.cmb_calidad.configure(values=vals)
-                        self.cmb_calidad.set(vals[0])
-                    except Exception:
-                        pass
+            # Salud
+            try:
+                vals = self.animal_service.cargar_estados_salud()
+                if not vals:
+                    vals = ["-"]
+                self.cmb_salud.configure(values=vals)
+                self.cmb_salud.set(vals[0])
+            except Exception:
+                pass
 
-                # Salud y Estado: por ahora desde animal
-                for column, combo in (
-                    ('salud', self.cmb_salud),
-                    ('estado', self.cmb_estado),
-                ):
-                    try:
-                        cur.execute(f"SELECT DISTINCT {column} FROM animal WHERE {column} IS NOT NULL AND TRIM({column}) <> '' ORDER BY {column}")
-                        vals = [row[0] for row in cur.fetchall()]
-                        if not vals:
-                            vals = ["-"]
-                        combo.configure(values=vals)
-                        combo.set(vals[0])
-                    except Exception:
-                        pass
+            # Estado
+            try:
+                vals = self.animal_service.cargar_estados()
+                if not vals:
+                    vals = ["-"]
+                self.cmb_estado.configure(values=vals)
+                self.cmb_estado.set(vals[0])
+            except Exception:
+                pass
         except Exception as e:
             print(f"Error cargando catálogos: {e}")
     
@@ -686,7 +604,7 @@ class ModalEditarAnimal(ctk.CTkToplevel):
             try:
                 # If DateEntry supports set_date, use it; else fallback
                 if hasattr(self.entry_fecha_nac, 'set_date'):
-                    self.entry_fecha_nac.set_date(datetime.strptime(str(fecha_nac), "%Y-%m-%d").date())
+                    getattr(self.entry_fecha_nac, 'set_date')(datetime.strptime(str(fecha_nac), "%Y-%m-%d").date())
                 else:
                     self.entry_fecha_nac.delete(0, 'end')
                     self.entry_fecha_nac.insert(0, str(fecha_nac))
@@ -697,7 +615,7 @@ class ModalEditarAnimal(ctk.CTkToplevel):
         if fecha_compra:
             try:
                 if hasattr(self.entry_fecha_compra, 'set_date'):
-                    self.entry_fecha_compra.set_date(datetime.strptime(str(fecha_compra), "%Y-%m-%d").date())
+                    getattr(self.entry_fecha_compra, 'set_date')(datetime.strptime(str(fecha_compra), "%Y-%m-%d").date())
                 else:
                     self.entry_fecha_compra.delete(0, 'end')
                     self.entry_fecha_compra.insert(0, str(fecha_compra))
@@ -795,40 +713,36 @@ class ModalEditarAnimal(ctk.CTkToplevel):
             self._show_photo(foto_path)
     
     def _load_fincas(self):
-        """Cargar fincas y aplicar filtrado dinámico"""
+        """Cargar fincas y aplicar filtrado dinámico (FASE 8.3.2: usa AnimalService)"""
         try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                
-                # Cargar fincas
-                cur.execute("SELECT id, nombre FROM finca ORDER BY nombre")
-                fincas = cur.fetchall()
-                finca_values = [f"{f[0]} - {f[1]}" for f in fincas]
-                self.cmb_finca.configure(values=finca_values)
-                
-                # Seleccionar finca actual y activar filtrado
-                finca_actual = self.animal.get('finca', '')
-                finca_id_actual = self.animal.get('id_finca') or self.animal.get('finca_id')
-                
-                if finca_id_actual:
-                    for val in finca_values:
-                        if val.startswith(f"{finca_id_actual} -"):
-                            self.cmb_finca.set(val)
-                            # Activar filtrado dinámico
-                            self._on_finca_change()
-                            break
-                elif finca_actual:
-                    for val in finca_values:
-                        if finca_actual in val:
-                            self.cmb_finca.set(val)
-                            self._on_finca_change()
-                            break
-                
-                # Después del filtrado, seleccionar ubicación actual
-                self._seleccionar_ubicacion_actual()
+            # Cargar fincas desde servicio
+            fincas_data = self.animal_service.cargar_fincas()
+            finca_values = [f"{f['id']} - {f['nombre']}" for f in fincas_data]
+            self.cmb_finca.configure(values=finca_values)
+            
+            # Seleccionar finca actual y activar filtrado
+            finca_id_actual = self.animal.get('id_finca') or self.animal.get('finca_id')
+            finca_actual = self.animal.get('finca') or self.animal.get('nombre_finca')
+            
+            if finca_id_actual:
+                for val in finca_values:
+                    if val.startswith(f"{finca_id_actual} -"):
+                        self.cmb_finca.set(val)
+                        # Activar filtrado dinámico
+                        self._on_finca_change()
+                        break
+            elif finca_actual:
+                for val in finca_values:
+                    if finca_actual in val:
+                        self.cmb_finca.set(val)
+                        self._on_finca_change()
+                        break
 
-                # Cargar catálogos globales
-                self._cargar_catalogos()
+            # Después del filtrado, seleccionar ubicación actual
+            self._seleccionar_ubicacion_actual()
+
+            # Cargar catálogos globales
+            self._cargar_catalogos()
                 
         except Exception as e:
             print(f"Error cargando fincas: {e}")
@@ -888,7 +802,8 @@ class ModalEditarAnimal(ctk.CTkToplevel):
             photo = ctk.CTkImage(light_image=img, dark_image=img, size=(230, 230))
             
             self.foto_label.configure(image=photo, text="")
-            self.foto_label.image = photo
+            # Guardar referencia en un atributo ignorado por el type checker
+            setattr(self.foto_label, "_photo_ref", photo)
         except Exception as e:
             print(f"Error mostrando foto: {e}")
     
@@ -1008,137 +923,59 @@ class ModalEditarAnimal(ctk.CTkToplevel):
                     messagebox.showerror("Error", f"No se pudo guardar la foto:\n{e}")
                     return
 
-            # ================== PERSISTENCIA ==================
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                # Column detection
-                cur.execute("PRAGMA table_info(animal)")
-                cols = {r[1] for r in cur.fetchall()}
-                finca_col = 'finca_id' if 'finca_id' in cols else 'id_finca'
-                sector_col = 'sector_id' if 'sector_id' in cols else 'id_sector'
-                potrero_col = 'potrero_id' if 'potrero_id' in cols else 'id_potrero'
-
-                # Ensure optional columns exist
-                add_defs = {
-                    'tipo_ingreso': 'TEXT',
-                    'fecha_compra': 'TEXT',
-                    'precio_compra': 'REAL',
-                    'peso_compra': 'REAL',
-                    'procedencia': 'TEXT',
-                    'vendedor': 'TEXT',
-                    'raza': 'TEXT',
-                    'peso_nacimiento': 'REAL',
-                    'condicion_corporal': 'TEXT',
-                    'estado': 'TEXT',
-                    'salud': 'TEXT',
-                    'calidad': 'TEXT',
-                    'grupo': 'TEXT',
-                    'color': 'TEXT',
-                    'hierro': 'TEXT',
-                    'inventariado': 'TEXT',
-                    'comentarios': 'TEXT',
-                    'madre_id': 'INTEGER',
-                    'padre_id': 'INTEGER',
-                    'inseminacion_artificial': 'INTEGER DEFAULT 0',
-                    'ultimo_peso': 'REAL',
-                    'tipo_reproduccion': 'TEXT'
-                }
-                for col_name, col_type in add_defs.items():
-                    if col_name not in cols:
-                        try:
-                            cur.execute(f"ALTER TABLE animal ADD COLUMN {col_name} {col_type}")
-                        except Exception:
-                            pass
-                # Re-read columns after potential alters
-                cur.execute("PRAGMA table_info(animal)")
-                cols = {r[1] for r in cur.fetchall()}
-
-                # Build dynamic UPDATE
-                set_parts = [
-                    'codigo = ?',
-                    'nombre = ?',
-                    'sexo = ?',
-                    'foto_path = ?'
-                ]
-                params = [
-                    codigo,
-                    (self.entry_nombre.get().strip() or None),
-                    sexo,
-                    foto_final_path
-                ]
-                if 'fecha_nacimiento' in cols:
-                    set_parts.append('fecha_nacimiento = ?'); params.append(fecha_nac)
-                set_parts.append(f'{finca_col} = ?'); params.append(finca_id)
-                if potrero_col in cols:
-                    set_parts.append(f'{potrero_col} = ?'); params.append(potrero_id)
-                if 'lote_id' in cols:
-                    set_parts.append('lote_id = ?'); params.append(lote_id)
-                if sector_col in cols:
-                    set_parts.append(f'{sector_col} = ?'); params.append(sector_id)
-                if 'ultimo_peso' in cols:
-                    set_parts.append('ultimo_peso = ?'); params.append(peso_actual)
-                # Optional business fields
-                if 'tipo_ingreso' in cols:
-                    set_parts.append('tipo_ingreso = ?'); params.append(tipo_ingreso)
-                if 'fecha_compra' in cols:
-                    set_parts.append('fecha_compra = ?'); params.append(fecha_compra)
-                if 'precio_compra' in cols:
-                    set_parts.append('precio_compra = ?'); params.append(precio_compra)
-                if 'peso_compra' in cols:
-                    set_parts.append('peso_compra = ?'); params.append(peso_compra)
-                if 'procedencia' in cols:
-                    val_proc = None
-                    try:
-                        val_proc = (self.cmb_procedencia.get().strip() or None)
-                    except Exception:
-                        val_proc = (getattr(self, 'entry_procedencia', ctk.CTkEntry(self)).get().strip() or None)
-                    set_parts.append('procedencia = ?'); params.append(val_proc)
-                if 'vendedor' in cols:
-                    set_parts.append('vendedor = ?'); params.append((self.entry_vendedor.get().strip() or None))
-                if 'raza' in cols:
-                    set_parts.append('raza = ?'); params.append(raza)
-                if 'peso_nacimiento' in cols:
-                    set_parts.append('peso_nacimiento = ?'); params.append(peso_nac)
-                if 'condicion_corporal' in cols:
-                    set_parts.append('condicion_corporal = ?'); params.append(condicion)
-                if 'estado' in cols:
-                    set_parts.append('estado = ?'); params.append(estado)
-                if 'salud' in cols:
-                    set_parts.append('salud = ?'); params.append(salud)
-                if 'calidad' in cols:
-                    set_parts.append('calidad = ?'); params.append(calidad)
-                if 'grupo' in cols:
-                    set_parts.append('grupo = ?'); params.append(grupo)
-                # Sincronizar clasificación también en columnas estándar si existen
-                if 'categoria' in cols:
-                    set_parts.append('categoria = ?'); params.append(grupo)
-                if 'grupo_compra' in cols:
-                    set_parts.append('grupo_compra = ?'); params.append(grupo)
-                if 'color' in cols:
-                    set_parts.append('color = ?'); params.append((self.entry_color.get().strip() or None))
-                if 'hierro' in cols:
-                    set_parts.append('hierro = ?'); params.append((self.entry_hierro.get().strip() or None))
-                if 'inventariado' in cols:
-                    set_parts.append('inventariado = ?'); params.append((self.entry_inventariado.get().strip() or None))
-                if 'comentarios' in cols:
-                    set_parts.append('comentarios = ?'); params.append((self.entry_comentarios.get().strip() or None))
-                if 'tipo_reproduccion' in cols:
-                    repro_val = None
-                    if tipo_ingreso == 'NACIMIENTO':
-                        if hasattr(self, 'cmb_tipo_reproduccion'):
-                            repro_val = self.cmb_tipo_reproduccion.get()
-                    set_parts.append('tipo_reproduccion = ?'); params.append(repro_val)
-                if 'madre_id' in cols:
-                    set_parts.append('madre_id = ?'); params.append(madre_id if tipo_ingreso == 'NACIMIENTO' else None)
-                if 'padre_id' in cols:
-                    set_parts.append('padre_id = ?'); params.append(padre_id if (tipo_ingreso == 'NACIMIENTO' and not inseminacion) else None)
-                if 'inseminacion_artificial' in cols:
-                    set_parts.append('inseminacion_artificial = ?'); params.append(inseminacion if tipo_ingreso == 'NACIMIENTO' else 0)
-
-                sql = f"UPDATE animal SET {', '.join(set_parts)} WHERE id = ?"
-                params.append(self.animal['id'])
-                cur.execute(sql, tuple(params))
-                conn.commit()
+            # ================== PERSISTENCIA (FASE 8.3.2: usa AnimalService) ==================
+            # Construir diccionario de cambios
+            val_proc = None
+            try:
+                val_proc = (self.cmb_procedencia.get().strip() or None)
+            except Exception:
+                val_proc = (getattr(self, 'entry_procedencia', ctk.CTkEntry(self)).get().strip() or None)
+            
+            repro_val = None
+            if tipo_ingreso == 'NACIMIENTO':
+                if hasattr(self, 'cmb_tipo_reproduccion'):
+                    repro_val = self.cmb_tipo_reproduccion.get()
+            
+            cambios = {
+                'codigo': codigo,
+                'nombre': (self.entry_nombre.get().strip() or None),
+                'sexo': sexo,
+                'foto_path': foto_final_path,
+                'fecha_nacimiento': fecha_nac,
+                'finca_id': finca_id,
+                'id_finca': finca_id,
+                'potrero_id': potrero_id,
+                'id_potrero': potrero_id,
+                'lote_id': lote_id,
+                'sector_id': sector_id,
+                'id_sector': sector_id,
+                'ultimo_peso': peso_actual,
+                'tipo_ingreso': tipo_ingreso,
+                'fecha_compra': fecha_compra,
+                'precio_compra': precio_compra,
+                'peso_compra': peso_compra,
+                'procedencia': val_proc,
+                'vendedor': (self.entry_vendedor.get().strip() or None),
+                'raza': raza,
+                'peso_nacimiento': peso_nac,
+                'condicion_corporal': condicion,
+                'estado': estado,
+                'salud': salud,
+                'calidad': calidad,
+                'grupo': grupo,
+                'categoria': grupo,
+                'grupo_compra': grupo,
+                'color': (self.entry_color.get().strip() or None),
+                'hierro': (self.entry_hierro.get().strip() or None),
+                'inventariado': (self.entry_inventariado.get().strip() or None),
+                'comentarios': (self.entry_comentarios.get().strip() or None),
+                'tipo_reproduccion': repro_val,
+                'madre_id': madre_id if tipo_ingreso == 'NACIMIENTO' else None,
+                'padre_id': padre_id if (tipo_ingreso == 'NACIMIENTO' and not inseminacion) else None,
+                'inseminacion_artificial': inseminacion if tipo_ingreso == 'NACIMIENTO' else 0,
+            }
+            
+            self.animal_service.actualizar_animal(self.animal['id'], cambios)
 
             messagebox.showinfo("Éxito", "Animal actualizado correctamente")
             if self.callback:

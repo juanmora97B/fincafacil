@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def get_connection(db_path: Optional[str] = None) -> Iterator[sqlite3.Connection]:
+def get_connection(db_path: Optional[Path | str] = None) -> Iterator[sqlite3.Connection]:
     """
     Context manager moderno para obtener conexión a BD.
     
@@ -58,7 +58,7 @@ class DatabaseManager:
         animales = db.execute_query("SELECT * FROM animal WHERE finca_id = ?", (1,))
     """
     
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[Path | str] = None):
         """
         Inicializa el DatabaseManager.
         
@@ -88,7 +88,7 @@ class DatabaseManager:
     def execute_query(
         self,
         query: str,
-        params: tuple = None,
+        params: Optional[tuple[Any, ...]] = None,
         fetch_one: bool = False,
         fetch_all: bool = True
     ) -> Any:
@@ -123,7 +123,7 @@ class DatabaseManager:
     def execute_one(
         self,
         query: str,
-        params: tuple = None
+        params: Optional[tuple[Any, ...]] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Ejecuta una consulta que retorna un solo registro.
@@ -140,7 +140,7 @@ class DatabaseManager:
     def execute_update(
         self,
         query: str,
-        params: tuple = None
+        params: Optional[tuple[Any, ...]] = None
     ) -> int:
         """
         Ejecuta una operación INSERT, UPDATE o DELETE.
@@ -291,7 +291,7 @@ class DatabaseManager:
         """
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(str(self.db_path))
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute("PRAGMA journal_mode = WAL")

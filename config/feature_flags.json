@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "version_aplicable": "1.0.0+",
+    "ultima_actualizacion": "2024-12-28",
+    "responsable": "Equipo de Producto"
+  },
+  "feature_flags": {
+    "FASE_8_DATA_QUALITY": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Validación y corrección automática de datos",
+      "impacto": "CRITICO"
+    },
+    "FASE_9_OBSERVABILITY": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Sistema de alertas y monitoreo 24/7",
+      "impacto": "CRITICO"
+    },
+    "FASE_10_EXPLAINABILITY": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Explicaciones en lenguaje natural de recomendaciones IA",
+      "impacto": "ALTO"
+    },
+    "FASE_11_SIMULATION": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Motor de simulación de escenarios What-If",
+      "impacto": "ALTO"
+    },
+    "FASE_13_UX_GUARDRAILS": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Tooltips, tours y prevención de errores",
+      "impacto": "MEDIO"
+    },
+    "FASE_14_RISK_MANAGEMENT": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Detección de patrones de riesgo de usuarios",
+      "impacto": "CRITICO"
+    },
+    "FASE_15_INCIDENT_MANAGEMENT": {
+      "habilitado": true,
+      "modos_activos": ["piloto", "produccion_controlada", "produccion_abierta"],
+      "porcentaje_rollout": 100,
+      "version_minima": "1.0.0",
+      "descripcion": "Gestión de incidentes y knowledge base",
+      "impacto": "ALTO"
+    },
+    "FASE_37_BI_ANALYTICS": {
+      "habilitado": false,
+      "modos_activos": [],
+      "porcentaje_rollout": 0,
+      "version_minima": "1.2.0",
+      "descripcion": "Business Intelligence y análisis avanzados",
+      "impacto": "MEDIO",
+      "notas": "Disponible desde v1.2.0 (FASE 20)"
+    },
+    "ALERTAS_BAJA": {
+      "habilitado": true,
+      "nivel_minimo_despliegue": "piloto",
+      "descripcion": "Alertas informativas de baja severidad"
+    },
+    "ALERTAS_MEDIA": {
+      "habilitado": true,
+      "nivel_minimo_despliegue": "piloto",
+      "descripcion": "Alertas de severidad media que requieren atención"
+    },
+    "ALERTAS_ALTA": {
+      "habilitado": true,
+      "nivel_minimo_despliegue": "piloto",
+      "descripcion": "Alertas de severidad alta"
+    },
+    "ALERTAS_CRITICA": {
+      "habilitado": true,
+      "nivel_minimo_despliegue": "piloto",
+      "descripcion": "Alertas críticas que requieren acción inmediata"
+    },
+    "MIGRACIONES_AUTOMATICAS": {
+      "habilitado": true,
+      "modo_despliegue": "produccion",
+      "descripcion": "Ejecutar migraciones de BD automáticamente en deploy"
+    },
+    "ROLLBACK_AUTOMATICO": {
+      "habilitado": false,
+      "umbral_error_rate_pct": 5,
+      "umbral_uptime_minutos": 30,
+      "descripcion": "Activar para producción abierta en v1.2+"
+    }
+  },
+  "limites_sistema": {
+    "max_usuarios_piloto": 3,
+    "max_animales_por_finca": 100000,
+    "max_eventos_simultaneos": 100,
+    "timeout_operacion_ms": 30000,
+    "max_tamaño_reporte_mb": 500
+  },
+  "integraciones": {
+    "api_externa": {
+      "habilitado": false,
+      "version_minima": "1.2.0",
+      "descripcion": "APIs externas para integraciones (v1.2+)"
+    },
+    "iot_sensores": {
+      "habilitado": false,
+      "version_minima": "2.0.0",
+      "descripcion": "Integración con sensores IoT (v2.0+)"
+    }
+  }
+}

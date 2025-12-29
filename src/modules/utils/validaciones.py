@@ -8,6 +8,12 @@ from typing import Tuple, Optional, Any
 import customtkinter as ctk
 from tkinter import messagebox
 
+try:
+    from modules.utils.validators import validator as _validator_instance
+    _VALIDATOR_AVAILABLE = True
+except ImportError:
+    _VALIDATOR_AVAILABLE = False
+
 class Validador:
     """Clase para validaciones centralizadas"""
     
@@ -147,6 +153,7 @@ class Validador:
     @staticmethod
     def validar_email(valor: str, nombre_campo: str = "Email",
                      permitir_vacio: bool = False) -> Tuple[bool, str, str]:
+        # DEPRECATED: Wrapper to validators.FincaFacilValidator.validar_email
         """
         Valida que un valor sea un email válido
         
@@ -158,18 +165,21 @@ class Validador:
                 return True, "", ""
             return False, "", f"{nombre_campo} no puede estar vacío"
         
-        email = valor.strip().lower()
+        if _VALIDATOR_AVAILABLE:
+            es_valido, mensaje = _validator_instance.validar_email(valor)
+            email_limpio = valor.strip().lower() if es_valido else ""
+            return es_valido, email_limpio, "" if es_valido else mensaje
         
-        # Patrón básico de email
+        email = valor.strip().lower()
         patron = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(patron, email):
             return False, "", f"{nombre_campo} no tiene un formato válido"
-        
         return True, email, ""
     
     @staticmethod
     def validar_telefono(valor: str, nombre_campo: str = "Teléfono",
                         permitir_vacio: bool = False) -> Tuple[bool, str, str]:
+        # DEPRECATED: Wrapper to validators.FincaFacilValidator.validar_telefono
         """
         Valida un número de teléfono
         
@@ -181,18 +191,17 @@ class Validador:
                 return True, "", ""
             return False, "", f"{nombre_campo} no puede estar vacío"
         
-        # Limpiar caracteres no numéricos excepto + - ( ) espacios
+        if _VALIDATOR_AVAILABLE:
+            es_valido, mensaje = _validator_instance.validar_telefono(valor)
+            telefono_limpio = valor.strip() if es_valido else ""
+            return es_valido, telefono_limpio, "" if es_valido else mensaje
+        
         telefono_limpio = re.sub(r'[^\d+\-() ]', '', valor.strip())
-        
-        # Contar solo dígitos
         digitos = re.sub(r'\D', '', telefono_limpio)
-        
         if len(digitos) < 7:
             return False, "", f"{nombre_campo} debe tener al menos 7 dígitos"
-        
         if len(digitos) > 15:
             return False, "", f"{nombre_campo} no puede tener más de 15 dígitos"
-        
         return True, telefono_limpio, ""
     
     @staticmethod
@@ -353,13 +362,3 @@ def validar_numero(valor: str, nombre_campo: str = "Campo", minimo: Optional[flo
                   maximo: Optional[float] = None) -> Tuple[bool, Optional[float], str]:
     """Valida números."""
     return Validador.validar_numerico(valor, nombre_campo, minimo, maximo)
-
-
-def validar_email(email: str) -> Tuple[bool, Optional[str], str]:
-    """Valida formato de correo electrónico."""
-    return Validador.validar_email(email)
-
-
-def validar_telefono(telefono: str) -> Tuple[bool, Optional[str], str]:
-    """Valida formato de teléfono."""
-    return Validador.validar_telefono(telefono)

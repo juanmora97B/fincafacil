@@ -8,6 +8,7 @@ emoji). Se mantiene compatibilidad con el estilo anterior mediante el parámetro
 """
 
 import os
+from typing import Tuple, Optional, List, cast
 import io
 from pathlib import Path
 from typing import Optional, Dict, Tuple
@@ -78,7 +79,7 @@ GLYPHS_MDL2 = {
 
 def _hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
     hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    return cast(Tuple[int, int, int], tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)))
 
 
 def _obtener_glyph(modulo: str) -> Tuple[str, Optional[str]]:
@@ -240,7 +241,7 @@ def obtener_icono_ctk(modulo, size=40, estilo="fluent"):
         pass
 
     # 3) Fallback al generador actual (emoji/fluent)
-    return generar_icono_simple(modulo, size, estilo)
+    return generar_icono_simple(modulo, size, estilo)  # type: ignore[arg-type]
 
 
 def obtener_frames_animados(modulo, size=40):

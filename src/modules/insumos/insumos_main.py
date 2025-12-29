@@ -353,7 +353,7 @@ class InsumosModule(ctk.CTkFrame):
             self.tabla.column(col, width=width, anchor="center")
         self.tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Barra inferior de acciones (botones alineados abajo)
@@ -600,7 +600,7 @@ class InsumosModule(ctk.CTkFrame):
         self.tabla_mant.pack(side="left", fill="both", expand=True)
         
         scrollbar_mant = ttk.Scrollbar(tabla_container, orient="vertical", command=self.tabla_mant.yview)
-        self.tabla_mant.configure(yscroll=scrollbar_mant.set)
+        self.tabla_mant.configure(yscroll=scrollbar_mant.set)  # type: ignore[arg-type]
         scrollbar_mant.pack(side="right", fill="y")
         
         self.cargar_mantenimientos()
@@ -1292,7 +1292,7 @@ class InsumosModule(ctk.CTkFrame):
         if not hasattr(self, 'combo_insumo_mant') or not self.combo_insumo_mant.get():
             messagebox.showwarning("Atención", "Seleccione un insumo en el combo de Movimientos")
             return
-        nuevo_estado = self.combo_estado_mant.get().strip() if hasattr(self, 'combo_estado_mant') else None
+        nuevo_estado = self.combo_estado_mant.get().strip() if hasattr(self, 'combo_estado_mant') and getattr(self, 'combo_estado_mant', None) else None  # type: ignore[attr-defined]
         if not nuevo_estado:
             messagebox.showwarning("Atención", "Seleccione un estado a aplicar")
             return
@@ -1851,9 +1851,11 @@ class InsumosModule(ctk.CTkFrame):
         try:
             wb = openpyxl.load_workbook(archivo)
             ws = wb.active
+            if ws is None:
+                ws = wb.create_sheet()
             
             # Verificar encabezados
-            headers = [cell.value for cell in ws[1]]
+            headers = [cell.value for cell in ws[1]]  # type: ignore[index]
             required = ["codigo", "nombre", "categoria"]
             
             if not all(h in [str(x).lower() if x else "" for x in headers] for h in required):
@@ -1886,11 +1888,11 @@ class InsumosModule(ctk.CTkFrame):
                     if norm.startswith('finca '):
                         fincas_map[norm[6:]] = fid
                 
-                for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):  # type: ignore[attr-defined]
                     try:
-                        codigo = row[col_map.get("codigo")]
-                        nombre = row[col_map.get("nombre")]
-                        categoria = row[col_map.get("categoria")]
+                        codigo = row[col_map.get("codigo", 0)] if col_map.get("codigo") is not None else None  # type: ignore[index]
+                        nombre = row[col_map.get("nombre", 1)] if col_map.get("nombre") is not None else None  # type: ignore[index]
+                        categoria = row[col_map.get("categoria", 2)] if col_map.get("categoria") is not None else None  # type: ignore[index]
                         
                         if not codigo or not nombre or not categoria:
                             errores.append(f"Fila {row_idx}: Faltan campos obligatorios")
@@ -1898,8 +1900,8 @@ class InsumosModule(ctk.CTkFrame):
                         
                         # Obtener id_finca
                         id_finca = None
-                        if "finca" in col_map and row[col_map["finca"]]:
-                            finca_nombre_original = str(row[col_map["finca"]]).strip()
+                        if "finca" in col_map and row[col_map.get("finca", -1)] if col_map.get("finca") is not None else None:  # type: ignore[index]
+                            finca_nombre_original = str(row[col_map["finca"]]).strip()  # type: ignore[index]
                             finca_key = self._normalize_text(finca_nombre_original)
                             id_finca = fincas_map.get(finca_key)
                             # Fallback quitar 'finca ' inicial
@@ -1916,25 +1918,25 @@ class InsumosModule(ctk.CTkFrame):
                                 errores.append(f"Fila {row_idx}: Finca '{finca_nombre_original}' no encontrada - verifique nombre")
                         
                         # Obtener otros campos opcionales
-                        proveedor_principal = row[col_map.get("proveedor_principal")] if "proveedor_principal" in col_map else None
-                        unidad_medida = row[col_map.get("unidad_medida")] if "unidad_medida" in col_map else None
-                        lote_proveedor = row[col_map.get("lote_proveedor")] if "lote_proveedor" in col_map else None
-                        estado = row[col_map.get("estado", "Operativa")] if "estado" in col_map else "Operativa"
-                        ubicacion = row[col_map.get("ubicacion")] if "ubicacion" in col_map else None
-                        responsable = row[col_map.get("responsable")] if "responsable" in col_map else None
-                        fecha_adq = row[col_map.get("fecha_adquisicion")] if "fecha_adquisicion" in col_map else None
+                        proveedor_principal = row[col_map.get("proveedor_principal", -1)] if "proveedor_principal" in col_map and col_map.get("proveedor_principal") is not None else None  # type: ignore[index]
+                        unidad_medida = row[col_map.get("unidad_medida", -1)] if "unidad_medida" in col_map and col_map.get("unidad_medida") is not None else None  # type: ignore[index]
+                        lote_proveedor = row[col_map.get("lote_proveedor", -1)] if "lote_proveedor" in col_map and col_map.get("lote_proveedor") is not None else None  # type: ignore[index]
+                        estado = row[col_map.get("estado", -1)] if "estado" in col_map and col_map.get("estado") is not None else "Operativa"  # type: ignore[index]
+                        ubicacion = row[col_map.get("ubicacion", -1)] if "ubicacion" in col_map and col_map.get("ubicacion") is not None else None  # type: ignore[index]
+                        responsable = row[col_map.get("responsable", -1)] if "responsable" in col_map and col_map.get("responsable") is not None else None  # type: ignore[index]
+                        fecha_adq = row[col_map.get("fecha_adquisicion", -1)] if "fecha_adquisicion" in col_map and col_map.get("fecha_adquisicion") is not None else None  # type: ignore[index]
                         valor = None
                         if "precio_unitario" in col_map:
-                            raw_valor = row[col_map.get("precio_unitario")]
+                            raw_valor = row[col_map.get("precio_unitario", -1)] if col_map.get("precio_unitario") is not None else None  # type: ignore[index]
                             try:
                                 valor = self._parse_valor(raw_valor)
                             except ValueError:
                                 errores.append(f"Fila {row_idx}: Valor inválido '{raw_valor}'")
-                        vida_util = row[col_map.get("stock_minimo")] if "stock_minimo" in col_map else None
-                        descripcion = row[col_map.get("descripcion")] if "descripcion" in col_map else None
-                        observaciones = row[col_map.get("observaciones")] if "observaciones" in col_map else None
-                        stock_actual_raw = row[col_map.get("stock_actual")] if "stock_actual" in col_map else None
-                        stock_bodega_raw = row[col_map.get("stock_bodega")] if "stock_bodega" in col_map else None
+                        vida_util = row[col_map.get("stock_minimo", -1)] if "stock_minimo" in col_map and col_map.get("stock_minimo") is not None else None  # type: ignore[index]
+                        descripcion = row[col_map.get("descripcion", -1)] if "descripcion" in col_map and col_map.get("descripcion") is not None else None  # type: ignore[index]
+                        observaciones = row[col_map.get("observaciones", -1)] if "observaciones" in col_map and col_map.get("observaciones") is not None else None  # type: ignore[index]
+                        stock_actual_raw = row[col_map.get("stock_actual", -1)] if "stock_actual" in col_map and col_map.get("stock_actual") is not None else None  # type: ignore[index]
+                        stock_bodega_raw = row[col_map.get("stock_bodega", -1)] if "stock_bodega" in col_map and col_map.get("stock_bodega") is not None else None  # type: ignore[index]
                         stock_actual = self._get_stock_actual_validado(stock_actual_raw)
                         stock_bodega = self._get_stock_bodega_validado(stock_bodega_raw, stock_actual, responsable or "Bodega")
                         
@@ -2000,6 +2002,13 @@ class InsumosModule(ctk.CTkFrame):
             # Crear workbook
             wb = openpyxl.Workbook()
             ws = wb.active
+            if ws is None:
+                ws = wb.create_sheet()
+            
+            # Type narrowing
+            from openpyxl.worksheet.worksheet import Worksheet
+            assert isinstance(ws, Worksheet), "ws debe ser una hoja de trabajo válida"
+            
             ws.title = "Insumos"
             
             # Encabezados
@@ -2011,10 +2020,11 @@ class InsumosModule(ctk.CTkFrame):
             ws.append(headers)
             
             # Formatear encabezados
-            for cell in ws[1]:
-                cell.font = openpyxl.styles.Font(bold=True)
-                cell.fill = openpyxl.styles.PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-                cell.font = openpyxl.styles.Font(color="FFFFFF", bold=True)
+            from openpyxl.styles import Font, PatternFill
+            for cell in ws[1]:  # type: ignore[index]
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
             
             # Agregar filas de ejemplo
             ws.append([
@@ -2031,7 +2041,7 @@ class InsumosModule(ctk.CTkFrame):
             # Ajustar ancho de columnas
             for column in ws.columns:
                 max_length = 0
-                column_letter = column[0].column_letter
+                column_letter = column[0].column_letter  # type: ignore[attr-defined]
                 for cell in column:
                     try:
                         if cell.value:

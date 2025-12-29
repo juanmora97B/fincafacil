@@ -1,0 +1,201 @@
+openapi: 3.0.3
+info:
+  title: FincaFacil Public API
+  version: 1.0.0
+  description: >-
+    API pública para integrar FincaFácil con sensores IoT, ERPs rurales, apps móviles
+    y sistemas gubernamentales. Versionada y compatible con v2.0.0 backend.
+servers:
+  - url: https://api.fincafacil.com/api/v1
+    description: Producción
+  - url: https://sandbox.fincafacil.com/api/v1
+    description: Sandbox
+security:
+  - ApiKeyAuth: []
+  - OAuth2ClientCredentials: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    OAuth2ClientCredentials:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.fincafacil.com/oauth/token
+          scopes:
+            read:animal: Leer animales
+            write:animal: Crear/editar animales
+            read:ordeño: Leer ordeños
+            write:ordeño: Crear ordeños
+            admin:tenant: Operaciones administrativas de tenant
+  parameters:
+    TenantHeader:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      description: Identificador del tenant/cliente
+      schema:
+        type: string
+    PaginationLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+        maximum: 200
+    PaginationOffset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+  responses:
+    UnauthorizedError:
+      description: API key o token inválido
+    TooManyRequests:
+      description: Límite de rate excedido
+    NotFound:
+      description: Recurso no encontrado
+    ValidationError:
+      description: Error de validación de payload
+  schemas:
+    Animal:
+      type: object
+      required: [id, identificador, estado]
+      properties:
+        id:
+          type: string
+        identificador:
+          type: string
+        estado:
+          type: string
+          enum: [Activo, Muerto, Vendido, Perdido]
+        fecha_nacimiento:
+          type: string
+          format: date
+        raza:
+          type: string
+    Ordeño:
+      type: object
+      required: [id, fecha]
+      properties:
+        id: { type: string }
+        fecha: { type: string, format: date }
+        litros_manana: { type: number }
+        litros_tarde: { type: number }
+        litros_noche: { type: number }
+    Prediccion:
+      type: object
+      properties:
+        id: { type: string }
+        tipo: { type: string }
+        puntaje_confianza: { type: number }
+        factores_clave: { type: array, items: { type: string } }
+
+paths:
+  /auth/token:
+    post:
+      summary: Obtener token OAuth2 (Client Credentials)
+      responses:
+        '200': { description: Token emitido }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /animals:
+    get:
+      summary: Listar animales
+      parameters: [ { $ref: '#/components/parameters/TenantHeader' }, { $ref: '#/components/parameters/PaginationLimit' }, { $ref: '#/components/parameters/PaginationOffset' } ]
+      responses:
+        '200':
+          description: Lista de animales
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Animal' }
+                  total: { type: integer }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      summary: Crear animal
+      parameters: [ { $ref: '#/components/parameters/TenantHeader' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Animal' }
+      responses:
+        '201': { description: Creado }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /animals/{id}:
+    get:
+      summary: Obtener animal por id
+      parameters:
+        - { $ref: '#/components/parameters/TenantHeader' }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Animal' }}}}
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /milking:
+    get:
+      summary: Listar ordeños
+      parameters: [ { $ref: '#/components/parameters/TenantHeader' }, { $ref: '#/components/parameters/PaginationLimit' }, { $ref: '#/components/parameters/PaginationOffset' } ]
+      responses:
+        '200': { description: Lista ordeños }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+    post:
+      summary: Crear ordeño
+      parameters: [ { $ref: '#/components/parameters/TenantHeader' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Ordeño' }
+      responses:
+        '201': { description: Creado }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /predicciones:
+    get:
+      summary: Listar predicciones (solo enterprise)
+      parameters: [ { $ref: '#/components/parameters/TenantHeader' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Prediccion' }}}}}
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { description: Requiere plan enterprise }
+
+  /webhooks/test:
+    post:
+      summary: Probar entrega de webhook
+      security: []
+      responses:
+        '200': { description: OK }
+
+webhooks:
+  alertaCritica:
+    post:
+      summary: Alerta crítica generada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipo: { type: string }
+                mensaje: { type: string }
+                severidad: { type: string }
+                tenant_id: { type: string }
+    responses:
+      '200': { description: Recibido }

@@ -1,6 +1,10 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
-from modules.utils import database_helpers as db
+
+try:
+    from database import get_db_connection
+except Exception:
+    from database.database import get_db_connection
 
 class InventarioRapido(ctk.CTkFrame):
     def __init__(self, master=None):
@@ -54,14 +58,14 @@ class InventarioRapido(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text="Guardar todo", command=self.guardar_todo).pack(side="left", padx=10)
 
     def obtener_fincas(self):
-        with db.get_connection() as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nombre FROM finca WHERE activo = 1")
             return cursor.fetchall()
 
     def cargar_animales_finca(self, event=None):
         finca_nombre = self.combo_finca.get()
-        with db.get_connection() as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM finca WHERE nombre = ?", (finca_nombre,))
             finca_id = cursor.fetchone()[0]
@@ -126,7 +130,7 @@ class InventarioRapido(ctk.CTkFrame):
                 if abs(peso_actual - peso_anterior) > max(0.2 * peso_anterior, 10):
                     messagebox.showwarning("Advertencia", "El peso actual difiere más de un 20% del anterior.")
                 # Guardar en BD
-                with db.get_connection() as conn:
+                with get_db_connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute("UPDATE animal SET peso_actual = ?, tratamientos = ?, observaciones = ?, inventariado = ? WHERE codigo = ?", (peso_actual, combo_trat.get(), entry_obs.get(), invent_var.get(), vals[0]))
                     conn.commit()
@@ -146,7 +150,7 @@ class InventarioRapido(ctk.CTkFrame):
                 peso_actual = float(vals[3])
                 if peso_actual <= 0:
                     continue
-                with db.get_connection() as conn:
+                with get_db_connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute("UPDATE animal SET peso_actual = ?, inventariado = ? WHERE codigo = ?", (peso_actual, vals[7], vals[0]))
                     conn.commit()

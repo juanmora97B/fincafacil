@@ -4,7 +4,7 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import db
+from infraestructura.potreros import PotrerosService, PotrerosRepository
 from modules.utils.ui import get_theme_colors, style_treeview, add_tooltip
 from modules.utils.colores import obtener_colores
 
@@ -22,6 +22,8 @@ class PotrerosModule(ctk.CTkFrame):
         self._hover_card = self._colors["hover"]
         self.main_frame = None  # Inicializar atributo
         self.finca_filtro_actual = "Todas las fincas"  # Almacenar finca seleccionada
+        # Inicializar servicio
+        self.potrero_service = PotrerosService(repository=PotrerosRepository())
         self.crear_widgets()
         self.cargar_fincas()
         self.cargar_potreros()
@@ -112,7 +114,7 @@ class PotrerosModule(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -195,18 +197,12 @@ class PotrerosModule(ctk.CTkFrame):
         return valor_label
     
     def cargar_fincas(self):
-        """Carga las fincas disponibles en el ComboBox"""
+        """Carga las fincas disponibles en el ComboBox usando servicio"""
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT nombre FROM finca WHERE estado = 'Activo' ORDER BY nombre")
-                fincas = [r[0] for r in cursor.fetchall()]
-                
-                # Insertar "Todas las fincas" al inicio
-                opciones = ["Todas las fincas"] + fincas
-                self.cb_finca_filtro.configure(values=opciones)
-                self.cb_finca_filtro.set("Todas las fincas")
-                self.finca_filtro_actual = "Todas las fincas"
+            opciones = self.potrero_service.listar_fincas()
+            self.cb_finca_filtro.configure(values=opciones)
+            self.cb_finca_filtro.set("Todas las fincas")
+            self.finca_filtro_actual = "Todas las fincas"
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las fincas:\n{e}")
     
@@ -216,102 +212,48 @@ class PotrerosModule(ctk.CTkFrame):
         self.cargar_potreros()
 
     def cargar_potreros(self):
-        """Carga los potreros en la tabla y actualiza métricas"""
+        """Carga los potreros en la tabla y actualiza métricas usando servicio"""
         # Limpiar tabla
         for fila in self.tabla.get_children():
             self.tabla.delete(fila)
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
+            potreros_data = self.potrero_service.listar_potreros_filtrado(self.finca_filtro_actual)
+            
+            for potrero in potreros_data:
+                area = f"{potrero['area_hectareas']:.2f}" if potrero['area_hectareas'] else "-"
+                capacidad = str(potrero['capacidad_maxima']) if potrero['capacidad_maxima'] else "-"
+                
+                # Contar animales en este potrero
+                cantidad_animales = self.potrero_service.contar_animales_potrero(potrero['id'])
 
-                # Construir consulta con filtro de finca
-                if self.finca_filtro_actual == "Todas las fincas":
-                    query = """
-                        SELECT 
-                            f.nombre as finca,
-                            p.nombre,
-                            COALESCE(s.nombre, 'N/A') as sector,
-                            p.area_hectareas,
-                            p.capacidad_maxima,
-                            p.tipo_pasto,
-                            p.estado,
-                            p.id
-                        FROM potrero p
-                        LEFT JOIN finca f ON p.id_finca = f.id
-                        LEFT JOIN sector s ON p.id_sector = s.id
-                        ORDER BY f.nombre, p.nombre
-                    """
-                    cursor.execute(query)
-                else:
-                    query = """
-                        SELECT 
-                            f.nombre as finca,
-                            p.nombre,
-                            COALESCE(s.nombre, 'N/A') as sector,
-                            p.area_hectareas,
-                            p.capacidad_maxima,
-                            p.tipo_pasto,
-                            p.estado,
-                            p.id
-                        FROM potrero p
-                        LEFT JOIN finca f ON p.id_finca = f.id
-                        LEFT JOIN sector s ON p.id_sector = s.id
-                        WHERE f.nombre = ?
-                        ORDER BY p.nombre
-                    """
-                    cursor.execute(query, (self.finca_filtro_actual,))
+                self.tabla.insert("", "end", values=(
+                    potrero['finca_nombre'] or "-",
+                    potrero['nombre'],
+                    potrero['sector'] or "-",
+                    area,
+                    capacidad,
+                    str(cantidad_animales),
+                    potrero['tipo_pasto'] or "-",
+                    potrero['estado'] or "Activo"
+                ))
 
-                potreros_data = []
-                for fila in cursor.fetchall():
-                    area = f"{fila[3]:.2f}" if fila[3] else "-"
-                    capacidad = str(fila[4]) if fila[4] else "-"
-                    
-                    # Contar animales en este potrero
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM animal 
-                        WHERE id_potrero = ? AND estado = 'Activo'
-                    """, (fila[7],))
-                    cantidad_animales = cursor.fetchone()[0]
-
-                    self.tabla.insert("", "end", values=(
-                        fila[0] or "-",
-                        fila[1],
-                        fila[2] or "-",
-                        area,
-                        capacidad,
-                        str(cantidad_animales),
-                        fila[5] or "-",
-                        fila[6] or "Activo"
-                    ))
-                    potreros_data.append(fila)
-
-                # Actualizar métricas
-                self.actualizar_metricas(cursor, potreros_data)
+            # Actualizar métricas
+            self.actualizar_metricas(potreros_data)
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los potreros:\n{e}")
 
-    def actualizar_metricas(self, cursor, potreros_data):
+    def actualizar_metricas(self, potreros_data):
         """Actualiza las métricas rápidas"""
         try:
-            # Total de potreros
-            total_potreros = len(potreros_data)
-            
-            # Potreros activos
-            potreros_activos = sum(1 for p in potreros_data if p[6] == 'Activo')
-            
-            # Área total
-            area_total = sum(p[3] for p in potreros_data if p[3] is not None)
-            
-            # Capacidad total
-            capacidad_total = sum(p[4] for p in potreros_data if p[4] is not None)
+            metricas = self.potrero_service.obtener_metricas(potreros_data)
 
             # Actualizar labels
-            self.metricas["total_potreros"].configure(text=str(total_potreros))
-            self.metricas["potreros_activos"].configure(text=str(potreros_activos))
-            self.metricas["area_total"].configure(text=f"{area_total:.2f} Ha")
-            self.metricas["capacidad_total"].configure(text=str(capacidad_total))
+            self.metricas["total_potreros"].configure(text=str(metricas['total']))
+            self.metricas["potreros_activos"].configure(text=str(metricas['activos']))
+            self.metricas["area_total"].configure(text=f"{metricas['area_total_ha']:.2f} Ha")
+            self.metricas["capacidad_total"].configure(text=str(metricas['capacidad_total']))
 
         except Exception as e:
             print(f"Error actualizando métricas: {e}")
@@ -327,54 +269,34 @@ class PotrerosModule(ctk.CTkFrame):
         nombre_potrero = self.tabla.item(seleccionado[0])["values"][1]
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT 
-                        p.nombre, COALESCE(s.nombre, 'N/A') as sector, p.area_hectareas, p.capacidad_maxima,
-                        p.tipo_pasto, p.descripcion, p.estado, f.nombre as finca_nombre
-                    FROM potrero p
-                    LEFT JOIN finca f ON p.id_finca = f.id
-                    LEFT JOIN sector s ON p.id_sector = s.id
-                    WHERE p.nombre = ? AND f.nombre = ?
-                """, (nombre_potrero, finca))
+            potrero = self.potrero_service.obtener_detalles(nombre_potrero, finca)
+            if potrero:
+                # Contar animales en el potrero
+                cantidad_animales = self.potrero_service.contar_animales_potrero(potrero['id'])
 
-                potrero = cursor.fetchone()
-                if potrero:
-                    # Contar animales en el potrero
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM animal 
-                        WHERE id_potrero = (
-                            SELECT p.id FROM potrero p
-                            LEFT JOIN finca f ON p.id_finca = f.id
-                            WHERE p.nombre = ? AND f.nombre = ?
-                        ) AND estado = 'Activo'
-                    """, (nombre_potrero, finca))
-                    cantidad_animales = cursor.fetchone()[0]
-
-                    detalles = f"""
+                detalles = f"""
 📋 DETALLES DEL POTRERO
 
-🏠 Finca: {potrero[7] or 'No especificada'}
-🌿 Potrero: {potrero[0]}
-📍 Sector: {potrero[1] or 'No especificado'}
-📐 Área: {potrero[2] or 0:.2f} hectáreas
-🐄 Capacidad Máxima: {potrero[3] or 0} animales
-🌱 Tipo de Pasto: {potrero[4] or 'No especificado'}
-📊 Estado: {potrero[6] or 'Activo'}
+🏠 Finca: {potrero['finca_nombre'] or 'No especificada'}
+🌿 Potrero: {potrero['nombre']}
+📍 Sector: {potrero['sector'] or 'No especificado'}
+📐 Área: {potrero['area_hectareas'] or 0:.2f} hectáreas
+🐄 Capacidad Máxima: {potrero['capacidad_maxima'] or 0} animales
+🌱 Tipo de Pasto: {potrero['tipo_pasto'] or 'No especificado'}
+📊 Estado: {potrero['estado'] or 'Activo'}
 
 📊 OCUPACIÓN ACTUAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🐄 Animales asignados: {cantidad_animales}
-📈 Porcentaje ocupación: {(cantidad_animales / (potrero[3] or 1)) * 100:.1f}%
+📈 Porcentaje ocupación: {(cantidad_animales / (potrero['capacidad_maxima'] or 1)) * 100:.1f}%
 
 📝 DESCRIPCIÓN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{potrero[5] or 'No hay descripción disponible'}
-                    """
-                    messagebox.showinfo(f"Detalles - {potrero[0]}", detalles)
-                else:
-                    messagebox.showerror("Error", "No se encontró el potrero")
+{potrero['descripcion'] or 'No hay descripción disponible'}
+                """
+                messagebox.showinfo(f"Detalles - {potrero['nombre']}", detalles)
+            else:
+                messagebox.showerror("Error", "No se encontró el potrero")
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los detalles:\n{e}")
@@ -395,89 +317,80 @@ class PotrerosModule(ctk.CTkFrame):
             return
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT 
-                        a.codigo, a.nombre, r.nombre as raza, a.sexo, a.estado
-                    FROM animal a
-                    LEFT JOIN raza r ON a.raza_id = r.id
-                    WHERE a.id_potrero = (
-                        SELECT p.id FROM potrero p
-                        LEFT JOIN finca f ON p.id_finca = f.id
-                        WHERE p.nombre = ? AND f.nombre = ?
-                    ) AND a.estado = 'Activo'
-                    ORDER BY a.codigo
-                """, (nombre_potrero, finca))
+            animales = self.potrero_service.obtener_animales(nombre_potrero, finca)
+            if animales:
+                # Crear ventana con lista de animales
+                ventana_animales = ctk.CTkToplevel(self)
+                ventana_animales.title(f"Animales en {nombre_potrero}")
+                ventana_animales.geometry("600x400")
+                ventana_animales.transient(self.winfo_toplevel())
+                ventana_animales.grab_set()
 
-                animales = cursor.fetchall()
-                if animales:
-                    # Crear ventana con lista de animales
-                    ventana_animales = ctk.CTkToplevel(self)
-                    ventana_animales.title(f"Animales en {nombre_potrero}")
-                    ventana_animales.geometry("600x400")
-                    ventana_animales.transient(self)
-                    ventana_animales.grab_set()
+                # Frame principal
+                main_frame = ctk.CTkFrame(ventana_animales)
+                # Compactar ancho (20→4)
+                main_frame.pack(fill="both", expand=True, padx=4, pady=5)
 
-                    # Frame principal
-                    main_frame = ctk.CTkFrame(ventana_animales)
-                    # Compactar ancho (20→4)
-                    main_frame.pack(fill="both", expand=True, padx=4, pady=5)
+                ctk.CTkLabel(
+                    main_frame,
+                    text=f"🐄 Animales en {nombre_potrero}",
+                    font=("Segoe UI", 16, "bold")
+                ).pack(pady=(0, 10))
 
-                    ctk.CTkLabel(
-                        main_frame,
-                        text=f"🐄 Animales en {nombre_potrero}",
-                        font=("Segoe UI", 16, "bold")
-                    ).pack(pady=(0, 10))
+                ctk.CTkLabel(
+                    main_frame,
+                    text=f"Total: {len(animales)} animales",
+                    font=("Segoe UI", 12)
+                ).pack(pady=(0, 10))
 
-                    ctk.CTkLabel(
-                        main_frame,
-                        text=f"Total: {len(animales)} animales",
-                        font=("Segoe UI", 12)
-                    ).pack(pady=(0, 10))
+                # Tabla de animales
+                table_frame = ctk.CTkFrame(main_frame)
+                table_frame.pack(fill="both", expand=True)
 
-                    # Tabla de animales
-                    table_frame = ctk.CTkFrame(main_frame)
-                    table_frame.pack(fill="both", expand=True)
+                tabla_animales = ttk.Treeview(
+                    table_frame,
+                    columns=("codigo", "nombre", "raza", "sexo", "estado"),
+                    show="headings",
+                    height=12
+                )
 
-                    tabla_animales = ttk.Treeview(
-                        table_frame,
-                        columns=("codigo", "nombre", "raza", "sexo", "estado"),
-                        show="headings",
-                        height=12
-                    )
+                columnas = [
+                    ("codigo", "Código", 100),
+                    ("nombre", "Nombre", 150),
+                    ("raza", "Raza", 120),
+                    ("sexo", "Sexo", 80),
+                    ("estado", "Estado", 100)
+                ]
 
-                    columnas = [
-                        ("codigo", "Código", 100),
-                        ("nombre", "Nombre", 150),
-                        ("raza", "Raza", 120),
-                        ("sexo", "Sexo", 80),
-                        ("estado", "Estado", 100)
-                    ]
+                for col, heading, width in columnas:
+                    tabla_animales.heading(col, text=heading)
+                    tabla_animales.column(col, width=width, anchor="center")
 
-                    for col, heading, width in columnas:
-                        tabla_animales.heading(col, text=heading)
-                        tabla_animales.column(col, width=width, anchor="center")
+                for animal in animales:
+                    tabla_animales.insert("", "end", values=(
+                        animal['codigo'],
+                        animal['nombre'],
+                        animal['raza'],
+                        animal['sexo'],
+                        animal['estado']
+                    ))
 
-                    for animal in animales:
-                        tabla_animales.insert("", "end", values=animal)
+                tabla_animales.pack(side="left", fill="both", expand=True)
 
-                    tabla_animales.pack(side="left", fill="both", expand=True)
+                scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla_animales.yview)
+                tabla_animales.configure(yscrollcommand=scrollbar.set)
+                scrollbar.pack(side="right", fill="y")
 
-                    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla_animales.yview)
-                    tabla_animales.configure(yscroll=scrollbar.set)
-                    scrollbar.pack(side="right", fill="y")
+                # Botón cerrar
+                ctk.CTkButton(
+                    main_frame,
+                    text="Cerrar",
+                    command=ventana_animales.destroy,
+                    width=100
+                ).pack(pady=10)
 
-                    # Botón cerrar
-                    ctk.CTkButton(
-                        main_frame,
-                        text="Cerrar",
-                        command=ventana_animales.destroy,
-                        width=100
-                    ).pack(pady=10)
-
-                else:
-                    messagebox.showinfo("Animales", f"El potrero '{nombre_potrero}' no tiene animales asignados")
+            else:
+                messagebox.showinfo("Animales", f"El potrero '{nombre_potrero}' no tiene animales asignados")
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los animales:\n{e}")

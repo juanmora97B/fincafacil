@@ -352,7 +352,7 @@ class HerramientasModule(ctk.CTkFrame):
             self.tabla.column(col, width=width, anchor="center")
         self.tabla.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Barra inferior de acciones (botones alineados abajo)
@@ -592,7 +592,7 @@ class HerramientasModule(ctk.CTkFrame):
         self.tabla_mant.pack(side="left", fill="both", expand=True)
         
         scrollbar_mant = ttk.Scrollbar(tabla_container, orient="vertical", command=self.tabla_mant.yview)
-        self.tabla_mant.configure(yscroll=scrollbar_mant.set)
+        self.tabla_mant.configure(yscroll=scrollbar_mant.set)  # type: ignore[arg-type]
         scrollbar_mant.pack(side="right", fill="y")
         
         self.cargar_mantenimientos()
@@ -1710,6 +1710,9 @@ class HerramientasModule(ctk.CTkFrame):
         try:
             wb = openpyxl.load_workbook(archivo)
             ws = wb.active
+            if ws is None:
+                messagebox.showerror("Error", "No se pudo cargar la hoja activa del archivo")
+                return
             
             # Verificar encabezados
             headers = [cell.value for cell in ws[1]]
@@ -1747,9 +1750,9 @@ class HerramientasModule(ctk.CTkFrame):
                 
                 for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                     try:
-                        codigo = row[col_map.get("codigo")]
-                        nombre = row[col_map.get("nombre")]
-                        categoria = row[col_map.get("categoria")]
+                        codigo = row[col_map.get("codigo", 0)] if col_map.get("codigo") is not None else None  # type: ignore[index]
+                        nombre = row[col_map.get("nombre", 1)] if col_map.get("nombre") is not None else None  # type: ignore[index]
+                        categoria = row[col_map.get("categoria", 2)] if col_map.get("categoria") is not None else None  # type: ignore[index]
                         
                         if not codigo or not nombre or not categoria:
                             errores.append(f"Fila {row_idx}: Faltan campos obligatorios")
@@ -1757,8 +1760,8 @@ class HerramientasModule(ctk.CTkFrame):
                         
                         # Obtener id_finca
                         id_finca = None
-                        if "finca" in col_map and row[col_map["finca"]]:
-                            finca_nombre_original = str(row[col_map["finca"]]).strip()
+                        if "finca" in col_map and col_map["finca"] is not None and row[col_map["finca"]]:  # type: ignore[index]
+                            finca_nombre_original = str(row[col_map["finca"]]).strip()  # type: ignore[index]
                             finca_key = self._normalize_text(finca_nombre_original)
                             id_finca = fincas_map.get(finca_key)
                             # Fallback quitar 'finca ' inicial
@@ -1775,25 +1778,25 @@ class HerramientasModule(ctk.CTkFrame):
                                 errores.append(f"Fila {row_idx}: Finca '{finca_nombre_original}' no encontrada - verifique nombre")
                         
                         # Obtener otros campos opcionales
-                        marca = row[col_map.get("marca")] if "marca" in col_map else None
-                        modelo = row[col_map.get("modelo")] if "modelo" in col_map else None
-                        numero_serie = row[col_map.get("numero_serie")] if "numero_serie" in col_map else None
-                        estado = row[col_map.get("estado", "Operativa")] if "estado" in col_map else "Operativa"
-                        ubicacion = row[col_map.get("ubicacion")] if "ubicacion" in col_map else None
-                        responsable = row[col_map.get("responsable")] if "responsable" in col_map else None
-                        fecha_adq = row[col_map.get("fecha_adquisicion")] if "fecha_adquisicion" in col_map else None
+                        marca = row[col_map.get("marca", 4)] if "marca" in col_map and col_map.get("marca") is not None else None  # type: ignore[index]
+                        modelo = row[col_map.get("modelo", 5)] if "modelo" in col_map and col_map.get("modelo") is not None else None  # type: ignore[index]
+                        numero_serie = row[col_map.get("numero_serie", 6)] if "numero_serie" in col_map and col_map.get("numero_serie") is not None else None  # type: ignore[index]
+                        estado = row[col_map.get("estado", 7)] if "estado" in col_map else "Operativa"  # type: ignore[index]
+                        ubicacion = row[col_map.get("ubicacion", 8)] if "ubicacion" in col_map and col_map.get("ubicacion") is not None else None  # type: ignore[index]
+                        responsable = row[col_map.get("responsable", 9)] if "responsable" in col_map and col_map.get("responsable") is not None else None  # type: ignore[index]
+                        fecha_adq = row[col_map.get("fecha_adquisicion", 10)] if "fecha_adquisicion" in col_map and col_map.get("fecha_adquisicion") is not None else None  # type: ignore[index]
                         valor = None
-                        if "valor_adquisicion" in col_map:
-                            raw_valor = row[col_map.get("valor_adquisicion")]
+                        if "valor_adquisicion" in col_map and col_map.get("valor_adquisicion") is not None:
+                            raw_valor = row[col_map.get("valor_adquisicion", 11)]  # type: ignore[index]
                             try:
                                 valor = self._parse_valor(raw_valor)
                             except ValueError:
                                 errores.append(f"Fila {row_idx}: Valor inválido '{raw_valor}'")
-                        vida_util = row[col_map.get("vida_util_anos")] if "vida_util_anos" in col_map else None
-                        descripcion = row[col_map.get("descripcion")] if "descripcion" in col_map else None
-                        observaciones = row[col_map.get("observaciones")] if "observaciones" in col_map else None
-                        stock_total_raw = row[col_map.get("stock_total")] if "stock_total" in col_map else None
-                        stock_bodega_raw = row[col_map.get("stock_bodega")] if "stock_bodega" in col_map else None
+                        vida_util = row[col_map.get("vida_util_anos", 12)] if "vida_util_anos" in col_map and col_map.get("vida_util_anos") is not None else None  # type: ignore[index]
+                        descripcion = row[col_map.get("descripcion", 13)] if "descripcion" in col_map and col_map.get("descripcion") is not None else None  # type: ignore[index]
+                        observaciones = row[col_map.get("observaciones", 14)] if "observaciones" in col_map and col_map.get("observaciones") is not None else None  # type: ignore[index]
+                        stock_total_raw = row[col_map.get("stock_total", 15)] if "stock_total" in col_map and col_map.get("stock_total") is not None else None  # type: ignore[index]
+                        stock_bodega_raw = row[col_map.get("stock_bodega", 16)] if "stock_bodega" in col_map and col_map.get("stock_bodega") is not None else None  # type: ignore[index]
                         stock_total = self._get_stock_total_validado(stock_total_raw)
                         stock_bodega = self._get_stock_bodega_validado(stock_bodega_raw, stock_total, responsable or "Bodega")
                         
@@ -1851,6 +1854,8 @@ class HerramientasModule(ctk.CTkFrame):
     def descargar_plantilla_excel(self):
         """Genera y descarga la plantilla Excel de herramientas"""
         try:
+            from openpyxl.styles import Font, PatternFill
+            
             plantillas_dir = os.path.join(os.path.dirname(__file__), '../../plantillas de carga')
             os.makedirs(plantillas_dir, exist_ok=True)
             
@@ -1859,6 +1864,9 @@ class HerramientasModule(ctk.CTkFrame):
             # Crear workbook
             wb = openpyxl.Workbook()
             ws = wb.active
+            if ws is None:
+                messagebox.showerror("Error", "No se pudo crear la hoja de trabajo")
+                return
             ws.title = "Herramientas"
             
             # Encabezados
@@ -1871,9 +1879,9 @@ class HerramientasModule(ctk.CTkFrame):
             
             # Formatear encabezados
             for cell in ws[1]:
-                cell.font = openpyxl.styles.Font(bold=True)
-                cell.fill = openpyxl.styles.PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-                cell.font = openpyxl.styles.Font(color="FFFFFF", bold=True)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
             
             # Agregar filas de ejemplo
             ws.append([
@@ -1890,7 +1898,7 @@ class HerramientasModule(ctk.CTkFrame):
             # Ajustar ancho de columnas
             for column in ws.columns:
                 max_length = 0
-                column_letter = column[0].column_letter
+                column_letter = column[0].column_letter  # type: ignore[attr-defined]
                 for cell in column:
                     try:
                         if cell.value:

@@ -88,12 +88,6 @@
         "duration": 0
       },
       {
-        "title": "Imagen del Animal 📷",
-        "description": "Foto del animal para identificación visual. Puedes agregar o cambiar la foto.",
-        "widget_name": "animal_image",
-        "duration": 0
-      },
-      {
         "title": "Procedencia y Origen 🏠",
         "description": "De dónde viene el animal: nacido en finca, comprado, procedencia. Rastreabilidad completa.",
         "widget_name": "procedencia_section",

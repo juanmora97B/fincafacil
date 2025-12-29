@@ -1,17 +1,19 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog, Menu
-import sqlite3
+from typing import Optional
 import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import db
 from modules.utils.importador_excel import parse_excel_to_dicts
+from infraestructura.configuracion.configuracion_service import ConfiguracionService
 
 
 class TipoExplotacionFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
+        self._service = ConfiguracionService()
+        self._tipo_editando_codigo: Optional[str] = None
         self.pack(fill="both", expand=True)
         self.crear_widgets()
         self.cargar_tipos_explotacion()
@@ -90,7 +92,7 @@ class TipoExplotacionFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -133,38 +135,33 @@ class TipoExplotacionFrame(ctk.CTkFrame):
             return
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                if self.entry_codigo.cget("state") == "disabled":
-                    cursor.execute("""
-                        UPDATE tipo_explotacion 
-                        SET descripcion = ?, categoria = ?, comentario = ?
-                        WHERE codigo = ?
-                    """, (
-                        descripcion,
-                        self.combo_categoria.get(),
-                        self.text_comentario.get("1.0", "end-1c").strip(),
-                        codigo
-                    ))
-                else:
-                    cursor.execute("""
-                        INSERT INTO tipo_explotacion (codigo, descripcion, categoria, comentario, estado)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (
-                        codigo,
-                        descripcion,
-                        self.combo_categoria.get(),
-                        self.text_comentario.get("1.0", "end-1c").strip(),
-                        "Activo"
-                    ))
-                conn.commit()
-
-            messagebox.showinfo("Éxito", "Tipo de explotación guardado correctamente." if self.entry_codigo.cget("state") != "disabled" else "Tipo de explotación actualizado correctamente.")
+            categoria = self.combo_categoria.get()
+            comentario = self.text_comentario.get("1.0", "end-1c").strip()
+            
+            if self._tipo_editando_codigo:
+                # Modo edición
+                self._service.actualizar_tipo_explotacion(
+                    codigo=codigo,
+                    descripcion=descripcion,
+                    categoria=categoria,
+                    comentario=comentario
+                )
+                messagebox.showinfo("Éxito", "Tipo de explotación actualizado correctamente.")
+            else:
+                # Modo creación
+                self._service.crear_tipo_explotacion(
+                    codigo=codigo,
+                    descripcion=descripcion,
+                    categoria=categoria,
+                    comentario=comentario
+                )
+                messagebox.showinfo("Éxito", "Tipo de explotación guardado correctamente.")
+            
             self.limpiar_formulario()
             self.cargar_tipos_explotacion()
             
-        except sqlite3.IntegrityError:
-            messagebox.showerror("Error", "Ya existe un tipo con ese código.")
+        except ValueError as e:
+            messagebox.showerror("Error de Validación", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el tipo:\n{e}")
 
@@ -174,13 +171,15 @@ class TipoExplotacionFrame(ctk.CTkFrame):
             self.tabla.delete(fila)
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT codigo, descripcion, categoria, comentario FROM tipo_explotacion WHERE estado = 'Activo'")
-                
-                for fila in cursor.fetchall():
-                    valores = tuple(str(v) if v is not None else "" for v in fila)
-                    self.tabla.insert("", "end", values=valores)
+            tipos = self._service.listar_tipos_explotacion_activos()
+            for tipo in tipos:
+                valores = (
+                    tipo.get('codigo', ''),
+                    tipo.get('descripcion', ''),
+                    tipo.get('categoria', ''),
+                    tipo.get('comentario', '')
+                )
+                self.tabla.insert("", "end", values=valores)
                     
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los tipos:\n{e}")
@@ -190,26 +189,32 @@ class TipoExplotacionFrame(ctk.CTkFrame):
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione un tipo para editar.")
             return
+        
         valores = self.tabla.item(seleccionado[0])["values"]
         codigo = valores[0]
+        
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT codigo, descripcion, categoria, comentario FROM tipo_explotacion WHERE codigo = ?", (codigo,))
-                row = cursor.fetchone()
-                if not row:
-                    messagebox.showerror("Error", "No se encontró el tipo de explotación")
-                    return
-                self.entry_codigo.delete(0, "end")
-                self.entry_codigo.insert(0, str(row[0]))
-                self.entry_codigo.configure(state="disabled")
-                self.entry_descripcion.delete(0, "end")
-                self.entry_descripcion.insert(0, str(row[1]))
-                if row[2]:
-                    self.combo_categoria.set(str(row[2]))
-                self.text_comentario.delete("1.0", "end")
-                if row[3]:
-                    self.text_comentario.insert("1.0", str(row[3]))
+            tipo = self._service.obtener_tipo_explotacion(codigo)
+            
+            # Cargar en formulario (inline editing)
+            self.entry_codigo.delete(0, "end")
+            self.entry_codigo.insert(0, tipo['codigo'])
+            self.entry_codigo.configure(state="disabled")
+            
+            self.entry_descripcion.delete(0, "end")
+            self.entry_descripcion.insert(0, tipo['descripcion'])
+            
+            self.combo_categoria.set(tipo.get('categoria', 'Carne'))
+            
+            self.text_comentario.delete("1.0", "end")
+            if tipo.get('comentario'):
+                self.text_comentario.insert("1.0", tipo['comentario'])
+            
+            # Tracking para saber que estamos editando
+            self._tipo_editando_codigo = codigo
+            
+        except ValueError as e:
+            messagebox.showerror("Error de Validación", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar el tipo:\n{e}")
 
@@ -220,16 +225,15 @@ class TipoExplotacionFrame(ctk.CTkFrame):
             return
         
         codigo = self.tabla.item(seleccionado[0])["values"][0]
-        if messagebox.askyesno("Confirmar", f"¿Eliminar el tipo '{codigo}'?\n\nEsta acción no se puede deshacer."):
+        if messagebox.askyesno("Confirmar", f"¿Marcar como inactivo el tipo '{codigo}'?\n\nPodrá reactivarlo desde la base de datos."):
             try:
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM tipo_explotacion WHERE codigo = ?", (codigo,))
-                    conn.commit()
-                messagebox.showinfo("Éxito", "Tipo eliminado.")
+                self._service.cambiar_estado_tipo_explotacion(codigo, 'Inactivo')
+                messagebox.showinfo("Éxito", "Tipo marcado como inactivo.")
                 self.cargar_tipos_explotacion()
+            except ValueError as e:
+                messagebox.showerror("Error de Validación", str(e))
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
+                messagebox.showerror("Error", f"No se pudo cambiar el estado:\n{e}")
 
     def limpiar_formulario(self):
         self.entry_codigo.configure(state="normal")
@@ -237,6 +241,7 @@ class TipoExplotacionFrame(ctk.CTkFrame):
         self.entry_descripcion.delete(0, "end")
         self.text_comentario.delete("1.0", "end")
         self.combo_categoria.set("Carne")
+        self._tipo_editando_codigo = None
         
     def importar_excel(self):
         """Importar tipos de explotación desde un archivo Excel.
@@ -283,9 +288,9 @@ class TipoExplotacionFrame(ctk.CTkFrame):
                 elif 'leche' in comentario:
                     fila['categoria'] = 'Leche'
                 elif 'doble' in comentario:
-                    fila['categoria'] = 'Doble propósito'
+                    fila['categoria'] = 'Doble Propósito'
                 else:
-                    fila['categoria'] = 'General'
+                    fila['categoria'] = 'Otros'
 
         primera = filas[0]
         if 'codigo' not in primera or 'descripcion' not in primera or 'categoria' not in primera:
@@ -293,57 +298,38 @@ class TipoExplotacionFrame(ctk.CTkFrame):
                 "Error",
                 "El archivo debe contener encabezados equivalentes a: codigo, descripcion, categoria.\n"
                 "Variantes aceptadas: codigos/código, descripción, categoría.\n"
-                "Si falta 'categoria' se infiere y se asigna 'General'."
+                "Si falta 'categoria' se infiere y se asigna 'Otros'."
             )
             return
 
         importados = 0
         errores = []
 
-        try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
+        for idx, fila in enumerate(filas, start=2):
+            codigo = str(fila.get('codigo') or "").strip()
+            descripcion = str(fila.get('descripcion') or "").strip()
+            categoria = str(fila.get('categoria') or "").strip()
+            comentario = str(fila.get('comentario') or "").strip()
 
-                for idx, fila in enumerate(filas, start=2):
-                    codigo = str(fila.get('codigo') or "").strip()
-                    descripcion = str(fila.get('descripcion') or "").strip()
-                    categoria = str(fila.get('categoria') or "").strip()
+            if not codigo or not descripcion or not categoria:
+                errores.append(f"Fila {idx}: faltan campos requeridos (código, descripción y categoría)")
+                continue
 
-                    if not codigo or not descripcion or not categoria:
-                        errores.append(f"Fila {idx}: faltan campos requeridos (código, descripción y categoría)")
-                        continue
+            try:
+                self._service.crear_tipo_explotacion(
+                    codigo=codigo,
+                    descripcion=descripcion,
+                    categoria=categoria,
+                    comentario=comentario
+                )
+                importados += 1
+            except ValueError as e:
+                errores.append(f"Fila {idx}: {str(e)}")
+            except Exception as e:
+                errores.append(f"Fila {idx}: {str(e)}")
 
-                    try:
-                        # Verificar si el tipo de explotación ya existe
-                        cursor.execute("SELECT COUNT(*) FROM tipo_explotacion WHERE codigo = ?", (codigo,))
-                        if cursor.fetchone()[0] > 0:
-                            errores.append(f"Fila {idx}: el tipo de explotación con código '{codigo}' ya existe")
-                            continue
-
-                        # Insertar nuevo tipo de explotación
-                        cursor.execute("""
-                            INSERT INTO tipo_explotacion (codigo, descripcion, categoria, comentario, estado)
-                            VALUES (?, ?, ?, ?, ?)
-                        """, (
-                            codigo,
-                            descripcion,
-                            categoria,
-                            str(fila.get('comentario') or "").strip() or None,
-                            str(fila.get('estado') or "Activo").strip()
-                        ))
-                        importados += 1
-                    except sqlite3.IntegrityError:
-                        errores.append(f"Fila {idx}: tipo de explotación duplicado")
-                    except Exception as e:
-                        errores.append(f"Fila {idx}: {str(e)}")
-
-                conn.commit()
-
-            mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
-            if errores:
-                mensaje += "\nPrimeros errores:\n" + "\n".join(errores[:10])
-            messagebox.showinfo("Importación", mensaje)
-            self.cargar_tipos_explotacion()
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al importar:\n{e}")
+        mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
+        if errores:
+            mensaje += "\nPrimeros errores:\n" + "\n".join(errores[:10])
+        messagebox.showinfo("Importación", mensaje)
+        self.cargar_tipos_explotacion()

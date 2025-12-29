@@ -215,7 +215,7 @@ class VentasModule(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla_ventas.yview)
-        self.tabla_ventas.configure(yscroll=scrollbar.set)
+        self.tabla_ventas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción

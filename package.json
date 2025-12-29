@@ -1,0 +1,36 @@
+{
+  "name": "fincafacil-analytics",
+  "version": "3.7.0",
+  "description": "FASE 37 - Analytics BI Dashboard for FincaFácil",
+  "main": "index.js",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/node": "^25.0.3",
+    "axios": "^1.13.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juanmora97B/FincaFacil.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/juanmora97B/FincaFacil/issues"
+  },
+  "homepage": "https://github.com/juanmora97B/FincaFacil#readme"
+}

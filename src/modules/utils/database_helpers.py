@@ -39,7 +39,7 @@ def normalizar_texto(texto: str) -> str:
 
 def buscar_id_por_nombre(cursor: sqlite3.Cursor, tabla: str, nombre: str, 
                          columna_nombre: str = "nombre", 
-                         condicion_extra: str = None) -> Optional[int]:
+                         condicion_extra: str | None = None) -> Optional[int]:
     """
     Busca el ID de un registro por nombre (case-insensitive)
     
@@ -78,7 +78,7 @@ def buscar_id_por_nombre(cursor: sqlite3.Cursor, tabla: str, nombre: str,
 
 def obtener_diccionario_normalizado(cursor: sqlite3.Cursor, tabla: str,
                                    columna_nombre: str = "nombre",
-                                   condicion: str = None) -> Dict[str, int]:
+                                   condicion: str | None = None) -> Dict[str, int]:
     """
     Obtiene un diccionario {nombre_normalizado: id} de una tabla
     
@@ -146,7 +146,7 @@ def buscar_raza_id(cursor: sqlite3.Cursor, nombre_raza: str) -> Optional[int]:
     )
 
 
-def buscar_potrero_id(cursor: sqlite3.Cursor, nombre_potrero: str, id_finca: int = None) -> Optional[int]:
+def buscar_potrero_id(cursor: sqlite3.Cursor, nombre_potrero: str, id_finca: int | None = None) -> Optional[int]:
     """
     Busca el ID de un potrero por nombre (case-insensitive)
     
@@ -267,7 +267,7 @@ def buscar_herramienta_id(cursor: sqlite3.Cursor, nombre_herramienta: str) -> Op
 
 def verificar_existe_nombre(cursor: sqlite3.Cursor, tabla: str, nombre: str,
                            columna_nombre: str = "nombre",
-                           excluir_id: int = None) -> bool:
+                           excluir_id: int | None = None) -> bool:
     """
     Verifica si ya existe un registro con ese nombre (case-insensitive)
     
@@ -287,7 +287,7 @@ def verificar_existe_nombre(cursor: sqlite3.Cursor, tabla: str, nombre: str,
     nombre_normalizado = normalizar_texto(nombre)
     
     query = f"SELECT COUNT(*) FROM {tabla} WHERE LOWER(TRIM({columna_nombre})) = ?"
-    params = [nombre_normalizado]
+    params: list[str | int] = [nombre_normalizado]
     
     if excluir_id:
         query += " AND id != ?"

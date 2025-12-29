@@ -1,10 +1,11 @@
 """
 Sistema de alertas para módulos críticos de FincaFacil
 Permite generar alertas automáticas para reproducción, salud y tratamientos
+REFACTOR FASE 7.5: Usa inyección de DbConnectionService en lugar de acceso directo a BD.
 """
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from database.database import get_db_connection
+from database.services import get_db_service
 import logging
 
 logger = logging.getLogger("SistemaAlertas")
@@ -53,6 +54,7 @@ class SistemaAlertas:
     def __init__(self):
         """Inicializa el sistema de alertas"""
         self.alertas: List[Alerta] = []
+        self.db_service = get_db_service()
     
     def generar_alertas_reproduccion(self) -> List[Alerta]:
         """
@@ -64,7 +66,7 @@ class SistemaAlertas:
         alertas = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Alertas de próximos partos (dentro de 7 días)
@@ -134,7 +136,7 @@ class SistemaAlertas:
         alertas = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Alertas de animales enfermos sin resolución
@@ -180,7 +182,7 @@ class SistemaAlertas:
         alertas = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Alertas de próximos tratamientos (hoy y mañana)

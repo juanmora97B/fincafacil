@@ -2,24 +2,29 @@
 Gestor del estado del tour interactivo del sistema.
 """
 import json
-from pathlib import Path
 from typing import Optional, List
+
+from modules.utils.app_paths import get_config_file
 
 
 class TourStateManager:
     """Gestiona el estado del tour interactivo"""
-    
-    CONFIG_FILE = Path("config/tour_state.json")
+    APP_VERSION = "2.0.1"
     
     def __init__(self):
+        self.config_file = get_config_file("tour_state.json")
         self.state = self._load_state()
     
     def _load_state(self) -> dict:
         """Carga el estado del tour desde el archivo de configuración"""
-        if self.CONFIG_FILE.exists():
+        if self.config_file.exists():
             try:
-                with open(self.CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    state = json.load(f)
+                # Si la versión cambió, reiniciar el tour para versiones nuevas
+                if state.get("app_version") != self.APP_VERSION:
+                    return self._get_default_state()
+                return state
             except Exception as e:
                 print(f"Error cargando tour state: {e}")
                 return self._get_default_state()
@@ -28,7 +33,7 @@ class TourStateManager:
     def _get_default_state(self) -> dict:
         """Retorna el estado por defecto"""
         return {
-            "app_version": "2.0.0",
+            "app_version": self.APP_VERSION,
             "primer_uso_completado": False,
             "tour_completado": False,
             "last_tour_module": "dashboard",
@@ -38,8 +43,8 @@ class TourStateManager:
     def _save_state(self):
         """Guarda el estado del tour en el archivo de configuración"""
         try:
-            self.CONFIG_FILE.parent.mkdir(exist_ok=True, parents=True)
-            with open(self.CONFIG_FILE, 'w', encoding='utf-8') as f:
+            self.config_file.parent.mkdir(exist_ok=True, parents=True)
+            with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.state, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"Error guardando tour state: {e}")

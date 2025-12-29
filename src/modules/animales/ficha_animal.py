@@ -283,6 +283,10 @@ class FichaAnimalFrame(ctk.CTkFrame):
         row_idx += 1
         cb_finca.bind("<<ComboboxSelected>>", lambda _e=None: on_change_finca(cb_finca.get()))
         def guardar():
+            # Validar que animal_actual existe
+            if not self.animal_actual:
+                messagebox.showerror("Reubicación", "Seleccione un animal primero")
+                return
             fecha = e_fecha.get().strip()
             destino = cb_potrero.get().strip()
             motivo = cb_motivo.get().strip()
@@ -616,6 +620,9 @@ class FichaAnimalFrame(ctk.CTkFrame):
             messagebox.showerror("Tratamientos", f"Error al cargar tratamientos: {e}")
 
     def _nuevo_tratamiento(self):
+        if not self.animal_actual:
+            messagebox.showinfo("Tratamientos", "Seleccione un animal primero")
+            return
         top = ctk.CTkToplevel(self)
         top.title("Nuevo Tratamiento")
         frm = ctk.CTkFrame(top)
@@ -629,6 +636,9 @@ class FichaAnimalFrame(ctk.CTkFrame):
         for w in (e_inicio,e_fin,e_tipo,e_prod,e_dosis,e_estado):
             w.pack(fill='x', padx=4, pady=4)
         def guardar():
+            if not self.animal_actual:
+                messagebox.showerror("Tratamientos", "Animal no disponible")
+                return
             try:
                 with get_db_connection() as conn:
                     cur = conn.cursor()
@@ -784,6 +794,9 @@ class FichaAnimalFrame(ctk.CTkFrame):
         e_txt.insert(0, txt or '')
         e_txt.pack(fill='x', padx=4, pady=4)
         def guardar():
+            if not self.animal_actual:
+                messagebox.showerror("Comentarios", "Animal no disponible")
+                return
             try:
                 with get_db_connection() as conn:
                     cur = conn.cursor()
@@ -797,6 +810,9 @@ class FichaAnimalFrame(ctk.CTkFrame):
         ctk.CTkButton(frm, text="Guardar", command=guardar).pack(pady=6)
 
     def _eliminar_comentario_sel(self):
+        if not self.animal_actual:
+            messagebox.showinfo("Comentarios", "Seleccione un animal primero")
+            return
         sel = self.tabla_comentarios.selection()
         if not sel:
             messagebox.showinfo("Comentarios", "Seleccione un comentario")
@@ -901,6 +917,9 @@ class FichaAnimalFrame(ctk.CTkFrame):
             w.insert(0, str(val or ''))
             w.pack(fill='x', padx=4, pady=4)
         def guardar():
+            if not self.animal_actual:
+                messagebox.showerror("Tratamientos", "Animal no disponible")
+                return
             try:
                 with get_db_connection() as conn:
                     cur = conn.cursor()
@@ -917,6 +936,9 @@ class FichaAnimalFrame(ctk.CTkFrame):
         ctk.CTkButton(frm, text="Guardar", command=guardar).pack(pady=6)
 
     def _eliminar_tratamiento_sel(self):
+        if not self.animal_actual:
+            messagebox.showinfo("Tratamientos", "Seleccione un animal primero")
+            return
         sel = self.tabla_tratamientos.selection()
         if not sel:
             messagebox.showinfo("Tratamientos", "Seleccione un tratamiento")

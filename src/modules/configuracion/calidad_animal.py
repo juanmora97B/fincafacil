@@ -1,12 +1,11 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog, Menu
-import sqlite3
 import sys
 import os
 
 # Add parent directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import db
+from infraestructura.configuracion import ConfiguracionService, ConfiguracionRepository
 from modules.utils.importador_excel import parse_excel_to_dicts
 
 
@@ -14,6 +13,7 @@ class CalidadAnimalFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        self.configuracion_service = ConfiguracionService(repository=ConfiguracionRepository())
         self.crear_widgets()
         self.cargar_calidades()
 
@@ -108,28 +108,19 @@ class CalidadAnimalFrame(ctk.CTkFrame):
             return
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                if self.entry_codigo.cget("state") == "disabled":
-                    cursor.execute("""
-                        UPDATE calidad_animal 
-                        SET descripcion = ?, comentario = ?
-                        WHERE codigo = ?
-                    """, (descripcion, comentario, codigo))
-                    messagebox.showinfo("Éxito", "Calidad animal actualizada")
-                else:
-                    cursor.execute("""
-                        INSERT INTO calidad_animal (codigo, descripcion, comentario)
-                        VALUES (?, ?, ?)
-                    """, (codigo, descripcion, comentario))
-                    messagebox.showinfo("Éxito", "Calidad animal guardada")
-                
-                conn.commit()  # Confirmar cambios en la base de datos
-                
+            if self.entry_codigo.cget("state") == "disabled":
+                # ACTUALIZACIÓN
+                self.configuracion_service.actualizar_calidad(codigo, descripcion, comentario or None)
+                messagebox.showinfo("Éxito", "Calidad animal actualizada")
+            else:
+                # CREACIÓN
+                self.configuracion_service.crear_calidad(codigo, descripcion, comentario or None)
+                messagebox.showinfo("Éxito", "Calidad animal guardada")
+            
             self.limpiar_formulario()
             self.cargar_calidades()
-        except sqlite3.IntegrityError:
-            messagebox.showerror("Error", "Ya existe una calidad con ese código")
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"Error al guardar: {str(e)}")
 
@@ -138,17 +129,14 @@ class CalidadAnimalFrame(ctk.CTkFrame):
             self.tabla.delete(item)
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT codigo, descripcion, comentario FROM calidad_animal")
-                for calidad in cursor.fetchall():
-                    # Convertir explícitamente a strings
-                    valores = (
-                        str(calidad[0]) if calidad[0] is not None else "",
-                        str(calidad[1]) if calidad[1] is not None else "",
-                        str(calidad[2]) if calidad[2] is not None else ""
-                    )
-                    self.tabla.insert("", "end", values=valores)
+            calidades = self.configuracion_service.listar_calidades()
+            for calidad in calidades:
+                valores = (
+                    calidad.get('codigo', ''),
+                    calidad.get('descripcion', ''),
+                    calidad.get('comentario', '')
+                )
+                self.tabla.insert("", "end", values=valores)
         except Exception as e:
             messagebox.showerror("Error", f"Error al cargar datos: {str(e)}")
 
@@ -182,12 +170,11 @@ class CalidadAnimalFrame(ctk.CTkFrame):
             return
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM calidad_animal WHERE codigo = ?", (codigo,))
-                conn.commit()  # Agregar commit
+            self.configuracion_service.eliminar_calidad(codigo)
             messagebox.showinfo("Éxito", "Calidad eliminada correctamente.")
             self.cargar_calidades()
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"Error al eliminar: {str(e)}")
 
@@ -216,27 +203,7 @@ class CalidadAnimalFrame(ctk.CTkFrame):
                 messagebox.showinfo("Importar", "No se encontraron filas para importar.")
                 return
             
-            importados = 0
-            errores = []
-            
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                for idx, reg in enumerate(registros, start=2):
-                    try:
-                        cursor.execute("""
-                            INSERT INTO calidad_animal (codigo, descripcion, comentario)
-                            VALUES (?, ?, ?)
-                        """, (
-                            str(reg.get('codigo', '')).strip(),
-                            str(reg.get('descripcion', '')).strip(),
-                            str(reg.get('comentario', '')).strip()
-                        ))
-                        importados += 1
-                    except sqlite3.IntegrityError:
-                        errores.append(f"Fila {idx}: código duplicado")
-                    except Exception as e:
-                        errores.append(f"Fila {idx}: {e}")
-                conn.commit()
+            importados, errores = self.configuracion_service.importar_calidades_bulk(registros)
             
             mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
             if errores:

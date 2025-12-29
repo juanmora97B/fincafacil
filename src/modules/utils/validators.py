@@ -1,6 +1,10 @@
 """
 Sistema centralizado de validación para FincaFacil
 Valida datos antes de insertar en la base de datos
+
+NOTA: Este módulo (modules.utils.validators) es la FUENTE OFICIAL de validación.
+Todas las validaciones de negocio deben definirse aquí.
+Ver docs/CONTRATO_VALIDACIONES.md para contrato de APIs.
 """
 
 import re
@@ -16,8 +20,17 @@ except ImportError as e:
     DB_DISPONIBLE = False
     print(f"⚠️ Modo de validación sin base de datos - no se verificará unicidad: {e}")
 
-class FincaFacilValidator:
-    """Validador principal para todos los datos del sistema"""
+class ValidadorBase:
+    """Clase base para validadores. No contiene lógica de validación."""
+
+
+class FincaFacilValidator(ValidadorBase):
+    """Validador principal para todos los datos del sistema.
+    
+    CONTRATO: Ver docs/CONTRATO_VALIDACIONES.md
+    Esta es la implementación oficial de validaciones.
+    Todas las firmas están congeladas.
+    """
     
     # Patrones de validación
     PATRON_ARETE = re.compile(r'^[A-Za-z0-9\-_]{3,20}$')  # 3-20 chars alfanuméricos

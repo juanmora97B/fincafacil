@@ -2,10 +2,12 @@
 
 Functions centralize the pattern of detecting foreign key column names
 (id_finca vs finca_id) and returning filtered lists.
+
+REFACTOR FASE 7.5: Usa inyección de DbConnectionService en lugar de acceso directo a BD.
 """
 from typing import List, Tuple, Dict, Optional
 import sqlite3
-from database import get_db_connection
+from database.services import get_db_service
 
 FK_CANDIDATES = ["id_finca", "finca_id"]
 
@@ -22,7 +24,8 @@ def _detect_fk(cursor: sqlite3.Cursor, table: str) -> Optional[str]:
 
 def fetch_by_finca(table: str, finca_id: int, order_col: str = "nombre", extra_where: str = "") -> List[Tuple[int,str]]:
     """Return (id, nombre) rows for table limited by finca_id if FK detected; fallback to all."""
-    with get_db_connection() as conn:
+    db_service = get_db_service()
+    with db_service.connection() as conn:
         cur = conn.cursor()
         fk = _detect_fk(cur, table)
         where_fk = f"{fk} = ?" if fk else "1=1"
@@ -34,7 +37,8 @@ def fetch_by_finca(table: str, finca_id: int, order_col: str = "nombre", extra_w
 
 def fetch_animals_for_parents(finca_id: int) -> Dict[str,List[Tuple[int,str,str]]]:
     """Return dict with 'madres' and 'padres' filtered by finca if possible."""
-    with get_db_connection() as conn:
+    db_service = get_db_service()
+    with db_service.connection() as conn:
         cur = conn.cursor()
         try:
             cur.execute("SELECT id, codigo, nombre FROM animal WHERE estado='Activo' AND sexo='Hembra' AND id_finca=?", (finca_id,))

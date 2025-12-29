@@ -3,20 +3,93 @@ Módulo unificado de base de datos para FincaFacil
 Gestión centralizada de operaciones con la base de datos SQLite
 """
 
+import os
+import shutil
 import sqlite3
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Iterator
 from contextlib import contextmanager
 
-# Configuración de rutas
-BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "database" / "fincafacil.db"
 
 logger = logging.getLogger(__name__)
 
+# Importar migraciones
+try:
+    from database.migraciones import ejecutar_migraciones
+except ImportError:
+    # Fallback si está en src/
+    try:
+        from migraciones import ejecutar_migraciones
+    except ImportError:
+        def ejecutar_migraciones(conn):
+            logger.warning("Módulo de migraciones no disponible")
+# Import app_paths lazily to avoid circular imports
+_DB_PATH = None
+_SEED_DB_PATH = None
+_initialized = False
+
+
+def _get_paths():
+    """Initialize paths if not already done."""
+    global _DB_PATH, _SEED_DB_PATH
+    if _DB_PATH is None:
+        try:
+            from modules.utils.app_paths import get_db_path, get_seed_path
+            _DB_PATH = get_db_path()
+            _SEED_DB_PATH = get_seed_path(Path("database") / "fincafacil.db")
+        except Exception as e:
+            logger.error(f"Error importing app_paths: {e}")
+            # Fallback to local paths
+            base = Path(__file__).parent.parent
+            _DB_PATH = base / "database" / "fincafacil.db"
+            _SEED_DB_PATH = _DB_PATH
+
+
+# Expose as module-level variable (will be set on first access)
+DB_PATH = None
+
+
+def get_db_path_safe() -> Path:
+    """Get database path, initializing if needed."""
+    global DB_PATH
+    if DB_PATH is None:
+        _get_paths()
+        DB_PATH = _DB_PATH
+    assert DB_PATH is not None, "Failed to initialize database path"
+    return DB_PATH
+
+
+def ensure_local_db() -> None:
+    """Garantiza que la BD exista en el directorio de usuario."""
+    global _initialized
+    if _initialized:
+        return
+    
+    try:
+        _get_paths()
+        db_path = _DB_PATH
+        seed_path = _SEED_DB_PATH
+        
+        if db_path and db_path.parent:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+        if db_path and not db_path.exists():
+            if seed_path and seed_path.exists():
+                shutil.copy2(seed_path, db_path)
+                logger.info("Base de datos copiada a directorio de usuario: %s", db_path)
+            else:
+                logger.warning("Seed de base de datos no encontrada: %s", seed_path)
+        _initialized = True
+    except Exception as exc:
+        logger.error("No se pudo preparar la base de datos en el directorio de usuario: %s", exc)
+
+
+# Initialize DB_PATH for first use
+get_db_path_safe()
+ensure_local_db()
+
 @contextmanager
-def get_db_connection(db_path: str = None):
+def get_db_connection(db_path: Optional[Path | str] = None) -> Iterator[sqlite3.Connection]:
     """
     Obtiene una conexión SQLite configurada.
     Args:
@@ -24,10 +97,10 @@ def get_db_connection(db_path: str = None):
     Yields:
         sqlite3.Connection
     """
-    path = db_path or DB_PATH
+    path = db_path or get_db_path_safe()
     try:
         Path(path).parent.mkdir(exist_ok=True, parents=True)
-        conn = sqlite3.connect(path)
+        conn = sqlite3.connect(str(path))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
@@ -79,7 +152,8 @@ def verificar_base_datos() -> bool:
         bool: True si es válida.
     """
     try:
-        if not Path(DB_PATH).exists():
+        path = get_db_path_safe()
+        if not path.exists():
             logger.warning("Base de datos no encontrada: %s", DB_PATH)
             return False
         with get_db_connection() as conn:
@@ -128,6 +202,12 @@ def asegurar_esquema_minimo() -> None:
 
             conn.commit()
             logger.info("Esquema mínimo verificado (app_settings y valores por defecto)")
+
+            # Ejecutar migraciones del sistema (usuarios, roles, auditoría, KPIs)
+            try:
+                ejecutar_migraciones(conn)
+            except Exception as e:
+                logger.warning(f"No se pudieron ejecutar migraciones adicionales: {e}")
 
             # Limpieza de tablas legacy residuales que causan errores FK
             try:
@@ -285,7 +365,7 @@ def asegurar_esquema_completo() -> None:
     except Exception as e:
         logger.warning(f"No se pudo asegurar esquema completo: {e}")
 
-def ejecutar_consulta(query: str, parametros: tuple = None, fetch: bool = False) -> Optional[List[Dict]]:
+def ejecutar_consulta(query: str, parametros: Optional[tuple[Any, ...]] = None, fetch: bool = False) -> Optional[List[Dict[str, Any]]]:
     """
     Ejecuta una consulta SQL de forma segura
     
@@ -727,6 +807,12 @@ CREATE TABLE IF NOT EXISTS insumo (
     id_finca INTEGER,
     ubicacion TEXT,
     proveedor_principal TEXT,
+    responsable TEXT,
+    observaciones TEXT,
+    id_trabajador INTEGER,
+    stock_bodega REAL DEFAULT 0,
+    foto_path TEXT,
+    fecha_adquisicion DATE,
     fecha_vencimiento DATE,
     lote_proveedor TEXT,
     estado TEXT DEFAULT 'Activo',
@@ -1035,19 +1121,8 @@ BEGIN
 END;
 """
 
-# Datos básicos para inicialización
-DATOS_BASICOS = """
--- Razas básicas
-INSERT OR IGNORE INTO raza (codigo, nombre, tipo_ganado, descripcion) VALUES 
-('BRA', 'Brahman', 'Carne', 'Raza cebuina adaptada a climas cálidos'),
-('ANG', 'Angus', 'Carne', 'Raza británica de carne de alta calidad'),
-('HOL', 'Holstein', 'Lechero', 'Raza lechera de alta producción'),
-('CRI', 'Criollo', 'Doble Propósito', 'Raza adaptada localmente');
-
--- Finca básica (opcional)
-INSERT OR IGNORE INTO finca (codigo, nombre, propietario, ubicacion, area_hectareas, estado) VALUES 
-('F001', 'Finca Principal', 'Propietario', 'Región', 100.0, 'Activo');
-"""
+# Datos básicos para inicialización (vacío para entregar base limpia sin registros)
+DATOS_BASICOS = """"""
 
 # Migración ligera: asegurar columnas esperadas en tablas existentes
 def _migrar_esquema_basico(conn: sqlite3.Connection) -> None:
@@ -1112,6 +1187,16 @@ def _migrar_esquema_basico(conn: sqlite3.Connection) -> None:
         # Empleado
         asegurar_columnas("empleado", {
             "id_finca": "INTEGER"
+        })
+
+        # Insumo
+        asegurar_columnas("insumo", {
+            "responsable": "TEXT",
+            "observaciones": "TEXT",
+            "id_trabajador": "INTEGER",
+            "stock_bodega": "REAL DEFAULT 0",
+            "foto_path": "TEXT",
+            "fecha_adquisicion": "DATE"
         })
 
         # Herramienta

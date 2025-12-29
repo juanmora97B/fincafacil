@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class LicenseFrame(ctk.CTkFrame):
     """Panel de gestión de licencia dentro de Ajustes"""
     
-    def __init__(self, master, usuario_id: int = None):
+    def __init__(self, master, usuario_id: int | None = None):
         super().__init__(master)
         
         self.usuario_id = usuario_id

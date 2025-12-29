@@ -1,16 +1,18 @@
 """
 Sistema de Notificaciones para FincaFacil
 Gestiona alertas y notificaciones importantes
+REFACTOR FASE 7.5: Usa inyección de DbConnectionService en lugar de acceso directo a BD.
 """
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
-from database.database import get_db_connection
+from database.services import get_db_service
 
 class SistemaNotificaciones:
     """Gestiona las notificaciones del sistema"""
     
     def __init__(self):
         self.notificaciones = []
+        self.db_service = get_db_service()
     
     def obtener_todas_notificaciones(self) -> List[Dict[str, Any]]:
         """Obtiene todas las notificaciones activas"""
@@ -37,7 +39,7 @@ class SistemaNotificaciones:
         notificaciones = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Obtener hembras gestantes con parto próximo
@@ -107,7 +109,7 @@ class SistemaNotificaciones:
         notificaciones = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Verificar si existe la tabla insumos
@@ -186,7 +188,7 @@ class SistemaNotificaciones:
         notificaciones = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Verificar si existe la tabla tratamientos
@@ -255,7 +257,7 @@ class SistemaNotificaciones:
         notificaciones = []
         
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Verificar si existe la tabla mantenimientos

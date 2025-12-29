@@ -1,12 +1,13 @@
 """
 Sistema de conversión y formato de unidades para FincaFacil
 Lee preferencias de app_settings y convierte/formatea valores
+REFACTOR FASE 7.5: Usa inyección de DbConnectionService en lugar de acceso directo a BD.
 """
 
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import get_db_connection
+from database.services import get_db_service
 
 
 class UnitsHelper:
@@ -19,12 +20,13 @@ class UnitsHelper:
     def __init__(self):
         self.weight_unit = "kg"
         self.volume_unit = "L"
+        self.db_service = get_db_service()
         self._load_preferences()
     
     def _load_preferences(self):
         """Carga las preferencias de unidades desde la base de datos"""
         try:
-            with get_db_connection() as conn:
+            with self.db_service.connection() as conn:
                 cursor = conn.cursor()
                 
                 # Unidad de peso

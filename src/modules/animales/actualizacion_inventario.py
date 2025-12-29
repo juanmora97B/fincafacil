@@ -11,15 +11,16 @@ from modules.utils.units_helper import units_helper
 from modules.utils.animal_format import build_animal_info_text
 from modules.utils.db_logging import safe_execute
 
-try:
-    from modules.utils.metadata import GestorMetadatos
-    def build_meta_note(note, metadata=None):
-        """Construye una nota con metadatos."""
-        return note
-except ImportError:
-    def build_meta_note(note, metadata=None):
-        """Fallback si no se puede importar metadata."""
-        return note
+def build_meta_note(event_type, resumen, metadata=None):
+    """Construye una nota con metadatos (interfaz unificada)."""
+    try:
+        from modules.utils.metadata import GestorMetadatos
+        # Si GestorMetadatos expone algún constructor estándar, úsalo.
+        return GestorMetadatos.build(event_type, resumen, metadata)  # type: ignore[attr-defined]
+    except (ImportError, Exception):
+        # Fallback básico si la API no coincide
+        base = f"{event_type}: {resumen}"
+        return base if not metadata else base + f" | meta={metadata}"
 
 class ActualizacionInventarioFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -197,7 +198,7 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(lista_frame, orient="vertical", command=self.tabla_sin_inventariar.yview)
-        self.tabla_sin_inventariar.configure(yscroll=scrollbar.set)
+        self.tabla_sin_inventariar.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Doble click para seleccionar
@@ -420,9 +421,9 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
             return
 
         # Convertir a litros para almacenar en BD
-        l_m = units_helper.convert_volume_to_l(l_m_input)
-        l_t = units_helper.convert_volume_to_l(l_t_input)
-        l_n = units_helper.convert_volume_to_l(l_n_input)
+        l_m = units_helper.convert_volume_to_l(l_m_input) or 0.0
+        l_t = units_helper.convert_volume_to_l(l_t_input) or 0.0
+        l_n = units_helper.convert_volume_to_l(l_n_input) or 0.0
 
         try:
             with db.get_connection() as conn:
@@ -593,6 +594,11 @@ class ActualizacionInventarioFrame(ctk.CTkFrame):
         t_obs.pack(side="top", padx=5, pady=5, fill="both", expand=True)
         
         def guardar():
+            # Revalidar que animal_actual existe (protección contra timing issues)
+            if not self.animal_actual:
+                messagebox.showwarning("Atención", "Animal no disponible")
+                return
+            
             try:
                 fecha = e_fecha.get().strip()
                 causa = cb_causa.get()

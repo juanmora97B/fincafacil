@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 import sys
@@ -184,7 +185,7 @@ class NominaModule(ctk.CTkFrame):
         self.tabla_empleados.pack(side="left", fill="both", expand=True)
 
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla_empleados.yview)
-        self.tabla_empleados.configure(yscroll=scrollbar.set)
+        self.tabla_empleados.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Botones
@@ -427,7 +428,7 @@ class NominaModule(ctk.CTkFrame):
         self.tabla_historial.pack(side="left", fill="both", expand=True)
 
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla_historial.yview)
-        self.tabla_historial.configure(yscroll=scrollbar.set)
+        self.tabla_historial.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Botones
@@ -469,6 +470,8 @@ class NominaModule(ctk.CTkFrame):
 
     def cargar_empleados(self):
         """Carga los empleados en la tabla"""
+        if self.tabla_empleados is None:
+            return
         for item in self.tabla_empleados.get_children():
             self.tabla_empleados.delete(item)
 
@@ -627,6 +630,9 @@ class NominaModule(ctk.CTkFrame):
 
     def ver_detalles_empleado(self):
         """Muestra los detalles del empleado seleccionado con foto"""
+        if self.tabla_empleados is None:
+            messagebox.showwarning("Atención", "La tabla de empleados no se inicializó correctamente")
+            return
         seleccionado = self.tabla_empleados.selection()
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione un empleado para ver sus detalles")
@@ -703,7 +709,7 @@ class NominaModule(ctk.CTkFrame):
         ventana.title(f"📋 Detalles del Empleado - {empleado[0]}")
         ventana.geometry("900x650")
         ventana.resizable(False, False)
-        ventana.transient(self)
+        ventana.transient(self.winfo_toplevel())
         ventana.grab_set()
         
         # Frame principal con scroll
@@ -734,8 +740,9 @@ class NominaModule(ctk.CTkFrame):
                 # Redimensionar manteniendo aspecto (máximo 200x250)
                 imagen.thumbnail((200, 250), Image.Resampling.LANCZOS)
                 foto_tk = ImageTk.PhotoImage(imagen)
-                label_foto = ctk.CTkLabel(foto_frame, image=foto_tk, text="")
-                label_foto.image = foto_tk  # Mantener referencia
+                # CTkLabel no acepta PhotoImage; usar label de tkinter
+                label_foto = tk.Label(foto_frame, image=foto_tk, bg='#2a2a2a')
+                label_foto.__dict__['image'] = foto_tk  # Mantener referencia
                 label_foto.pack()
             except Exception as e:
                 ctk.CTkLabel(foto_frame, text="📷\nFoto no disponible", font=("Segoe UI", 14), 
@@ -867,7 +874,7 @@ class NominaModule(ctk.CTkFrame):
 
     def calcular_nomina(self):
         """Calcula la nómina de un empleado"""
-        if not self.combo_empleado.get() or not self.entry_dias.get():
+        if self.combo_empleado is None or not self.combo_empleado.get() or self.entry_dias is None or not self.entry_dias.get():
             messagebox.showwarning("Atención", "Complete todos los campos")
             return
 
@@ -1014,9 +1021,11 @@ class NominaModule(ctk.CTkFrame):
 
     def limpiar_calculo(self):
         """Limpia el formulario de cálculo"""
-        self.combo_empleado.set("")
-        self.entry_dias.delete(0, "end")
-        self.entry_dias.insert(0, "30")
+        if self.combo_empleado is not None and hasattr(self.combo_empleado, 'set'):
+            self.combo_empleado.set("")  # type: ignore[union-attr]
+        if self.entry_dias is not None and hasattr(self.entry_dias, 'delete'):
+            self.entry_dias.delete(0, "end")  # type: ignore[union-attr]
+            self.entry_dias.insert(0, "30")  # type: ignore[union-attr]
         hoy = datetime.now()
         primer_dia_mes = hoy.replace(day=1)
         self.entry_fecha_inicio.delete(0, "end")
@@ -1029,6 +1038,8 @@ class NominaModule(ctk.CTkFrame):
 
     def cargar_historial(self):
         """Carga el historial de pagos"""
+        if self.tabla_historial is None:
+            return
         for item in self.tabla_historial.get_children():
             self.tabla_historial.delete(item)
 
@@ -1086,6 +1097,8 @@ class NominaModule(ctk.CTkFrame):
 
     def aplicar_filtros_historial(self):
         """Aplica filtros al historial de pagos"""
+        if self.tabla_historial is None:
+            return
         for item in self.tabla_historial.get_children():
             self.tabla_historial.delete(item)
 
@@ -1108,7 +1121,7 @@ class NominaModule(ctk.CTkFrame):
                 params = []
                 
                 # Filtro por empleado
-                empleado_filtro = self.combo_filtro_empleado.get()
+                empleado_filtro = self.combo_filtro_empleado.get() if self.combo_filtro_empleado else "Todos los empleados"
                 if empleado_filtro != "Todos los empleados":
                     codigo = empleado_filtro.split(" - ")[0]
                     query += " AND e.codigo = ?"
@@ -1147,11 +1160,14 @@ class NominaModule(ctk.CTkFrame):
 
     def ver_detalle_pago(self):
         """Muestra el detalle completo de un pago seleccionado"""
+        if self.tabla_historial is None:
+            messagebox.showwarning("Atención", "La tabla de historial no se inicializó correctamente")
+            return
         seleccionado = self.tabla_historial.selection()
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione un pago para ver el detalle")
             return
-
+        
         pago_id = self.tabla_historial.item(seleccionado[0])["values"][0]
         
         try:
@@ -1175,7 +1191,7 @@ class NominaModule(ctk.CTkFrame):
                 ventana = ctk.CTkToplevel(self)
                 ventana.title(f"📄 Detalle de Pago - ID: {pago_id}")
                 ventana.geometry("700x600")
-                ventana.transient(self)
+                ventana.transient(self.winfo_toplevel())  # type: ignore[arg-type]
                 ventana.grab_set()
                 
                 # Frame con scroll
@@ -1282,7 +1298,7 @@ class NominaModule(ctk.CTkFrame):
         ventana_formato = ctk.CTkToplevel(self)
         ventana_formato.title("Exportar Empleados")
         ventana_formato.geometry("400x200")
-        ventana_formato.transient(self)
+        ventana_formato.transient(self.winfo_toplevel())  # type: ignore[arg-type]
         ventana_formato.grab_set()
         
         ctk.CTkLabel(ventana_formato, text="Seleccione el formato de exportación:", 
@@ -1320,11 +1336,14 @@ class NominaModule(ctk.CTkFrame):
     
     def anular_pago(self):
         """Anula un pago seleccionado"""
+        if self.tabla_historial is None:
+            messagebox.showwarning("Atención", "La tabla de historial no se inicializó correctamente")
+            return
         seleccionado = self.tabla_historial.selection()
         if not seleccionado:
             messagebox.showwarning("Atención", "Seleccione un pago para anular")
             return
-
+        
         pago_id = self.tabla_historial.item(seleccionado[0])["values"][0]
         
         if messagebox.askyesno("Confirmar", f"¿Está seguro de anular el pago ID: {pago_id}?"):

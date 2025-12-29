@@ -22,7 +22,8 @@ AppUpdatesURL={#MyAppURL}/descargas
 ; Soporte: {#MyAppSupportEmail} | Tel: {#MyAppSupportPhone}
 
 ; Configuración de instalación
-DefaultDirName={autopf}\{#MyAppName}
+; Instalación per-user para evitar requerir administrador y alinear con datos en AppData
+DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=docs\LICENCIA.txt
@@ -38,7 +39,9 @@ SolidCompression=yes
 
 ; Requisitos del sistema
 MinVersion=10.0.0
-ArchitecturesInstallIn64BitMode=x64
+; Identificador recomendado: x64compatible (evita advertencia de x64)
+ArchitecturesInstallIn64BitMode=x64compatible
+PrivilegesRequired=lowest
 
 ; Firma digital (opcional)
 ; SignTool=signtool

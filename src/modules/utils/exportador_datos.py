@@ -30,10 +30,16 @@ class ExportadorDatos:
         try:
             import openpyxl
             from openpyxl.styles import Font, PatternFill, Alignment
+            from openpyxl.worksheet.worksheet import Worksheet
             
             # Crear workbook
             wb = openpyxl.Workbook()
             ws = wb.active
+            if ws is None:
+                ws = wb.create_sheet()
+            
+            assert isinstance(ws, Worksheet), "ws debe ser una hoja de trabajo válida"
+            
             ws.title = nombre_hoja
             
             # Estilo de encabezados
@@ -57,7 +63,7 @@ class ExportadorDatos:
             # Ajustar ancho de columnas
             for column in ws.columns:
                 max_length = 0
-                column_letter = column[0].column_letter
+                column_letter = column[0].column_letter  # type: ignore[attr-defined]
                 for cell in column:
                     try:
                         if len(str(cell.value)) > max_length:

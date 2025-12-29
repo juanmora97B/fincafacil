@@ -763,7 +763,7 @@ class ReportesModule(ctk.CTkFrame):
                 if filas:
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscrollcommand=scrollbar.set)
                     scrollbar.pack(side="right", fill="y")
 
                 # Mostrar cantidad de resultados
@@ -834,7 +834,7 @@ class ReportesModule(ctk.CTkFrame):
                         total_ventas += row[2] or 0
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscrollcommand=scrollbar.set)
                     scrollbar.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(tabla_section, text="No hay ventas registradas", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=8)
@@ -894,7 +894,7 @@ class ReportesModule(ctk.CTkFrame):
                         tv_finca.insert("", "end", values=(row[0], row[1], f"${(row[2] or 0):,.2f}"))
                     tv_finca.pack(side="left", fill="x", expand=True)
                     sb = ttk.Scrollbar(table_finca, orient="vertical", command=tv_finca.yview)
-                    tv_finca.configure(yscroll=sb.set)
+                    tv_finca.configure(yscrollcommand=sb.set)
                     sb.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(finca_section, text="No hay ventas recientes por finca", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=8)
@@ -947,7 +947,7 @@ class ReportesModule(ctk.CTkFrame):
                         tabla.insert("", "end", values=row)
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscrollcommand=scrollbar.set)
                     scrollbar.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(tabla_section, text="No hay tratamientos registrados", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=8)
@@ -1027,7 +1027,7 @@ class ReportesModule(ctk.CTkFrame):
                         tabla.insert("", "end", values=row)
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscrollcommand=scrollbar.set)
                     scrollbar.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(tabla_section, text="No hay servicios registrados", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=8)
@@ -1147,7 +1147,7 @@ class ReportesModule(ctk.CTkFrame):
                     
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
                     scrollbar.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(tabla_section, text="No hay empleados registrados", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=20)
@@ -1210,7 +1210,7 @@ class ReportesModule(ctk.CTkFrame):
                     
                     tabla_hist.pack(side="left", fill="both", expand=True)
                     scrollbar_hist = ttk.Scrollbar(hist_frame, orient="vertical", command=tabla_hist.yview)
-                    tabla_hist.configure(yscroll=scrollbar_hist.set)
+                    tabla_hist.configure(yscroll=scrollbar_hist.set)  # type: ignore[arg-type]
                     scrollbar_hist.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(hist_section, text="No hay registros de nómina en los últimos 30 días", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=20)
@@ -1305,7 +1305,7 @@ class ReportesModule(ctk.CTkFrame):
                     
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
                     scrollbar.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(tabla_section, text="No hay potreros registrados", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=20)
@@ -1408,7 +1408,7 @@ class ReportesModule(ctk.CTkFrame):
                         tabla.insert("", "end", values=row)
                     tabla.pack(side="left", fill="both", expand=True)
                     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tabla.yview)
-                    tabla.configure(yscroll=scrollbar.set)
+                    tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
                     scrollbar.pack(side="right", fill="y")
                 else:
                     ctk.CTkLabel(tabla_section, text="No hay registros de producción de leche", font=("Segoe UI", 12), text_color=self._text_secondary).pack(pady=8)

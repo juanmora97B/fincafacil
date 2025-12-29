@@ -126,7 +126,7 @@ class PotrerosFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -217,9 +217,6 @@ class PotrerosFrame(ctk.CTkFrame):
                 ))
                 conn.commit()
                 return True
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo actualizar el potrero:\n{e}")
-            return False
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo actualizar el potrero:\n{e}")
             return False

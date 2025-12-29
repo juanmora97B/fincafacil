@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
+import io
 
 # Importación segura de config
 try:
@@ -22,6 +23,15 @@ except ImportError:
     
     config = DefaultConfig()
     HAS_CONFIG = False
+
+# Reconfigure sys.stdout/stderr to use UTF-8
+try:
+    if sys.stdout.encoding.lower() != 'utf-8':
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    if sys.stderr.encoding.lower() != 'utf-8':
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+except Exception as e:
+    pass
 
 # Crear directorio de logs si no existe
 try:
@@ -51,7 +61,7 @@ class Logger:
                            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         formatter = logging.Formatter(log_format)
         
-        # Console handler
+        # Console handler - usa stdout ya reconfigurado a UTF-8
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
@@ -76,25 +86,25 @@ class Logger:
         
         return logger
     
-    def debug(self, message):
+    def debug(self, message, *args, **kwargs):
         """Log debug."""
-        self.logger.debug(message)
+        self.logger.debug(message, *args, **kwargs)
     
-    def info(self, message):
+    def info(self, message, *args, **kwargs):
         """Log info."""
-        self.logger.info(message)
+        self.logger.info(message, *args, **kwargs)
     
-    def warning(self, message):
+    def warning(self, message, *args, **kwargs):
         """Log warning."""
-        self.logger.warning(message)
+        self.logger.warning(message, *args, **kwargs)
     
-    def error(self, message):
+    def error(self, message, *args, **kwargs):
         """Log error."""
-        self.logger.error(message)
+        self.logger.error(message, *args, **kwargs)
     
-    def critical(self, message):
+    def critical(self, message, *args, **kwargs):
         """Log critical."""
-        self.logger.critical(message)
+        self.logger.critical(message, *args, **kwargs)
 
 
 # Logger global para compatibilidad

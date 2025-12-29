@@ -1,12 +1,35 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
+# -*- mode: python ; coding: utf-8 -*-
+
+
 a = Analysis(
-    ['main.py'],
+    ['src/main.py'],
     pathex=[],
     binaries=[],
-    datas=[('src\\assets', 'assets'), ('config', 'config'), ('docs', 'docs')],
-    hiddenimports=[],
+    datas=[
+        ('src/modules', 'modules'),
+        ('src/assets', 'assets'),
+        ('src/database', 'database'),
+        ('docs', 'docs'),
+        ('config.py', '.')
+    ],
+    hiddenimports=[
+        'modules',
+        'modules.dashboard.dashboard_main',
+        'modules.ajustes.ajustes_main',
+        'modules.ventas.ventas_main',
+        'modules.utils.logger',
+        'modules.utils.login_ui',
+        'modules.utils.app_paths',
+        'modules.utils.usuario_manager',
+        'modules.utils.license_manager',
+        'modules.utils.tour_state_manager',
+        'database',
+        'database.connection',
+        'database.database'
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -35,5 +58,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['src\\assets\\Logo.ico'],
+    icon=['src/assets/Logo.ico'],
 )

@@ -194,7 +194,7 @@ class PesajeLecheFrame(ctk.CTkFrame):
         
         self.tabla_registros.pack(side="left", fill="both", expand=True)
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.tabla_registros.yview)
-        self.tabla_registros.configure(yscroll=scrollbar.set)
+        self.tabla_registros.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -258,7 +258,7 @@ class PesajeLecheFrame(ctk.CTkFrame):
         
         self.tabla_bajos.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         scrollbar_bajos = ttk.Scrollbar(frame_bajos, orient="vertical", command=self.tabla_bajos.yview)
-        self.tabla_bajos.configure(yscroll=scrollbar_bajos.set)
+        self.tabla_bajos.configure(yscrollcommand=scrollbar_bajos.set)
         scrollbar_bajos.pack(side="right", fill="y")
 
     def _crear_tab_comparativas(self):
@@ -312,7 +312,7 @@ class PesajeLecheFrame(ctk.CTkFrame):
         
         self.tabla_comparativa.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         scrollbar_comp = ttk.Scrollbar(frame_tabla, orient="vertical", command=self.tabla_comparativa.yview)
-        self.tabla_comparativa.configure(yscroll=scrollbar_comp.set)
+        self.tabla_comparativa.configure(yscrollcommand=scrollbar_comp.set)
         scrollbar_comp.pack(side="right", fill="y")
 
     def _crear_tab_graficas(self):
@@ -891,13 +891,13 @@ class PesajeLecheFrame(ctk.CTkFrame):
         ax = fig.add_subplot(111, facecolor='#3a3a3a')
         
         if tipo_visual == "Línea":
-            ax.plot(fechas, totales, marker='o', linewidth=2, color='#FBC02D', markersize=6)
-            ax.fill_between(fechas, totales, alpha=0.3, color='#FBC02D')
+            ax.plot(fechas, totales, marker='o', linewidth=2, color='#FBC02D', markersize=6)  # type: ignore[arg-type]
+            ax.fill_between(fechas, totales, alpha=0.3, color='#FBC02D')  # type: ignore[arg-type]
         elif tipo_visual == "Barras":
-            ax.bar(fechas, totales, color='#4CAF50', alpha=0.8, edgecolor='white', width=0.8)
+            ax.bar(fechas, totales, color='#4CAF50', alpha=0.8, edgecolor='white', width=0.8)  # type: ignore[arg-type]
         elif tipo_visual == "Combinada (Columnas+Línea)":
-            ax.bar(fechas, totales, color='#4CAF50', alpha=0.6)
-            ax.plot(fechas, totales, marker='o', linewidth=2.5, color='#FFC107', markersize=7)
+            ax.bar(fechas, totales, color='#4CAF50', alpha=0.6)  # type: ignore[arg-type]
+            ax.plot(fechas, totales, marker='o', linewidth=2.5, color='#FFC107', markersize=7)  # type: ignore[arg-type]
         elif tipo_visual == "Pastel":
             messagebox.showwarning("Atención", "El gráfico de pastel no es aplicable a datos diarios.\nUse 'Producción por Vaca'")
             return
@@ -961,9 +961,11 @@ class PesajeLecheFrame(ctk.CTkFrame):
             valores_pos = [v for v in valores if v > 0]
             etiquetas_pos = [e for e, v in zip(etiquetas, valores) if v > 0]
             if valores_pos:
-                colores_pastel = plt.cm.Set3(range(len(valores_pos)))
-                wedges, texts, autotexts = ax.pie(valores_pos, labels=etiquetas_pos, autopct='%1.1f%%',
-                                                   colors=colores_pastel, startangle=90, textprops={'color': 'white', 'fontsize': 9})
+                colores_pastel = plt.get_cmap('Set3')(range(len(valores_pos)))
+                pie_result = ax.pie(valores_pos, labels=etiquetas_pos, autopct='%1.1f%%',
+                                                   colors=colores_pastel, startangle=90, textprops={'color': 'white', 'fontsize': 9})  # type: ignore[arg-type]
+                # pie() puede retornar 2 o 3 valores; tomar primer intento
+                autotexts = pie_result[2] if len(pie_result) > 2 else []
                 for autotext in autotexts:
                     autotext.set_color('black')
                     autotext.set_fontweight('bold')
@@ -1030,9 +1032,10 @@ class PesajeLecheFrame(ctk.CTkFrame):
             for i, (bar, val) in enumerate(zip(bars, valores)):
                 ax.text(val + 0.1, i, f'{val:.1f}L', va='center', color='white', fontsize=10)
         elif tipo_visual == "Pastel":
-            colores_pastel = plt.cm.Set3(range(len(valores)))
-            wedges, texts, autotexts = ax.pie(valores, labels=etiquetas, autopct='%1.1f%%',
-                                               colors=colores_pastel, startangle=90, textprops={'color': 'white', 'fontsize': 9})
+            colores_pastel = plt.get_cmap('Set3')(range(len(valores)))
+            pie_result = ax.pie(valores, labels=etiquetas, autopct='%1.1f%%',
+                                               colors=colores_pastel, startangle=90, textprops={'color': 'white', 'fontsize': 9})  # type: ignore[arg-type]
+            autotexts = pie_result[2] if len(pie_result) > 2 else []
             for autotext in autotexts:
                 autotext.set_color('black')
                 autotext.set_fontweight('bold')
@@ -1181,9 +1184,9 @@ class PesajeLecheFrame(ctk.CTkFrame):
             ax.set_xticks(x[::max(1, len(x)//10)])
             ax.set_xticklabels([f.strftime('%d/%m') for f in fechas[::max(1, len(fechas)//10)]], rotation=45)
         elif tipo_visual == "Línea":
-            ax.plot(fechas, manana, marker='o', linewidth=2, color='#FF9800', label='Mañana', markersize=5)
-            ax.plot(fechas, tarde, marker='s', linewidth=2, color='#2196F3', label='Tarde', markersize=5)
-            ax.plot(fechas, noche, marker='^', linewidth=2, color='#9C27B0', label='Noche', markersize=5)
+            ax.plot(fechas, manana, marker='o', linewidth=2, color='#FF9800', label='Mañana', markersize=5)  # type: ignore[arg-type]
+            ax.plot(fechas, tarde, marker='s', linewidth=2, color='#2196F3', label='Tarde', markersize=5)  # type: ignore[arg-type]
+            ax.plot(fechas, noche, marker='^', linewidth=2, color='#9C27B0', label='Noche', markersize=5)  # type: ignore[arg-type]
             fig.autofmt_xdate(rotation=45)
         elif tipo_visual == "Barras":
             x = range(len(fechas))

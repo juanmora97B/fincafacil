@@ -305,7 +305,7 @@ class VentanaGraficas(ctk.CTkToplevel):
             labels = [row[0] for row in data]
             sizes = [row[1] for row in data]
             
-            colors = plt.cm.Pastel1(np.linspace(0, 1, len(labels)))
+            colors = plt.get_cmap('Pastel1')(np.linspace(0, 1, len(labels)))
             
             ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors)
             ax.set_title('Distribución por Categorías', fontweight='bold')

@@ -1,11 +1,10 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog
-import sqlite3
 import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import db
+from infraestructura.configuracion import ConfiguracionService, ConfiguracionRepository
 from modules.utils.importador_excel import parse_excel_to_dicts
 
 
@@ -13,6 +12,7 @@ class DiagnosticosFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        self.configuracion_service = ConfiguracionService(repository=ConfiguracionRepository())
         self.crear_widgets()
         self.cargar_diagnosticos()
 
@@ -83,7 +83,7 @@ class DiagnosticosFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -103,28 +103,19 @@ class DiagnosticosFrame(ctk.CTkFrame):
         if not codigo or not descripcion:
             messagebox.showwarning("Atención", "Código y Descripción son campos obligatorios.")
             return
-
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO diagnostico_veterinario (codigo, descripcion, tipo_diagnostico, comentario, estado)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (
-                    codigo,
-                    descripcion,
-                    self.combo_tipo.get(),
-                    self.text_comentario.get("1.0", "end-1c").strip(),
-                    "Activo"
-                ))
-                conn.commit()
-
+            self.configuracion_service.crear_diagnostico(
+                codigo=codigo,
+                descripcion=descripcion,
+                tipo_diagnostico=self.combo_tipo.get(),
+                comentario=self.text_comentario.get("1.0", "end-1c").strip(),
+                estado="Activo",
+            )
             messagebox.showinfo("Éxito", "Diagnóstico guardado correctamente.")
             self.limpiar_formulario()
             self.cargar_diagnosticos()
-            
-        except sqlite3.IntegrityError:
-            messagebox.showerror("Error", "Ya existe un diagnóstico con ese código.")
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el diagnóstico:\n{e}")
 
@@ -133,13 +124,14 @@ class DiagnosticosFrame(ctk.CTkFrame):
             self.tabla.delete(fila)
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT codigo, descripcion, tipo_diagnostico, comentario FROM diagnostico_veterinario WHERE estado = 'Activo'")
-                
-                for fila in cursor.fetchall():
-                    self.tabla.insert("", "end", values=fila)
-                    
+            filas = self.configuracion_service.listar_diagnosticos()
+            for fila in filas:
+                self.tabla.insert("", "end", values=(
+                    fila.get('codigo',''),
+                    fila.get('descripcion',''),
+                    fila.get('tipo_diagnostico',''),
+                    fila.get('comentario','')
+                ))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los diagnósticos:\n{e}")
 
@@ -159,12 +151,11 @@ class DiagnosticosFrame(ctk.CTkFrame):
         codigo = self.tabla.item(seleccionado[0])["values"][0]
         if messagebox.askyesno("Confirmar", f"¿Eliminar el diagnóstico '{codigo}'?"):
             try:
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE diagnostico_veterinario SET estado = 'Inactivo' WHERE codigo = ?", (codigo,))
-                    conn.commit()
+                self.configuracion_service.cambiar_estado_diagnostico(codigo, "Inactivo")
                 messagebox.showinfo("Éxito", "Diagnóstico eliminado.")
                 self.cargar_diagnosticos()
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
 
@@ -199,42 +190,35 @@ class DiagnosticosFrame(ctk.CTkFrame):
         errores = []
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
+            registros = []
+            for fila in filas:
+                registros.append({
+                    'codigo': str(fila.get('codigo') or '').strip(),
+                    'descripcion': str(fila.get('descripcion') or '').strip(),
+                    'tipo_diagnostico': str(fila.get('tipo_diagnostico') or 'General').strip(),
+                    'comentario': str(fila.get('comentario') or '').strip(),
+                    'estado': str(fila.get('estado') or 'Activo').strip(),
+                })
 
-                for idx, fila in enumerate(filas, start=2):
-                    codigo = str(fila.get('codigo') or "").strip()
-                    descripcion = str(fila.get('descripcion') or "").strip()
+            importados = 0
+            errores = []
+            for idx, r in enumerate(registros, start=2):
+                try:
+                    if not r['codigo'] or not r['descripcion']:
+                        raise ValueError("faltan campos requeridos (código y descripción)")
 
-                    if not codigo or not descripcion:
-                        errores.append(f"Fila {idx}: faltan campos requeridos (código y descripción)")
-                        continue
-
-                    try:
-                        # Verificar si el diagnóstico ya existe
-                        cursor.execute("SELECT COUNT(*) FROM diagnostico_veterinario WHERE codigo = ?", (codigo,))
-                        if cursor.fetchone()[0] > 0:
-                            errores.append(f"Fila {idx}: el diagnóstico con código '{codigo}' ya existe")
-                            continue
-
-                        # Insertar nuevo diagnóstico
-                        cursor.execute("""
-                            INSERT INTO diagnostico_veterinario (codigo, descripcion, tipo_diagnostico, comentario, estado)
-                            VALUES (?, ?, ?, ?, ?)
-                        """, (
-                            codigo,
-                            descripcion,
-                            str(fila.get('tipo_diagnostico') or "General").strip(),
-                            str(fila.get('comentario') or "").strip() or None,
-                            str(fila.get('estado') or "Activo").strip()
-                        ))
-                        importados += 1
-                    except sqlite3.IntegrityError:
-                        errores.append(f"Fila {idx}: diagnóstico duplicado")
-                    except Exception as e:
-                        errores.append(f"Fila {idx}: {str(e)}")
-
-                conn.commit()
+                    self.configuracion_service.crear_diagnostico(
+                        codigo=r['codigo'],
+                        descripcion=r['descripcion'],
+                        tipo_diagnostico=r['tipo_diagnostico'],
+                        comentario=r['comentario'],
+                        estado=r['estado'] or 'Activo',
+                    )
+                    importados += 1
+                except ValueError as e:
+                    errores.append(f"Fila {idx}: {str(e)}")
+                except Exception as e:
+                    errores.append(f"Fila {idx}: {str(e)}")
 
             mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
             if errores:

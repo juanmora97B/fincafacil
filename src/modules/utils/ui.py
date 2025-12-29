@@ -36,7 +36,7 @@ def style_treeview():
 def add_tooltip(widget, text):
     """Agrega un tooltip mejorado con manejo robusto de destrucción."""
     try:
-        tooltip_window = [None]
+        tooltip_window = []  # type: ignore[var-annotated]
         schedule_id = [None]
         
         def destruir_tooltip():
@@ -48,13 +48,13 @@ def add_tooltip(widget, text):
                 except:
                     pass
             
-            if tooltip_window[0] is not None:
+            if tooltip_window:
                 try:
                     tooltip_window[0].destroy()
                 except:
                     pass
                 finally:
-                    tooltip_window[0] = None
+                    tooltip_window.clear()
         
         def crear_tooltip():
             """Crea el tooltip después del delay"""
@@ -62,14 +62,15 @@ def add_tooltip(widget, text):
                 if not widget.winfo_exists():
                     return
                 
-                tooltip_window[0] = ctk.CTkToplevel(widget)
-                tooltip_window[0].wm_overrideredirect(True)
-                tooltip_window[0].wm_attributes("-topmost", True)
+                new_tooltip = ctk.CTkToplevel(widget)  # type: ignore[attr-defined]
+                tooltip_window.append(new_tooltip)
+                new_tooltip.wm_overrideredirect(True)
+                new_tooltip.wm_attributes("-topmost", True)
                 
                 try:
                     x = widget.winfo_rootx() + 40
                     y = widget.winfo_rooty() + 20
-                    tooltip_window[0].geometry(f"+{x}+{y}")
+                    new_tooltip.geometry(f"+{x}+{y}")
                 except:
                     destruir_tooltip()
                     return

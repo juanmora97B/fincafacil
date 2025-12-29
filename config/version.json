@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "build_date": "2024-12-28",
+  "release_name": "Lanzamiento Inicial + Productización",
+  "modo_despliegue": "piloto",
+  "environments": {
+    "development": {
+      "debug": true,
+      "database": "database/finca_dev.db",
+      "allowed_hosts": ["localhost", "127.0.0.1"]
+    },
+    "staging": {
+      "debug": false,
+      "database": "database/finca_staging.db",
+      "allowed_hosts": ["staging.fincafacil.local"]
+    },
+    "production": {
+      "debug": false,
+      "database": "database/finca.db",
+      "allowed_hosts": ["fincafacil.co", "app.fincafacil.co"]
+    }
+  }
+}

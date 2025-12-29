@@ -108,7 +108,7 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción
@@ -260,7 +260,7 @@ class CondicionesCorporalesFrame(ctk.CTkFrame):
                     detalles_window = ctk.CTkToplevel(self)
                     detalles_window.title(f"Detalles - {codigo}")
                     detalles_window.geometry("800x600")
-                    detalles_window.transient(self)
+                    detalles_window.transient(self.winfo_toplevel())
                     detalles_window.grab_set()
 
                     # Contenido scrollable

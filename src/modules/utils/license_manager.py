@@ -1,5 +1,6 @@
 """
 Sistema de gestión de licencias con período de prueba de 6 meses.
+REFACTOR FASE 7.5: Usa inyección de PathService en lugar de acceso directo a BD paths.
 """
 import sqlite3
 import json
@@ -8,7 +9,10 @@ import string
 import random
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
+from typing import Optional
+
+from database.services import get_path_service
+from modules.utils.app_paths import get_config_dir, get_config_file
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +20,11 @@ logger = logging.getLogger(__name__)
 class LicenseManager:
     """Gestiona licencias, período de prueba y validación de fechas"""
     
-    def __init__(self, db_path: str = "database/fincafacil.db"):
-        self.db_path = db_path
-        self.config_dir = Path("config")
-        self.config_dir.mkdir(exist_ok=True)
-        self.license_file = self.config_dir / "license.json"
+    def __init__(self, db_path: Optional[str] = None):
+        path_service = get_path_service()
+        self.db_path = str(db_path or path_service.get_db_path())
+        self.config_dir = get_config_dir()
+        self.license_file = get_config_file("license.json")
         
         # Asegurar tabla de licencias en BD
         self._asegurar_tabla_licencias()

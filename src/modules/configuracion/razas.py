@@ -1,12 +1,12 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import sqlite3
 import sys
 import os
+from typing import Optional
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import db
+from infraestructura.configuracion import ConfiguracionService
 from modules.utils.importador_excel import parse_excel_to_dicts
 
 
@@ -14,6 +14,8 @@ class RazasFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill="both", expand=True)
+        self.service = ConfiguracionService()
+        self.editando_codigo: Optional[str] = None
         self.crear_widgets()
         self.cargar_razas()
 
@@ -104,7 +106,7 @@ class RazasFrame(ctk.CTkFrame):
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscroll=scrollbar.set)
+        self.tabla.configure(yscroll=scrollbar.set)  # type: ignore[arg-type]
         scrollbar.pack(side="right", fill="y")
 
         # Botones de acción con tamaño estándar
@@ -121,7 +123,7 @@ class RazasFrame(ctk.CTkFrame):
                       height=36).pack(side="left", padx=5)
 
     def guardar_raza(self):
-        """Guarda una nueva raza"""
+        """Guarda una nueva raza o actualiza si está en edición"""
         codigo = self.entry_codigo.get().strip()
         nombre = self.entry_nombre.get().strip()
         
@@ -130,93 +132,52 @@ class RazasFrame(ctk.CTkFrame):
             return
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO raza (codigo, nombre, tipo_ganado, especie, descripcion, estado)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
+            if self.editando_codigo is not None:
+                self.service.actualizar_raza(
                     codigo,
                     nombre,
                     self.combo_tipo.get(),
                     self.combo_especie.get(),
-                    self.text_descripcion.get("1.0", "end-1c").strip(),
-                    "Activa"
-                ))
-                conn.commit()
-
-            messagebox.showinfo("Éxito", "Raza guardada correctamente.")
+                    self.text_descripcion.get("1.0", "end-1c").strip()
+                )
+                messagebox.showinfo("Éxito", "Raza actualizada correctamente.")
+            else:
+                self.service.crear_raza(
+                    codigo,
+                    nombre,
+                    self.combo_tipo.get(),
+                    self.combo_especie.get(),
+                    self.text_descripcion.get("1.0", "end-1c").strip()
+                )
+                messagebox.showinfo("Éxito", "Raza guardada correctamente.")
+            
             self.limpiar_formulario()
             self.cargar_razas()
             
-        except sqlite3.IntegrityError:
-            # Intentar detectar si existe una raza inactiva con mismo código/nombre y ofrecer reactivarla
-            try:
-                with db.get_connection() as conn2:
-                    c2 = conn2.cursor()
-                    c2.execute("SELECT codigo, nombre, estado FROM raza WHERE codigo = ? OR nombre = ?", (codigo, nombre))
-                    row = c2.fetchone()
-                    if row and (row[2] or '').lower() in ('inactiva','inactivo'):
-                        if messagebox.askyesno(
-                            "Reactivar raza",
-                            f"Ya existe una raza '{row[0]}' inactiva.\n¿Desea reactivarla y actualizar sus datos?"
-                        ):
-                            c2.execute(
-                                """
-                                UPDATE raza
-                                SET nombre = ?, tipo_ganado = ?, especie = ?, descripcion = ?, estado = 'Activa'
-                                WHERE codigo = ?
-                                """,
-                                (
-                                    nombre,
-                                    self.combo_tipo.get(),
-                                    self.combo_especie.get(),
-                                    self.text_descripcion.get("1.0", "end-1c").strip(),
-                                    row[0]
-                                )
-                            )
-                            conn2.commit()
-                            messagebox.showinfo("Éxito", "Raza reactivada y actualizada.")
-                            self.limpiar_formulario()
-                            self.cargar_razas()
-                            return
-            except Exception:
-                pass
-            messagebox.showerror("Error", "Ya existe una raza con ese código o nombre.")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Validación fallida: {str(e)}")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo guardar la raza:\n{e}")
+            messagebox.showerror("Error", f"No se pudo guardar la raza: {str(e)}")
 
     def cargar_razas(self):
-        """Carga las razas en la tabla.
-        Se muestran todas las razas activas; si existen inactivas no se listan
-        pero pueden reactivarse automáticamente al intentar guardar con el mismo código.
-        """
+        """Carga las razas en la tabla"""
         for fila in self.tabla.get_children():
             self.tabla.delete(fila)
 
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                # Mostrar activas; evitamos ocultar registros por estados no estándar
-                cursor.execute("""
-                    SELECT codigo, nombre, tipo_ganado, especie, descripcion
-                    FROM raza
-                    WHERE COALESCE(LOWER(estado), 'activa') IN ('activa','activo') OR estado IS NULL
-                """)
-                
-                for fila in cursor.fetchall():
-                    # Convertir a string y acortar descripción si es muy larga
-                    codigo = str(fila[0]) if fila[0] is not None else ""
-                    nombre = str(fila[1]) if fila[1] is not None else ""
-                    tipo = str(fila[2]) if fila[2] is not None else "-"
-                    especie = str(fila[3]) if fila[3] is not None else "-"
-                    descripcion = str(fila[4]) if fila[4] is not None else ""
-                    if descripcion and len(descripcion) > 50:
-                        descripcion = descripcion[:50] + "..."
-                    self.tabla.insert("", "end", values=(codigo, nombre, tipo, especie, descripcion))
+            razas = self.service.listar_razas()
+            for raza in razas:
+                codigo = raza['codigo']
+                nombre = raza['nombre']
+                tipo = raza['tipo_ganado'] or "-"
+                especie = raza['especie'] or "-"
+                descripcion = raza['descripcion'] or ""
+                if descripcion and len(descripcion) > 50:
+                    descripcion = descripcion[:50] + "..."
+                self.tabla.insert("", "end", values=(codigo, nombre, tipo, especie, descripcion))
                     
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudieron cargar las razas:\n{e}")
+            messagebox.showerror("Error", f"No se pudieron cargar las razas: {str(e)}")
 
     def editar_raza(self):
         """Edita la raza seleccionada"""
@@ -225,97 +186,26 @@ class RazasFrame(ctk.CTkFrame):
             messagebox.showwarning("Atención", "Seleccione una raza para editar.")
             return
 
-        # Obtener datos del item seleccionado
-        item = self.tabla.item(seleccionado[0])
-        codigo = item["values"][0]
-
+        codigo = self.tabla.item(seleccionado[0])["values"][0]
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM raza WHERE codigo = ?", (codigo,))
-                raza = cursor.fetchone()
-
-                if raza:
-                    # Crear ventana de edición
-                    ventana_edicion = ctk.CTkToplevel(self)
-                    ventana_edicion.title("Editar Raza")
-                    ventana_edicion.geometry("550x550")
-                    ventana_edicion.transient(self)
-                    ventana_edicion.grab_set()
-
-                    # Formulario con scroll
-                    form_frame = ctk.CTkScrollableFrame(ventana_edicion)
-                    # Compactar ancho (20→4)
-                    form_frame.pack(padx=4, pady=20, fill="both", expand=True)
-
-                    # Campos
-                    ctk.CTkLabel(form_frame, text="Código:").pack(anchor="w", padx=5, pady=2)
-                    entry_codigo = ctk.CTkEntry(form_frame, width=200)
-                    entry_codigo.insert(0, raza[0])
-                    entry_codigo.configure(state="disabled")
-                    entry_codigo.pack(anchor="w", padx=5, pady=2)
-
-                    ctk.CTkLabel(form_frame, text="Nombre:").pack(anchor="w", padx=5, pady=2)
-                    entry_nombre = ctk.CTkEntry(form_frame, width=200)
-                    entry_nombre.insert(0, raza[1])
-                    entry_nombre.pack(anchor="w", padx=5, pady=2)
-
-                    ctk.CTkLabel(form_frame, text="Tipo Ganado:").pack(anchor="w", padx=5, pady=2)
-                    combo_tipo = ctk.CTkComboBox(form_frame, values=["Lechero", "Carne", "Doble Propósito", "Registro"], width=160)
-                    combo_tipo.set(raza[2] if raza[2] else "Doble Propósito")
-                    combo_tipo.pack(anchor="w", padx=5, pady=2)
-                    ctk.CTkLabel(form_frame, text="Especie:").pack(anchor="w", padx=5, pady=2)
-                    combo_especie = ctk.CTkComboBox(form_frame, values=["Bovino","Bufalo","Caprino","Ovino","Porcino","Equino","Otro"], width=160)
-                    # Índice especie (si se añadió por ALTER TABLE normalmente será el último)
-                    especie_val = raza[7] if len(raza) >= 8 else None
-                    combo_especie.set(especie_val if especie_val else "Bovino")
-                    combo_especie.pack(anchor="w", padx=5, pady=2)
-
-                    ctk.CTkLabel(form_frame, text="Descripción:").pack(anchor="w", padx=5, pady=2)
-                    text_descripcion = ctk.CTkTextbox(form_frame, width=300, height=100)
-                    # descripcion originalmente en índice 4 si especie está en 7, pero en SELECT * descripción sigue en índice 4
-                    text_descripcion.insert("1.0", raza[4] if raza[4] else "")
-                    text_descripcion.pack(anchor="w", padx=5, pady=2)
-
-                    def guardar_cambios():
-                        try:
-                            nombre = entry_nombre.get().strip()
-                            if not nombre:
-                                messagebox.showwarning("Atención", "El nombre es obligatorio.")
-                                return
-
-                            # Abrir una NUEVA conexión para evitar 'closed database'
-                            with db.get_connection() as conn_update:
-                                cursor_update = conn_update.cursor()
-                                cursor_update.execute("""
-                                    UPDATE raza 
-                                    SET nombre = ?, tipo_ganado = ?, especie = ?, descripcion = ?
-                                    WHERE codigo = ?
-                                """, (
-                                    nombre,
-                                    combo_tipo.get(),
-                                    combo_especie.get(),
-                                    text_descripcion.get("1.0", "end-1c").strip(),
-                                    codigo
-                                ))
-                                conn_update.commit()
-                            messagebox.showinfo("Éxito", "Raza actualizada correctamente.")
-                            ventana_edicion.destroy()
-                            self.cargar_razas()
-                        except Exception as e:
-                            messagebox.showerror("Error", f"No se pudo actualizar la raza:\n{e}")
-
-                    # Botones
-                    btn_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
-                    btn_frame.pack(pady=20)
-                    
-                    ctk.CTkButton(btn_frame, text="💾 Guardar", command=guardar_cambios,
-                                fg_color="green", hover_color="#006400").pack(side="left", padx=5)
-                    ctk.CTkButton(btn_frame, text="❌ Cancelar", command=ventana_edicion.destroy,
-                                fg_color="red", hover_color="#8B0000").pack(side="left", padx=5)
-
+            raza = self.service.obtener_raza(codigo)
+            if not raza:
+                messagebox.showerror("Error", "No se encontró la raza")
+                return
+            
+            self.editando_codigo = codigo
+            self.entry_codigo.delete(0, "end")
+            self.entry_codigo.insert(0, codigo)
+            self.entry_codigo.configure(state="disabled")
+            self.entry_nombre.delete(0, "end")
+            self.entry_nombre.insert(0, raza['nombre'])
+            self.combo_tipo.set(raza['tipo_ganado'] or "Doble Propósito")
+            self.combo_especie.set(raza['especie'] or "Bovino")
+            self.text_descripcion.delete("1.0", "end")
+            if raza['descripcion']:
+                self.text_descripcion.insert("1.0", raza['descripcion'])
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar la raza para editar:\n{e}")
+            messagebox.showerror("Error", f"No se pudo cargar la raza: {str(e)}")
 
     def eliminar_raza(self):
         seleccionado = self.tabla.selection()
@@ -324,19 +214,17 @@ class RazasFrame(ctk.CTkFrame):
             return
         
         codigo = self.tabla.item(seleccionado[0])["values"][0]
-        if messagebox.askyesno("Confirmar", f"¿Eliminar la raza '{codigo}'?\n\nEsta acción no se puede deshacer."):
+        if messagebox.askyesno("Confirmar", f"¿Eliminar la raza '{codigo}'?"):
             try:
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    # Eliminación física para evitar conflictos de duplicidad ocultos
-                    cursor.execute("DELETE FROM raza WHERE codigo = ?", (codigo,))
-                    conn.commit()
-                messagebox.showinfo("Éxito", "Raza eliminada correctamente.")
+                self.service.cambiar_estado_raza(codigo, "Inactivo")
+                messagebox.showinfo("Éxito", "Raza eliminada.")
                 self.cargar_razas()
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
+                messagebox.showerror("Error", f"No se pudo eliminar: {str(e)}")
 
     def limpiar_formulario(self):
+        self.editando_codigo = None
+        self.entry_codigo.configure(state="normal")
         self.entry_codigo.delete(0, "end")
         self.entry_nombre.delete(0, "end")
         self.text_descripcion.delete("1.0", "end")
@@ -353,8 +241,8 @@ class RazasFrame(ctk.CTkFrame):
             self.menu_contextual.post(event.x_root, event.y_root)
 
     def importar_excel(self):
-        """Importar razas desde Excel usando el util genérico.
-        Se esperan encabezados con al menos 'codigo' y 'nombre'.
+        """Importar razas desde Excel.
+        Se esperan encabezados: codigo,nombre,tipo_ganado,especie,descripcion
         """
         ruta = filedialog.askopenfilename(title="Seleccionar archivo Excel", filetypes=[("Excel files", "*.xlsx *.xls"), ("Todos los archivos", "*.*")])
         if not ruta:
@@ -371,72 +259,35 @@ class RazasFrame(ctk.CTkFrame):
 
         primera = filas[0]
         if 'codigo' not in primera or 'nombre' not in primera:
-            messagebox.showerror("Error", "El archivo debe tener columnas con encabezados 'codigo' y 'nombre'.")
+            messagebox.showerror("Error", "El archivo debe tener columnas 'codigo' y 'nombre'.")
             return
-
-        # Preguntar si desea simular la importación (modo dry-run)
-        simular = messagebox.askyesno("Simular importación", "¿Desea simular la importación?\n(Si selecciona 'Sí' se validarán los datos pero no se guardarán en la base de datos)")
 
         importados = 0
         errores = []
 
-        # Función interna para validar una fila y devolver (ok, mensaje_error)
-        def validar_fila(idx, fila):
-            codigo_val = fila.get('codigo')
-            nombre_val = fila.get('nombre')
-            codigo = (codigo_val or "").strip() if isinstance(codigo_val, str) else (str(codigo_val) if codigo_val is not None else "")
-            nombre = (nombre_val or "").strip() if isinstance(nombre_val, str) else (str(nombre_val) if nombre_val is not None else "")
-            if not codigo or not nombre:
-                return False, f"Fila {idx}: falta código o nombre"
-            return True, None
-
         try:
-            if simular:
-                # Solo validar filas
-                for idx, fila in enumerate(filas, start=2):
-                    ok, err = validar_fila(idx, fila)
-                    if ok:
-                        importados += 1
-                    else:
-                        errores.append(err)
+            for idx, fila in enumerate(filas, start=2):
+                codigo = str(fila.get('codigo') or "").strip()
+                nombre = str(fila.get('nombre') or "").strip()
+                tipo_ganado = str(fila.get('tipo_ganado') or fila.get('tipo') or "").strip() or None
+                especie = str(fila.get('especie') or "").strip() or None
+                descripcion = str(fila.get('descripcion') or "").strip() or None
 
-                mensaje = f"Simulación finalizada. Filas válidas: {importados}. Errores: {len(errores)}"
-                if errores:
-                    mensaje += "\nPrimeros errores:\n" + "\n".join(errores[:10])
-                messagebox.showinfo("Simulación", mensaje)
-                return
+                if not codigo or not nombre:
+                    errores.append(f"Fila {idx}: faltan campos requeridos (codigo o nombre)")
+                    continue
 
-            # Modo real: insertar en la BD
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                for idx, fila in enumerate(filas, start=2):
-                    ok, err = validar_fila(idx, fila)
-                    if not ok:
-                        errores.append(err)
+                try:
+                    if self.service.existe_raza(codigo):
+                        errores.append(f"Fila {idx}: raza con código '{codigo}' ya existe")
                         continue
 
-                    codigo = (fila.get('codigo') or "").strip() if isinstance(fila.get('codigo'), str) else (str(fila.get('codigo')) if fila.get('codigo') is not None else "")
-                    nombre = (fila.get('nombre') or "").strip() if isinstance(fila.get('nombre'), str) else (str(fila.get('nombre')) if fila.get('nombre') is not None else "")
-                    try:
-                        cursor.execute(
-                            """
-                            INSERT INTO raza (codigo, nombre, tipo_ganado, especie, descripcion, estado)
-                            VALUES (?, ?, ?, ?, ?, 'Activa')
-                        """,
-                            (
-                                codigo,
-                                nombre,
-                                fila.get('tipo_ganado') or fila.get('tipo') or None,
-                                fila.get('especie') or None,
-                                fila.get('descripcion') or None
-                            )
-                        )
-                        importados += 1
-                    except sqlite3.IntegrityError:
-                        errores.append(f"Fila {idx}: código o nombre duplicado ({codigo})")
-                    except Exception as e:
-                        errores.append(f"Fila {idx}: {e}")
-                conn.commit()
+                    self.service.crear_raza(codigo, nombre, tipo_ganado, especie, descripcion)
+                    importados += 1
+                except ValueError as e:
+                    errores.append(f"Fila {idx}: {str(e)}")
+                except Exception as e:
+                    errores.append(f"Fila {idx}: {str(e)}")
 
             mensaje = f"Importación finalizada. Importados: {importados}. Errores: {len(errores)}"
             if errores:

@@ -1,12 +1,14 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
+from typing import Any
 import os
 import sqlite3
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from database import get_db_connection
+from infraestructura.animales.animal_service import AnimalService
+from database.database import get_db_connection
 from modules.utils.units_helper import units_helper
 from modules.utils.date_picker import attach_date_picker
 from modules.utils.ui import add_tooltip
@@ -32,6 +34,10 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 def warning(self, *a, **k): pass
                 def error(self, *a, **k): pass
             self.logger = _DummyLogger()
+        # Inicializar servicio de animales (FASE 8.3: reemplaza acceso directo a BD)
+        self.animal_service = AnimalService()
+        # Placeholder para switch de autocomplete global (UI eliminada, se conserva compatibilidad)
+        self.switch_autocomplete_global: Any | None = None
         self.foto_path = None
         self.crear_widgets()
         self.cargar_datos_combos()
@@ -472,24 +478,23 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 return
         self._force_reload = False
         try:
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Cargar fincas (filtrar inactivas/eliminadas)
-                cursor.execute("SELECT id, nombre, estado FROM finca")
-                raw_fincas = cursor.fetchall()
-                excluir = {'eliminada','eliminado','inactiva','inactivo'}
-                finca_rows = [r for r in raw_fincas if (r[2] or '').lower() not in excluir]
-                if not finca_rows:
-                    finca_rows = raw_fincas  # fallback si quedara vacío tras filtro
-                # Construir valores visibles con ID-prefijo: "<id> - <nombre>"
-                fincas = [f"{row[0]} - {row[1]}" for row in finca_rows]
-                # Mapas para uso interno
-                self._finca_id_map = {row[1]: row[0] for row in finca_rows}
-                self._finca_display_to_id = {f"{row[0]} - {row[1]}": row[0] for row in finca_rows}
-                # Leer finca por defecto usando ID almacenado
-                default_finca_key = None
-                try:
+            # Cargar fincas usando AnimalService (FASE 8.3)
+            raw_fincas = self.animal_service.cargar_fincas()
+            excluir = {'eliminada','eliminado','inactiva','inactivo'}
+            finca_rows = [r for r in raw_fincas if (r.get('estado') or '').lower() not in excluir]
+            if not finca_rows:
+                finca_rows = raw_fincas  # fallback si quedara vacío tras filtro
+            # Construir valores visibles con ID-prefijo: "<id> - <nombre>"
+            fincas = [f"{row['id']} - {row['nombre']}" for row in finca_rows]
+            # Mapas para uso interno
+            self._finca_id_map = {row['nombre']: row['id'] for row in finca_rows}
+            self._finca_display_to_id = {f"{row['id']} - {row['nombre']}": row['id'] for row in finca_rows}
+            # Leer finca por defecto (LEGACY: se requiere get_db_connection para app_settings)
+            default_finca_key = None
+            try:
+                from database.database import get_db_connection as _legacy_get_db
+                with _legacy_get_db() as conn:
+                    cursor = conn.cursor()
                     cursor.execute("SELECT valor FROM app_settings WHERE clave = 'default_finca_id'")
                     row = cursor.fetchone()
                     if row and row[0]:
@@ -498,44 +503,42 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                             if _id == dfid:
                                 default_finca_key = nombre
                                 break
-                except Exception:
-                    pass
-                
-                # Cargar razas (ampliar criterios)
-                cursor.execute("SELECT id, nombre, estado FROM raza")
-                raw_razas = cursor.fetchall()
-                raza_rows = [r for r in raw_razas if (r[2] or '').lower() not in ('inactiva','eliminada')]
-                if not raza_rows:
-                    raza_rows = raw_razas
-                razas = [f"{row[0]} - {row[1]}" for row in raza_rows]
-                self._raza_id_map = {row[1]: row[0] for row in raza_rows}
-                self._raza_display_to_id = {f"{row[0]} - {row[1]}": row[0] for row in raza_rows}
-                
-                # Cargar condiciones corporales desde BD
-                cursor.execute("SELECT codigo, descripcion FROM condicion_corporal WHERE estado='Activo' ORDER BY codigo")
-                condicion_rows = cursor.fetchall()
-                condiciones = [f"{row[0]} - {row[1]}" for row in condicion_rows]
-                self._condicion_map = {f"{row[0]} - {row[1]}": row[0] for row in condicion_rows}
-                
-                # No cargar padres globales; se cargarán al elegir finca
-                madres = []
-                padres = []
-                self._madre_id_map = {}
-                self._padre_id_map = {}
-                
-                # No cargar procedencias/vendedores globales; se filtrarán por finca si existe FK
-                procedencias = []
-                vendedores = []
-                self._procedencia_id_map = {}
-                self._vendedor_id_map = {}
-                
-                # No cargar potreros/lotes/grupos hasta elegir finca
-                potreros = []
-                lotes = []
-                grupos = []
-                self._potrero_id_map = {}
-                self._lote_id_map = {}
-                self._grupo_id_map = {}
+            except Exception:
+                pass
+            
+            # Cargar razas usando AnimalService (FASE 8.3)
+            raw_razas = self.animal_service.cargar_razas()
+            raza_rows = [r for r in raw_razas if (r.get('estado') or '').lower() not in ('inactiva','eliminada')]
+            if not raza_rows:
+                raza_rows = raw_razas
+            razas = [f"{row['id']} - {row['nombre']}" for row in raza_rows]
+            self._raza_id_map = {row['nombre']: row['id'] for row in raza_rows}
+            self._raza_display_to_id = {f"{row['id']} - {row['nombre']}": row['id'] for row in raza_rows}
+            
+            # Cargar condiciones corporales usando AnimalService (FASE 8.3)
+            condicion_rows = self.animal_service.cargar_condiciones_corporales()
+            condiciones = [f"{row['codigo']} - {row['descripcion']}" for row in condicion_rows]
+            self._condicion_map = {f"{row['codigo']} - {row['descripcion']}": row['codigo'] for row in condicion_rows}
+            
+            # No cargar padres globales; se cargarán al elegir finca
+            madres = []
+            padres = []
+            self._madre_id_map = {}
+            self._padre_id_map = {}
+            
+            # No cargar procedencias/vendedores globales; se filtrarán por finca si existe FK
+            procedencias = []
+            vendedores = []
+            self._procedencia_id_map = {}
+            self._vendedor_id_map = {}
+            
+            # No cargar potreros/lotes/grupos hasta elegir finca
+            potreros = []
+            lotes = []
+            grupos = []
+            self._potrero_id_map = {}
+            self._lote_id_map = {}
+            self._grupo_id_map = {}
                 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los datos:\n{e}")
@@ -735,12 +738,19 @@ class RegistroAnimalFrame(ctk.CTkFrame):
 
     def _init_global_autocomplete_switch(self):
         modo = self._get_autocomplete_mode()
+        switch = getattr(self, 'switch_autocomplete_global', None)
         if modo == 'startswith':
-            try: self.switch_autocomplete_global.select()
-            except Exception: pass
+            try:
+                if switch:
+                    switch.select()
+            except Exception:
+                pass
         else:
-            try: self.switch_autocomplete_global.deselect()
-            except Exception: pass
+            try:
+                if switch:
+                    switch.deselect()
+            except Exception:
+                pass
 
     def _apply_mode_all_combos(self, modo: str):
         combos = [
@@ -757,8 +767,9 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                     pass
 
     def _toggle_global_autocomplete_mode(self):
+        switch = getattr(self, 'switch_autocomplete_global', None)
         try:
-            estado = self.switch_autocomplete_global.get()
+            estado = switch.get() if switch is not None else 0
         except Exception:
             estado = 0
         modo = 'startswith' if estado == 1 else 'contains'
@@ -791,107 +802,69 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             if finca_id is None:
                 return
             
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                # Detectar nombre de columna FK hacia finca para cada tabla
-                def _fk_col(tabla):
-                    try:
-                        cursor.execute(f"PRAGMA table_info({tabla})")
-                        cols = [r[1] for r in cursor.fetchall()]
-                        for cand in ("id_finca", "finca_id"):
-                            if cand in cols:
-                                return cand
-                    except Exception:
-                        return None
-                    return None
+            # Cargar madres usando AnimalService (FASE 8.3)
+            try:
+                madre_list = self.animal_service.cargar_madres_por_finca(finca_id)
+                madres = [f"{row['codigo']} ({row['nombre'] or 'Sin nombre'})" for row in madre_list]
+                self._madre_id_map = {f"{row['codigo']} ({row['nombre'] or 'Sin nombre'})": row['id'] for row in madre_list}
+                padre_list = self.animal_service.cargar_padres_por_finca(finca_id)
+                padres = [f"{row['codigo']} ({row['nombre'] or 'Sin nombre'})" for row in padre_list]
+                self._padre_id_map = {f"{row['codigo']} ({row['nombre'] or 'Sin nombre'})": row['id'] for row in padre_list}
+            except Exception:
+                madres, padres = [], []
 
-                potrero_fk = _fk_col("potrero") or "id_finca"  # potrero migraciones usan id_finca
-                lote_fk = _fk_col("lote") or "finca_id"        # migración 008D usa finca_id
-                grupo_fk = _fk_col("grupo")  # Puede no existir relación
+            # Cargar potreros filtrados usando AnimalService (FASE 8.3)
+            try:
+                potrero_list = self.animal_service.cargar_potreros_por_finca(finca_id)
+                potreros = [row['nombre'] for row in potrero_list]
+                self._potrero_id_map = {row['nombre']: row['id'] for row in potrero_list}
+            except Exception:
+                potreros = []
+                self._potrero_id_map = {}
+            
+            # Cargar lotes filtrados usando AnimalService (FASE 8.3)
+            try:
+                lote_list = self.animal_service.cargar_lotes_por_finca(finca_id)
+                lotes = [row['nombre'] for row in lote_list]
+                self._lote_id_map = {row['nombre']: row['id'] for row in lote_list}
+            except Exception:
+                lotes = []
+                self._lote_id_map = {}
+            
+            # Cargar sectores filtrados usando AnimalService (FASE 8.3)
+            grupos = []  # reutilizamos variable 'grupos' para minimizar cambios posteriores
+            try:
+                sector_list = self.animal_service.cargar_sectores_por_finca(finca_id)
+                grupos = [row['nombre'] for row in sector_list]
+                # Mapa de sectores (usamos nombre de variable legacy para compatibilidad en resto del código)
+                self._sector_id_map = {row['nombre']: row['id'] for row in sector_list}
+            except Exception:
+                grupos = []
+                self._sector_id_map = {}
 
-                # Cargar padres (animales activos en esa finca)
-                try:
-                    cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado='Activo' AND sexo='Hembra' AND id_finca=?", (finca_id,))
-                    madre_rows = cursor.fetchall()
-                    madres = [f"{row[1]} ({row[2] or 'Sin nombre'})" for row in madre_rows]
-                    self._madre_id_map = {f"{row[1]} ({row[2] or 'Sin nombre'})": row[0] for row in madre_rows}
-                    cursor.execute("SELECT id, codigo, nombre FROM animal WHERE estado='Activo' AND sexo='Macho' AND id_finca=?", (finca_id,))
-                    padre_rows = cursor.fetchall()
-                    padres = [f"{row[1]} ({row[2] or 'Sin nombre'})" for row in padre_rows]
-                    self._padre_id_map = {f"{row[1]} ({row[2] or 'Sin nombre'})": row[0] for row in padre_rows}
-                except Exception:
-                    madres, padres = [], []
-
-                # Cargar potreros filtrados
-                potrero_sql = f"SELECT id, nombre FROM potrero WHERE {potrero_fk} = ? AND (estado = 'Activo' OR estado = 'Disponible') ORDER BY nombre" if potrero_fk else "SELECT id, nombre FROM potrero WHERE (estado = 'Activo' OR estado = 'Disponible') ORDER BY nombre"
-                params_potrero = (finca_id,) if potrero_fk else ()
-                cursor.execute(potrero_sql, params_potrero)
-                potrero_rows = cursor.fetchall()
-                potreros = [row[1] for row in potrero_rows]
-                self._potrero_id_map = {row[1]: row[0] for row in potrero_rows}
-                # Cargar lotes filtrados
-                lote_sql = f"SELECT id, nombre FROM lote WHERE {lote_fk} = ? ORDER BY nombre" if lote_fk else "SELECT id, nombre FROM lote ORDER BY nombre"
-                params_lote = (finca_id,) if lote_fk else ()
-                try:
-                    cursor.execute(lote_sql, params_lote)
-                    lote_rows = cursor.fetchall()
-                except sqlite3.Error as e:
-                    # Fallback sin filtro si columna no existe por algún motivo
-                    cursor.execute("SELECT id, nombre FROM lote ORDER BY nombre")
-                    lote_rows = cursor.fetchall()
-                lotes = [row[1] for row in lote_rows]
-                self._lote_id_map = {row[1]: row[0] for row in lote_rows}
-                
-                # Cargar sectores filtrados (reemplaza uso de grupos en UI)
-                grupos = []  # reutilizamos variable 'grupos' para minimizar cambios posteriores
-                try:
-                    cursor.execute("SELECT id, nombre FROM sector WHERE finca_id = ? AND estado='Activo' ORDER BY nombre", (finca_id,))
-                    sector_rows = cursor.fetchall()
-                    grupos = [row[1] for row in sector_rows]
-                    # Mapa de sectores (usamos nombre de variable legacy para compatibilidad en resto del código)
-                    self._sector_id_map = {row[1]: row[0] for row in sector_rows}
-                except Exception:
-                    pass
-
-                # Cargar origen unificado si existe tabla 'origen'; si no, usar procedencia/vendedor
+            # Cargar procedencias y vendedores usando AnimalService (FASE 8.3)
+            procedencias = []
+            vendedores = []
+            base_origen = []
+            self._origen_id_map = {}
+            try:
+                # Intentar cargar procedencias
+                proc_list = self.animal_service.cargar_procedencias(finca_id)
+                procedencias = [r['descripcion'] for r in proc_list]
+                self._procedencia_id_map = {r['descripcion']: r['id'] for r in proc_list}
+                if not procedencias:
+                    # Si no hay procedencias, cargar vendedores
+                    vend_list = self.animal_service.cargar_vendedores(finca_id)
+                    vendedores = [r['nombre'] for r in vend_list]
+                    self._vendedor_id_map = {r['nombre']: r['id'] for r in vend_list}
+                else:
+                    vendedores = []
+                    self._vendedor_id_map = {}
+            except Exception:
                 procedencias = []
                 vendedores = []
-                base_origen = []
-                self._origen_id_map = {}
-                try:
-                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='origen'")
-                    if cursor.fetchone():
-                        # Usar origen consolidado
-                        cursor.execute("SELECT id, tipo, nombre FROM origen WHERE (id_finca = ? OR id_finca IS NULL) AND estado='Activo' ORDER BY nombre", (finca_id,))
-                        origen_rows = cursor.fetchall()
-                        base_origen = [r[2] for r in origen_rows]
-                        self._origen_id_map = {r[2]: r[0] for r in origen_rows}
-                    else:
-                        # Procedencia + vendedor legacy
-                        proc_fk = _fk_col("procedencia")
-                        vend_fk = _fk_col("vendedor")
-                        if proc_fk:
-                            cursor.execute(f"SELECT id, descripcion FROM procedencia WHERE {proc_fk}=? AND (estado='Activo' OR estado IS NULL) ORDER BY descripcion", (finca_id,))
-                        else:
-                            cursor.execute("SELECT id, descripcion FROM procedencia WHERE estado='Activo' OR estado IS NULL ORDER BY descripcion")
-                        proc_rows = cursor.fetchall()
-                        procedencias = [r[1] for r in proc_rows]
-                        self._procedencia_id_map = {r[1]: r[0] for r in proc_rows}
-                        if not procedencias:
-                            if vend_fk:
-                                cursor.execute(f"SELECT id, nombre FROM vendedor WHERE {vend_fk}=? AND (estado='Activo' OR estado IS NULL) ORDER BY nombre", (finca_id,))
-                            else:
-                                cursor.execute("SELECT id, nombre FROM vendedor WHERE estado='Activo' OR estado IS NULL ORDER BY nombre")
-                            vend_rows = cursor.fetchall()
-                            vendedores = [r[1] for r in vend_rows]
-                            self._vendedor_id_map = {r[1]: r[0] for r in vend_rows}
-                        else:
-                            vendedores = []
-                            self._vendedor_id_map = {}
-                except Exception:
-                    base_origen = []
-                    procedencias = []
-                    vendedores = []
+                self._procedencia_id_map = {}
+                self._vendedor_id_map = {}
                 
                 # Actualizar combos según tipo
                 if tipo == "nac":
@@ -1135,46 +1108,52 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 condicion_nac
             )
             
-            # Insertar en BD
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                # Validar unicidad explícita antes de intentar insertar para mensaje amigable
-                cursor.execute("SELECT 1 FROM animal WHERE codigo = ?", (codigo,))
-                if cursor.fetchone():
-                    messagebox.showerror("Duplicado", f"El código '{codigo}' ya existe.")
-                    return
-                # Validaciones de FK previas para mensajes claros
-                fk_checks = [
-                    (id_finca, 'finca'), (raza_id, 'raza'), (id_potrero, 'potrero'),
-                    (id_lote, 'lote'), (id_sector, 'sector')
-                ]
-                for val, tabla in fk_checks:
-                    if val is not None:
-                        cursor.execute(f"SELECT 1 FROM {tabla} WHERE id=?", (val,))
-                        if cursor.fetchone() is None:
-                            messagebox.showerror("Validación", f"El {tabla} seleccionado no existe.")
-                            return
-
-                cursor.execute("""
-                    INSERT INTO animal (
-                        id_finca, codigo, nombre, tipo_ingreso, sexo, raza_id, id_potrero,
-                        lote_id, id_sector, fecha_nacimiento, fecha_compra, peso_nacimiento,
-                        peso_compra, id_vendedor, precio_compra, id_padre, id_madre,
-                        tipo_concepcion, salud, estado, inventariado, color, hierro,
-                        numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro,
-                        categoria, grupo_compra, condicion_corporal
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, datos_insercion)
-                # Establecer ultimo_peso inicial si se proporcionó peso de nacimiento
-                if peso_nac_kg is not None:
-                    try:
-                        cursor.execute(
-                            "UPDATE animal SET ultimo_peso = ?, fecha_ultimo_peso = ? WHERE codigo = ?",
-                            (peso_nac_kg, datetime.now().strftime('%Y-%m-%d'), codigo)
-                        )
-                    except Exception:
-                        pass
-                conn.commit()
+            # Insertar en BD usando AnimalService (FASE 8.3)
+            try:
+                # Construir diccionario de datos para el servicio
+                datos_insercion_dict = {
+                    'id_finca': id_finca,
+                    'codigo': codigo,
+                    'nombre': nombre,
+                    'tipo_ingreso': 'Nacimiento',
+                    'sexo': sexo,
+                    'raza_id': raza_id,
+                    'id_potrero': id_potrero,
+                    'lote_id': id_lote,
+                    'id_sector': id_sector,
+                    'fecha_nacimiento': fecha_nacimiento,
+                    'fecha_compra': None,
+                    'peso_nacimiento': peso_nac_kg,
+                    'peso_compra': None,
+                    'id_vendedor': None,
+                    'precio_compra': None,
+                    'id_padre': id_padre,
+                    'id_madre': id_madre,
+                    'tipo_concepcion': self.combo_concepcion_nac.get(),
+                    'salud': self.combo_salud_nac.get(),
+                    'estado': self.combo_estado_nac.get(),
+                    'inventariado': 0,
+                    'color': self.entry_color_nac.get().strip() or None,
+                    'hierro': self.entry_hierro_nac.get().strip() or None,
+                    'numero_hierros': int(self.entry_num_hierros_nac.get().strip()) if self.entry_num_hierros_nac.get().strip() else 0,
+                    'composicion_racial': self.entry_composicion_nac.get().strip() or None,
+                    'comentarios': self.text_comentarios_nac.get("1.0", "end-1c").strip() or None,
+                    'foto_path': self.foto_path,
+                    'fecha_registro': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'categoria': grupo_nac,
+                    'grupo_compra': grupo_nac,
+                    'condicion_corporal': condicion_nac,
+                    'ultimo_peso': peso_nac_kg,
+                    'fecha_ultimo_peso': datetime.now().strftime('%Y-%m-%d') if peso_nac_kg else None
+                }
+                self.animal_service.registrar_animal(datos_insercion_dict)
+            except ValueError as ve:
+                # Excepciones de validación del servicio (código duplicado, sexo inválido, etc.)
+                messagebox.showerror("Validación", str(ve))
+                return
+            except Exception as e:
+                messagebox.showerror("Error", f"❌ No se pudo guardar el animal:\n{e}")
+                return
                 
             messagebox.showinfo("Éxito", "✅ Animal registrado por nacimiento correctamente.")
             self.limpiar_formulario()
@@ -1225,16 +1204,14 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             if sel_origen in vend_map:
                 id_vendedor = vend_map[sel_origen]
             else:
-                # Si se estuviera mostrando con prefijo "ID - nombre", intentar parsear y validar contra vendedor
+                # Si se estuviera mostrando con prefijo "ID - nombre", intentar parsear y validar contra vendedor map
                 if '-' in sel_origen:
                     try:
                         posible_id = int(sel_origen.split('-', 1)[0].strip())
-                        # Validar que exista en vendedor
-                        with get_db_connection() as _c:
-                            _cu = _c.cursor()
-                            _cu.execute("SELECT 1 FROM vendedor WHERE id=?", (posible_id,))
-                            if _cu.fetchone():
-                                id_vendedor = posible_id
+                        # Validar que exista en el mapa de vendedores ya cargado
+                        vendor_map = getattr(self, '_vendedor_id_map', {})
+                        if any(vid == posible_id for vid in vendor_map.values()):
+                            id_vendedor = posible_id
                     except Exception:
                         id_vendedor = None
             id_potrero = extraer_id(self.combo_potrero_comp.get(), getattr(self, '_potrero_id_map', None))
@@ -1291,44 +1268,52 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                 condicion_comp
             )
             
-            # Insertar en BD
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1 FROM animal WHERE codigo = ?", (codigo,))
-                if cursor.fetchone():
-                    messagebox.showerror("Duplicado", f"El código '{codigo}' ya existe.")
-                    return
-                # Validaciones de FK previas para mensajes claros
-                fk_checks = [
-                    (id_finca, 'finca'), (raza_id, 'raza'), (id_potrero, 'potrero'),
-                    (id_lote, 'lote'), (id_sector, 'sector'), (id_vendedor, 'vendedor')
-                ]
-                for val, tabla in fk_checks:
-                    if val is not None:
-                        cursor.execute(f"SELECT 1 FROM {tabla} WHERE id=?", (val,))
-                        if cursor.fetchone() is None:
-                            messagebox.showerror("Validación", f"El {tabla} seleccionado no existe.")
-                            return
-                cursor.execute("""
-                    INSERT INTO animal (
-                        id_finca, codigo, nombre, tipo_ingreso, sexo, raza_id, id_potrero,
-                        lote_id, id_sector, fecha_nacimiento, fecha_compra, peso_nacimiento,
-                        peso_compra, id_vendedor, precio_compra, id_padre, id_madre,
-                        tipo_concepcion, salud, estado, inventariado, color, hierro,
-                        numero_hierros, composicion_racial, comentarios, foto_path, fecha_registro,
-                        categoria, grupo_compra, condicion_corporal
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, datos_insercion)
-                # Establecer ultimo_peso inicial si se proporcionó peso de compra
-                if peso_comp_kg is not None:
-                    try:
-                        cursor.execute(
-                            "UPDATE animal SET ultimo_peso = ?, fecha_ultimo_peso = ? WHERE codigo = ?",
-                            (peso_comp_kg, datetime.now().strftime('%Y-%m-%d'), codigo)
-                        )
-                    except Exception:
-                        pass
-                conn.commit()
+            # Insertar en BD usando AnimalService (FASE 8.3)
+            try:
+                # Construir diccionario de datos para el servicio
+                datos_insercion_dict = {
+                    'id_finca': id_finca,
+                    'codigo': codigo,
+                    'nombre': nombre,
+                    'tipo_ingreso': 'Compra',
+                    'sexo': sexo,
+                    'raza_id': raza_id,
+                    'id_potrero': id_potrero,
+                    'lote_id': id_lote,
+                    'id_sector': id_sector,
+                    'fecha_nacimiento': fecha_nacimiento,
+                    'fecha_compra': fecha_compra,
+                    'peso_nacimiento': None,
+                    'peso_compra': peso_comp_kg,
+                    'id_vendedor': id_vendedor,
+                    'precio_compra': float(self.entry_precio.get()) if self.entry_precio.get().strip() else None,
+                    'id_padre': None,
+                    'id_madre': None,
+                    'tipo_concepcion': None,
+                    'salud': self.combo_salud_comp.get(),
+                    'estado': self.combo_estado_comp.get(),
+                    'inventariado': 0,
+                    'color': self.entry_color_comp.get().strip() or None,
+                    'hierro': self.entry_hierro_comp.get().strip() or None,
+                    'numero_hierros': int(self.entry_num_hierros_comp.get().strip()) if self.entry_num_hierros_comp.get().strip() else 0,
+                    'composicion_racial': self.entry_composicion_comp.get().strip() or None,
+                    'comentarios': self.text_comentarios_comp.get("1.0", "end-1c").strip() or None,
+                    'foto_path': self.foto_path,
+                    'fecha_registro': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'categoria': grupo_comp,
+                    'grupo_compra': grupo_comp,
+                    'condicion_corporal': condicion_comp,
+                    'ultimo_peso': peso_comp_kg,
+                    'fecha_ultimo_peso': datetime.now().strftime('%Y-%m-%d') if peso_comp_kg else None
+                }
+                self.animal_service.registrar_animal(datos_insercion_dict)
+            except ValueError as ve:
+                # Excepciones de validación del servicio (código duplicado, sexo inválido, etc.)
+                messagebox.showerror("Validación", str(ve))
+                return
+            except Exception as e:
+                messagebox.showerror("Error", f"❌ No se pudo guardar el animal:\n{e}")
+                return
                 
             messagebox.showinfo("Éxito", "✅ Animal registrado por compra correctamente.")
             self.limpiar_formulario()
@@ -1414,13 +1399,20 @@ class RegistroAnimalFrame(ctk.CTkFrame):
             
             for r in registros_compra:
                 try:
+                    finca_nombre = r.get('finca') or ""
+                    raza_nombre = r.get('raza') or ""
+                    potrero_nombre = r.get('potrero') or ""
+                    lote_nombre = r.get('lote') or ""
+                    sector_nombre = r.get('sector') or ""
+                    vendedor_nombre = r.get('vendedor') or ""
+
                     # Resolución de IDs usando helpers case-insensitive
-                    id_finca = buscar_finca_id(cur, r.get('finca'))
-                    raza_id = buscar_raza_id(cur, r.get('raza'))
-                    id_potrero = buscar_potrero_id(cur, r.get('potrero'), id_finca)
-                    id_lote = buscar_lote_id(cur, r.get('lote'))
-                    id_sector = buscar_sector_id(cur, r.get('sector'))
-                    id_vendedor = buscar_vendedor_id(cur, r.get('vendedor'))
+                    id_finca = buscar_finca_id(cur, finca_nombre)
+                    raza_id = buscar_raza_id(cur, raza_nombre)
+                    id_potrero = buscar_potrero_id(cur, potrero_nombre, id_finca or -1)
+                    id_lote = buscar_lote_id(cur, lote_nombre)
+                    id_sector = buscar_sector_id(cur, sector_nombre)
+                    id_vendedor = buscar_vendedor_id(cur, vendedor_nombre)
 
                     cur.execute("""
                         INSERT INTO animal (
@@ -1475,8 +1467,9 @@ class RegistroAnimalFrame(ctk.CTkFrame):
                     pass
             _collect(parent)
             # Fallback: atributo frame_inventario con métodos de refresco antiguos
-            if hasattr(parent, 'frame_inventario'):
-                objetivos.append(parent.frame_inventario)
+            frame_inv = getattr(parent, 'frame_inventario', None)
+            if frame_inv is not None:
+                objetivos.append(frame_inv)
             usados = 0
             for obj in objetivos:
                 if hasattr(obj, 'refrescar_inventario_externo'):

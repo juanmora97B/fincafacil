@@ -3,6 +3,7 @@ Sistema Principal FincaFacil
 Módulo unificado para la gestión integral de fincas ganaderas
 """
 
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -11,17 +12,30 @@ from pathlib import Path
 if getattr(sys, 'frozen', False):
     # Ejecutándose como ejecutable empaquetado
     current_dir = Path(sys.executable).parent
-    base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else current_dir  # type: ignore
+    base_path = Path(getattr(sys, '_MEIPASS', current_dir))  # type: ignore
 else:
     # Ejecutándose como script Python
     current_dir = Path(__file__).parent
     base_path = current_dir
 
+
+def _write_startup_log(msg: str) -> None:
+    """Escribe mensajes tempranos en un log para depurar arranques fallidos."""
+    try:
+        base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
+        log_dir = Path(base) / "FincaFacil" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with open(log_dir / "startup.log", "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
+
 # Agregar el directorio raíz al path para imports absolutos
 # NOTA: El orden importa. insert(0, ...) inserta al INICIO
 # Si haces insert(0, x) luego insert(0, y), y termina ANTES que x
-sys.path.insert(0, str(current_dir / "src"))  # Primero src/
-sys.path.insert(0, str(current_dir))  # Luego raíz (quedará en posición 0)
+sys.path.insert(0, str(base_path / "src"))  # Primero src/ extraído (_MEIPASS o repo)
+sys.path.insert(0, str(base_path))  # Luego raíz de extracción
+sys.path.insert(0, str(current_dir))  # Por compatibilidad con ejecuciones locales
 
 # Importaciones de módulos
 try:
@@ -51,12 +65,19 @@ try:
     print("DEBUG: Importando config...")
     from config import config
     print("DEBUG: OK - Config")
+
+    print("DEBUG: Importando ciclo de vida y permisos...")
+    from core.app_lifecycle import get_app_lifecycle
+    from core.permissions_manager import get_permissions_manager, RoleEnum, PermissionEnum
+    print("DEBUG: OK - Ciclo de vida y permisos")
     
 except ImportError as e:
-    # Logger aun no disponible, usar print como ultima opcion
-    import traceback
-    print("ERROR CRITICO: No se pueden importar modulos necesarios: " + str(e))
+    # Logger aun no disponible, registrar en archivo de arranque
+    msg = f"ERROR CRITICO: No se pueden importar modulos necesarios: {e}"
+    print(msg)
     traceback.print_exc()
+    _write_startup_log(msg)
+    _write_startup_log(traceback.format_exc())
     sys.exit(1)
 
 import customtkinter as ctk
@@ -64,7 +85,7 @@ from tkinter import messagebox
 from modules.utils.login_ui import mostrar_login
 
 class FincaFacilApp(ctk.CTk):
-    def __init__(self):
+    def __init__(self, usuario_actual: str | None = None):
         super().__init__()
 
         self.title("FincaFácil 🐄 - Gestión Ganadera Profesional")
@@ -98,6 +119,20 @@ class FincaFacilApp(ctk.CTk):
             self.logger.info("Interfaz gráfica iniciada")
         except:
             self.logger = None
+
+        # Gestores centrales
+        self.lifecycle = get_app_lifecycle()
+        self.permissions = get_permissions_manager()
+
+        # Usuario actual (se asigna desde login, fallback admin)
+        self.current_user = usuario_actual or "admin"
+        try:
+            self.permissions.set_current_user(self.current_user, RoleEnum.ADMINISTRADOR)
+        except Exception:
+            pass
+
+        # Hook de cierre seguro
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # ----------- CONTENEDORES PRINCIPALES -----------
         # Frame contenedor del sidebar con estilo mejorado
@@ -157,6 +192,9 @@ class FincaFacilApp(ctk.CTk):
         # Verificar si es el primer uso y mostrar tour
         self.after(1000, self.verificar_primer_uso)
 
+        # Ejecutar detectores AI en segundo plano al inicio
+        self.after(3000, self.ejecutar_ai_startup)
+
         # Crear menú principal
         self.crear_menu_principal()
 
@@ -202,6 +240,38 @@ class FincaFacilApp(ctk.CTk):
         except Exception as e:
             if self.logger:
                 self.logger.warning(f"No se pudo iniciar tour global: {e}")
+
+    def ejecutar_ai_startup(self):
+        """Ejecuta detectores AI en segundo plano al iniciar, sin bloquear UI."""
+        try:
+            from src.services.ai_anomaly_detector import get_ai_anomaly_detector_service
+            from src.services.ai_pattern_detector import get_ai_pattern_detector_service
+            from src.core.audit_service import log_event
+
+            anomaly_service = get_ai_anomaly_detector_service()
+            pattern_service = get_ai_pattern_detector_service()
+
+            anomalies = anomaly_service.evaluar_anomalias(usuario_id=None, incluir_alertas=True)
+            patterns = pattern_service.detectar_patrones(usuario_id=None, incluir_alertas=True)
+
+            if self.logger:
+                self.logger.info(
+                    f"Startup AI: {len(anomalies)} anomalías, {len(patterns)} patrones"
+                )
+            try:
+                log_event(
+                    usuario=self.current_user,
+                    modulo="AI",
+                    accion="EJECUCION_STARTUP",
+                    entidad="inicio",
+                    resultado="OK",
+                    mensaje=f"{len(anomalies)} anomalías; {len(patterns)} patrones"
+                )
+            except Exception:
+                pass
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Startup AI no ejecutado: {e}")
 
     def create_sidebar(self):
         # Header con fondo claro para resaltar el logo
@@ -479,8 +549,12 @@ class FincaFacilApp(ctk.CTk):
                 from modules.nomina.nomina_main import NominaModule
                 self.current_module = NominaModule(self.main_frame)
             elif name == "reportes":
-                from modules.reportes.reportes_main import ReportesModule
-                self.current_module = ReportesModule(self.main_frame)
+                try:
+                    from modules.reportes.reportes_fase3 import ReportesFase3
+                    self.current_module = ReportesFase3(self.main_frame)
+                except Exception:
+                    from modules.reportes.reportes_main import ReportesModule
+                    self.current_module = ReportesModule(self.main_frame)
             elif name == "configuracion":
                 from modules.configuracion.__main__ import ConfiguracionModule
                 self.current_module = ConfiguracionModule(self.main_frame)
@@ -558,35 +632,68 @@ class FincaFacilApp(ctk.CTk):
         return frame
 
     def on_closing(self):
-        """Maneja el cierre de la aplicación con backup automático"""
+        """Cierre controlado con validaciones, backup y auditoría"""
         try:
-            # Verificar si es necesario hacer backup automático
-            if self._necesita_backup_automatico():
-                respuesta = messagebox.askyesno(
-                    "Backup Automático",
-                    "Han pasado más de 24 horas desde el último backup.\n\n"
-                    "¿Desea crear un backup de seguridad antes de salir?",
-                    icon='question'
+            # 1) Validaciones y cierres pendientes (lifecycle)
+            import asyncio
+            try:
+                result = asyncio.run(self.lifecycle.on_app_close(usuario_id=self.current_user))
+            except RuntimeError:
+                # Si ya hay un loop (poco probable en Tk), usar run_until_complete
+                loop = asyncio.get_event_loop()
+                result = loop.run_until_complete(self.lifecycle.on_app_close(usuario_id=self.current_user))
+
+            if not result:
+                messagebox.showwarning(
+                    "Cierre cancelado",
+                    "No se pudo cerrar la aplicación. Revisa operaciones pendientes o cierres mensuales."
                 )
-                
-                if respuesta:
-                    self._hacer_backup_automatico()
-            
+                return
+
+            # 2) Backup automático (mantener lógica previa)
+            try:
+                if self._necesita_backup_automatico():
+                    respuesta = messagebox.askyesno(
+                        "Backup Automático",
+                        "Han pasado más de 24 horas desde el último backup.\n\n"
+                        "¿Desea crear un backup de seguridad antes de salir?",
+                        icon='question'
+                    )
+                    if respuesta:
+                        self._hacer_backup_automatico()
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"Backup automático falló: {e}")
+
+            # 3) Auditoría de cierre
+            try:
+                from core.audit_service import log_event
+                log_event(
+                    usuario=self.current_user,
+                    modulo="app",
+                    accion="CIERRE",
+                    entidad="application",
+                    resultado="OK",
+                    mensaje="Aplicación cerrada"
+                )
+            except Exception:
+                pass
+
             if self.logger:
                 self.logger.info("Aplicación cerrada por el usuario")
-            
-            # Cancelar todos los callbacks pendientes del after
+
+            # 4) Cancelar callbacks pendientes
             for after_id in self.tk.eval('after info').split():
                 try:
                     self.after_cancel(after_id)
-                except:
+                except Exception:
                     pass
-                    
+
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Error en cierre de aplicación: {e}")
         finally:
-            self.quit()  # Usar quit() en lugar de destroy() para limpiar el event loop
+            self.quit()
             self.destroy()
 
     # ------------------- Helpers de barra de estado (deshabilitado para ahorrar espacio) -------------------
@@ -605,7 +712,7 @@ class FincaFacilApp(ctk.CTk):
             from pathlib import Path
             from datetime import datetime, timedelta
             
-            backup_dir = Path("backup")
+            backup_dir = config.BACKUP_DIR
             if not backup_dir.exists():
                 return True  # Si no hay carpeta de backup, crear uno
             
@@ -634,12 +741,13 @@ class FincaFacilApp(ctk.CTk):
             from datetime import datetime
             
             # Rutas
-            db_path = Path("database/fincafacil.db")
-            if not db_path.exists():
+            from database.database import get_db_path_safe
+            db_path = get_db_path_safe()
+            if not db_path or not db_path.exists():
                 return
             
-            backup_dir = Path("backup")
-            backup_dir.mkdir(exist_ok=True)
+            backup_dir = config.BACKUP_DIR
+            backup_dir.mkdir(exist_ok=True, parents=True)
             
             # Nombre del backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -647,14 +755,14 @@ class FincaFacilApp(ctk.CTk):
             backup_path = backup_dir / backup_name
             
             # Copiar base de datos
-            shutil.copy2(db_path, backup_path)
+            shutil.copy2(str(db_path), str(backup_path))
             
             if self.logger:
                 self.logger.info(f"Backup automático creado: {backup_name}")
             
             messagebox.showinfo(
                 "Backup Creado",
-                f"✅ Backup automático creado exitosamente:\n{backup_name}"
+                f"[OK] Backup automatico creado exitosamente:\n{backup_name}"
             )
             
         except Exception as e:
@@ -727,7 +835,7 @@ def inicializar_sistema():
         except Exception as mig_e2:
             logger.warning(f"No se pudo asegurar esquema completo: {mig_e2}")
         
-        logger.info("✅ Sistema inicializado correctamente")
+        logger.info("[OK] Sistema inicializado correctamente")
         return True
         
     except Exception as e:
@@ -744,7 +852,7 @@ def main():
     try:
         # Configurar logging desde el inicio
         logger = setup_logger()
-        logger.info("🚀 Iniciando FincaFacil...")
+        logger.info("[START] Iniciando FincaFacil...")
         
         # Verificar dependencias
         logger.info("Verificando dependencias del sistema...")
@@ -772,8 +880,7 @@ def main():
         logger.info(f"Usuario '{usuario_logueado}' ha iniciado sesión")
         
         # Ejecutar aplicación
-        app = FincaFacilApp()
-        app.protocol("WM_DELETE_WINDOW", app.on_closing)
+        app = FincaFacilApp(usuario_logueado)
         app.mainloop()
         
         logger.info("👋 FincaFacil finalizado correctamente")
